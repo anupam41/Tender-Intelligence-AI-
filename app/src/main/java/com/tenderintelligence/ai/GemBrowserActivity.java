@@ -23,38 +23,44 @@ public class GemBrowserActivity extends Activity {
   super.onCreate(bundle);
   getWindow().setStatusBarColor(Color.rgb(6,10,18));
   LinearLayout page=new LinearLayout(this);page.setOrientation(1);page.setBackgroundColor(Color.rgb(6,10,18));setContentView(page);page.setOnApplyWindowInsetsListener((v,insets)->{int top=android.os.Build.VERSION.SDK_INT>=30?insets.getInsets(android.view.WindowInsets.Type.statusBars()).top:insets.getSystemWindowInsetTop();v.setPadding(0,top,0,0);return insets;});
-  TextView heading=new TextView(this);heading.setText("GeM Bid Search");heading.setTextSize(19);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(Color.WHITE);heading.setPadding(16,16,16,8);page.addView(heading);
-  TextView note=new TextView(this);note.setText("Browse GeM pages manually. Use GeM's search and pagination. This browser does not automatically download or analyze tenders.");note.setTextColor(Color.LTGRAY);note.setPadding(16,0,16,8);page.addView(note);
+  TextView heading=new TextView(this);heading.setText("GeM Bid Search");heading.setTextSize(19);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(Color.WHITE);heading.setPadding(16,8,16,4);page.addView(heading);
+  TextView note=new TextView(this);note.setText("Choose a keyword, tap Search, then review GeM bid results.");note.setTextColor(Color.LTGRAY);note.setPadding(16,0,16,2);page.addView(note);
   LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.HORIZONTAL);page.addView(controls);
-  Button back=button("Back");controls.addView(back,new LinearLayout.LayoutParams(0,52,1));back.setOnClickListener(v->{if(browser.canGoBack())browser.goBack();else finish();});
+  Button back=button("Back");controls.addView(back,new LinearLayout.LayoutParams(0,40,1));back.setOnClickListener(v->{if(browser.canGoBack())browser.goBack();else finish();});
   Button home=button("GeM home");controls.addView(home,new LinearLayout.LayoutParams(0,52,1));home.setOnClickListener(v->browser.loadUrl(GEM));
   Button reload=button("Reload");controls.addView(reload,new LinearLayout.LayoutParams(0,52,1));reload.setOnClickListener(v->browser.reload());
   Spinner picker=new Spinner(this);
   String[] options={"Choose equipment keyword","Heat exchanger","Condenser","Sample cooler","Oil cooler","SWAS cooler","Air cooler","Water cooler","Tube bundle","U tube bundle","Cooling coil","Chiller","Radiator","Dryer","Heater","Economizer","Ejector","Evaporator","Tank","Pressure vessel"};
-  picker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,options));page.addView(picker);
+  ArrayAdapter<String> pickerAdapter=new ArrayAdapter<String>(this,android.R.layout.simple_spinner_item,options){
+   @Override public View getView(int position,View convertView,android.view.ViewGroup parent){View v=super.getView(position,convertView,parent);if(v instanceof TextView)((TextView)v).setTextColor(Color.WHITE);return v;}
+   @Override public View getDropDownView(int position,View convertView,android.view.ViewGroup parent){View v=super.getDropDownView(position,convertView,parent);if(v instanceof TextView){((TextView)v).setTextColor(Color.BLACK);v.setBackgroundColor(Color.WHITE);}return v;}
+  };pickerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);picker.setAdapter(pickerAdapter);page.addView(picker);
   picker.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> parent){}public void onItemSelected(AdapterView<?> parent,View view,int position,long id){if(position>0)term.setText(options[position]);}});
   LinearLayout findRow=new LinearLayout(this);findRow.setOrientation(LinearLayout.HORIZONTAL);page.addView(findRow);
-  term=new EditText(this);term.setSingleLine(true);term.setTextColor(Color.WHITE);term.setHintTextColor(Color.LTGRAY);term.setHint("Or type equipment keyword");term.setTextSize(14);findRow.addView(term,new LinearLayout.LayoutParams(0,54,1));
+  term=new EditText(this);term.setSingleLine(true);term.setTextColor(Color.WHITE);term.setHintTextColor(Color.LTGRAY);term.setHint("Or type equipment keyword");term.setTextSize(14);findRow.addView(term,new LinearLayout.LayoutParams(0,44,1));
   Button find=button("Search");findRow.addView(find);find.setOnClickListener(v->{
    String q=term.getText().toString().trim();
    if(q.isEmpty()){state.setText("Select or type an equipment keyword first.");return;}
    state.setText("Submitting GeM bid search…");
+   ((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(term.getWindowToken(),0);
+   term.clearFocus();
    String js="(function(){"+
-    "var fields=Array.from(document.querySelectorAll('input[type=text],input[type=search],input:not([type])'));"+
-    "var el=fields.find(e=>{var r=e.getBoundingClientRect();return r.width>80&&r.height>0&&(/keyword|search/i.test((e.placeholder||'')+' '+(e.getAttribute('aria-label')||'')))&&!!e.closest('form, .bid-listing, .search, .search-box, body')});"+
-    "if(!el)return 'SEARCH_FIELD_NOT_FOUND';"+
-    "el.focus();var setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(el,"+org.json.JSONObject.quote(q)+");"+
+    "var inputs=Array.from(document.querySelectorAll('input')).filter(e=>{var r=e.getBoundingClientRect();return r.width>100&&r.height>0&&!e.disabled});"+
+    "var el=inputs.find(e=>/searchBid|search_bid|bid_search|search_bid/i.test((e.id||'')+' '+(e.name||'')))||inputs.find(e=>{var r=e.getBoundingClientRect();var p=e.parentElement;return p&&/contains/i.test((p.parentElement&&p.parentElement.innerText||'').slice(0,90))&&r.width>100})||inputs.find(e=>/heat exchanger|oil cooler|bid listing/i.test(e.value||''))||inputs.filter(e=>/text|search/i.test(e.type||'text')).slice(-1)[0];"+
+    "if(!el)return 'NO_BID_INPUT';"+
+    "var setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(el,"+org.json.JSONObject.quote(q)+");"+
     "el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));"+
-    "var scope=el.closest('form')||el.parentElement;"+
-    "var btn=scope&&scope.querySelector('button[type=submit],input[type=submit],button');"+
-    "if(!btn&&scope&&scope.parentElement)btn=scope.parentElement.querySelector('button[type=submit],button');"+
-    "if(btn){btn.click();return 'SUBMITTED'}"+
-    "if(el.form){if(el.form.requestSubmit)el.form.requestSubmit();else el.form.submit();return 'SUBMITTED'}"+
-    "return 'SEARCH_BUTTON_NOT_FOUND';"+
+    "var parent=el.parentElement;var btn=null;for(var i=0;i<4&&parent;i++,parent=parent.parentElement){"+
+    "var buttons=Array.from(parent.querySelectorAll('button,input[type=submit],a')).filter(e=>{var r=e.getBoundingClientRect();return r.width>0&&r.height>0});"+
+    "btn=buttons.find(e=>/search/i.test((e.title||'')+' '+(e.getAttribute('aria-label')||'')+' '+(e.className||'')+' '+(e.innerText||'')))||buttons.find(e=>e.querySelector('.fa-search,.glyphicon-search,.bi-search,svg'));"+
+    "if(btn)break;}"+
+    "if(!btn)return 'BID_INPUT_SET_BUT_BUTTON_NOT_FOUND';"+
+    "btn.click();return 'SEARCH_CLICKED';"+
     "})()";
    browser.evaluateJavascript(js,result->{
-    if(result.contains("SUBMITTED"))state.setText("GeM search submitted. Waiting for results…");
-    else state.setText("Could not locate GeM search controls. Use the search box inside the GeM page.");
+    if(result.contains("SEARCH_CLICKED"))state.setText("GeM search requested for "+q+". Check results below.");
+    else if(result.contains("NO_BID_INPUT"))state.setText("GeM bid search field not found. Use the search box inside the webpage.");
+    else state.setText("Keyword entered, but GeM's search button was not detected. Tap the blue magnifying glass beside GeM's bid search field.");
    });
   });
   Button next=button("Next");findRow.addView(next);next.setOnClickListener(v->{
