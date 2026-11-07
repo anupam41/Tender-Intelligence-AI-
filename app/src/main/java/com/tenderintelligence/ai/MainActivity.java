@@ -18,7 +18,7 @@ import java.util.concurrent.*;
 
 public class MainActivity extends Activity {
  final ExecutorService pool=Executors.newSingleThreadExecutor();
- LinearLayout root; EditText key, model, title, deadline, body; TextView status, saved; LinearLayout resultCards, shortlistCards; TextView kpiFound,kpiFiltered,kpiSaved; EditText resultFilter; Button scanButton; volatile boolean scanRunning=false; final ArrayList<JSONObject> lastResults=new ArrayList<>();
+ LinearLayout root; EditText key, model, title, deadline, body; TextView status, saved; LinearLayout resultCards, shortlistCards; TextView kpiFound,kpiFiltered,kpiSaved; EditText resultFilter; Button scanButton; LinearLayout manualTools; volatile boolean scanRunning=false; final ArrayList<JSONObject> lastResults=new ArrayList<>();
  final ArrayList<String> records=new ArrayList<>();
  final String[] keywords={"heat exchanger","shell and tube","tube bundle","condenser","surface condenser","cooler","oil cooler","air cooler","water cooler","intercooler","aftercooler","pressure vessel","storage vessel","storage tank","receiver","reactor","column","tower","separator","scrubber","demister","evaporator","reboiler","heater","feedwater heater","air preheater","economizer","radiator","chiller","heat recovery","waste heat","steam generator","boiler","tube sheet","tubesheet","baffle","tube expansion","tube replacement","retubing","tube insertion","fabrication","mechanical equipment","process equipment","piping","shell","fin tube"};
  static final int OPEN_TXT=8, SAVE_CSV=9, OPEN_PDF=10;
@@ -48,12 +48,12 @@ public class MainActivity extends Activity {
    TenderFilter.Result filtered=TenderFilter.apply(enriched);
    runOnUiThread(()->{
     lastResults.clear();lastResults.addAll(filtered.accepted);renderSearchCards();
-    StringBuilder summary=new StringBuilder("GeM pages: "+r.stats.pages+" | Found: "+enriched.size()+" | Relevant: "+filtered.accepted.size()+" | Blocked: "+(r.stats.blocked+filtered.blocked)+" | Expired hidden: "+filtered.expired+" | Unknown deadline hidden: "+filtered.unknown+" | Duplicates: "+filtered.duplicates);
-    for(String err:r.stats.errors)summary.append("\nProvider error: ").append(err);
+    StringBuilder summary=new StringBuilder("Checked "+r.stats.pages+" GeM pages. "+filtered.accepted.size()+" matching bids. "+filtered.expired+" closed and "+filtered.unknown+" unverified deadlines hidden.");
+    if(!r.stats.errors.isEmpty())summary.append("\nIssue: ").append(r.stats.errors.get(0));
     if(filtered.accepted.isEmpty())summary.append("\nNo usable open bids found. GeM may have changed its public endpoint, or bid deadlines may be missing. This does NOT mean there are no tenders.");status.setText(summary.toString());scanRunning=false;if(scanButton!=null){scanButton.setEnabled(true);scanButton.setText("🚀 SEARCH GEM TENDERS");}if(kpiFound!=null)kpiFound.setText(String.valueOf(filtered.accepted.size()));if(kpiFiltered!=null)kpiFiltered.setText(String.valueOf(r.stats.blocked+filtered.blocked+filtered.expired+filtered.unknown+filtered.duplicates));
 
    });
-  }catch(Exception e){runOnUiThread(()->{status.setText("GeM connection failed: "+e.getClass().getSimpleName()+" — "+e.getMessage()+"\nPlease share this error text. The direct GeM endpoint is not yet verified.");scanRunning=false;if(scanButton!=null){scanButton.setEnabled(true);scanButton.setText("🚀 SEARCH GEM TENDERS");}});}
+  }catch(Exception e){runOnUiThread(()->{status.setText(e.getMessage()!=null&&e.getMessage().contains("403")?"GeM blocked automated search (HTTP 403). This is a portal access restriction, not a keyword problem. Tap Open GeM below to browse bids normally. Automatic scanning needs an authorized data source.":"GeM search failed: "+e.getMessage());scanRunning=false;if(scanButton!=null){scanButton.setEnabled(true);scanButton.setText("🚀 SEARCH GEM TENDERS");}});}
  });
  }
  void renderSearchCards(){
@@ -100,6 +100,7 @@ public class MainActivity extends Activity {
  TextView text(String s,int size){TextView v=new TextView(this);v.setText(s);v.setTextSize(size);v.setTextColor(Color.rgb(29,41,57));v.setPadding(0,10,0,10);return v;}
  EditText edit(String hint, boolean multi){EditText e=new EditText(this);e.setHint(hint);e.setTextColor(Color.WHITE);e.setHintTextColor(Color.rgb(148,163,184));e.setBackground(panel(Color.rgb(15,23,42),Color.rgb(51,65,85),10));e.setPadding(dp(12),dp(10),dp(12),dp(10));if(multi){e.setMinLines(5);e.setGravity(Gravity.TOP);e.setInputType( android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);}return e;}
  Button addScanButton(String label,Runnable fn){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextColor(Color.rgb(4,18,28));b.setTypeface(null,Typeface.BOLD);b.setBackground(panel(Color.rgb(45,212,191),Color.rgb(34,211,238),14));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(52));lp.setMargins(0,dp(5),0,dp(5));root.addView(b,lp);b.setOnClickListener(v->fn.run());return b;}
+ void addManualButton(String label,Runnable fn){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextColor(Color.rgb(165,243,252));b.setBackground(panel(Color.rgb(15,23,42),Color.rgb(51,65,85),10));manualTools.addView(b);b.setOnClickListener(v->fn.run());}
  void addSecondaryButton(String label,Runnable fn){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(13);b.setTextColor(Color.rgb(165,243,252));b.setBackground(panel(Color.rgb(15,23,42),Color.rgb(51,65,85),12));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(44));lp.setMargins(0,dp(4),0,dp(4));root.addView(b,lp);b.setOnClickListener(v->fn.run());}
  void addButton(String label,Runnable fn){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextColor(Color.rgb(4,18,28));b.setTypeface(null,Typeface.BOLD);b.setBackground(panel(Color.rgb(45,212,191),Color.rgb(34,211,238),14));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(52));lp.setMargins(0,dp(5),0,dp(5));root.addView(b,lp);b.setOnClickListener(v->fn.run());}
  void draw(){
@@ -110,38 +111,40 @@ public class MainActivity extends Activity {
  int inset=statusId>0?getResources().getDimensionPixelSize(statusId):dp(26);
  sc.setPadding(0,inset,0,0);
  root.setBackgroundColor(Color.rgb(6,10,18));
- TextView heading=text("Aditya Udyog Official\nTender Radar",25);heading.setTextColor(Color.WHITE);heading.setTypeface(null,1);root.addView(heading);
- TextView subtitle=text("Official-domain tender discovery • verification required",13);subtitle.setTextColor(Color.rgb(159,178,205));root.addView(subtitle);
- TextView banner=text("🔒 DIRECT GEM SEARCH • NO SEARCH API KEY",13);banner.setTextColor(Color.rgb(29,220,180));root.addView(banner);
- statsRow();
- sectionLabel("Tender Scanner");
- TextView scanTitle=text("GeM Tender Discovery",17);scanTitle.setTextColor(Color.WHITE);scanTitle.setTypeface(null,1);root.addView(scanTitle);
- TextView disclaimer=text("Direct GeM ongoing-bid search (up to 3 pages per equipment group). Closed and unknown-deadline bids are hidden. Verify each bid on GeM.",12);disclaimer.setTextColor(Color.rgb(159,178,205));root.addView(disclaimer);
+ TextView heading=text("Aditya Udyog • Tender Radar",23);heading.setTextColor(Color.WHITE);heading.setTypeface(null,1);root.addView(heading);
  
- addSecondaryButton("⚙ Optional OpenRouter AI Key",this::showApiSettings);
+ TextView banner=text("GeM • Public bid discovery",13);banner.setTextColor(Color.rgb(29,220,180));root.addView(banner);
+ statsRow();
+
+ TextView disclaimer=text("GeM currently rejects direct automated requests on some connections. Search results require official verification.",12);disclaimer.setTextColor(Color.rgb(159,178,205));root.addView(disclaimer);
+ 
+ 
  scanButton=addScanButton("🚀 SEARCH GEM TENDERS",this::searchTenders);
  status=text("Ready to scan GeM. Tap Search GeM Tenders.",14);status.setTextColor(Color.rgb(45,212,191));status.setTextIsSelectable(true);root.addView(status);
- addSecondaryButton("Browse all GeM bid pages",this::officialPortals);
- addSecondaryButton("View equipment keyword categories",this::showKeywords);
+ addSecondaryButton("Open official GeM bids in browser",this::officialPortals);
+ addSecondaryButton("Equipment keyword categories",this::showKeywords);
  sectionLabel("GeM tender results");
  resultFilter=edit("Filter results by title, bid ID or equipment...",false);root.addView(resultFilter);
  resultCards=new LinearLayout(this);resultCards.setOrientation(1);root.addView(resultCards);
  resultFilter.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){renderSearchCards();}public void afterTextChanged(android.text.Editable e){}});
  TextView shortlistHeading=text("Saved shortlist — review required",19);shortlistHeading.setPadding(0,dp(20),0,dp(8));shortlistHeading.setTextColor(Color.WHITE);root.addView(shortlistHeading);
  shortlistCards=new LinearLayout(this);shortlistCards.setOrientation(1);root.addView(shortlistCards);
- TextView stats=text("Shortlisted for review: "+records.size()+" • Equipment categories from supplied PDF",13);stats.setTextColor(Color.rgb(29,220,180));root.addView(stats);
- TextView section=text("Tender Import & AI Analysis",20);section.setTextColor(Color.WHITE);section.setPadding(0,dp(22),0,dp(8));root.addView(section);
+ 
+ addSecondaryButton("⚙ OpenRouter AI settings",this::showApiSettings);
+ addSecondaryButton("Manual PDF analysis (optional) ▾",()->{boolean visible=manualTools.getVisibility()!=View.VISIBLE;manualTools.setVisibility(visible?View.VISIBLE:View.GONE);});
+ manualTools=new LinearLayout(this);manualTools.setOrientation(1);manualTools.setVisibility(View.GONE);root.addView(manualTools);
+ 
  key=edit("OpenRouter API key",false);key.setInputType(129);
- model=edit("Model ID (e.g. openai/gpt-4o-mini)",false);model.setText(getPreferences(0).getString("model_id","openai/gpt-4o-mini"));root.addView(model);model.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){getPreferences(0).edit().putString("model_id",s.toString()).apply();}public void afterTextChanged(android.text.Editable e){}});
- addButton("Choose model from OpenRouter",this::chooseModel);
- title=edit("Tender title",false);root.addView(title);
- deadline=edit("Deadline YYYY-MM-DD (optional)",false);root.addView(deadline);
- body=edit("Tender document text / technical scope",true);root.addView(body);
- addButton("Import PDF tender (offline text extraction)",()->{Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("application/pdf");i.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,OPEN_PDF);});
- addButton("Import TXT document",()->{Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("text/plain");i.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,OPEN_TXT);});
- addButton("Score and save tender",this::save);
- addButton("Analyze with OpenRouter AI",this::analyze);
- addButton("Export shortlist CSV",()->{Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("text/csv");i.putExtra(Intent.EXTRA_TITLE,"tender-shortlist.csv");startActivityForResult(i,SAVE_CSV);});
+ model=edit("Model ID (e.g. openai/gpt-4o-mini)",false);model.setText(getPreferences(0).getString("model_id","openai/gpt-4o-mini"));manualTools.addView(model);model.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){getPreferences(0).edit().putString("model_id",s.toString()).apply();}public void afterTextChanged(android.text.Editable e){}});
+ addManualButton("Choose model from OpenRouter",this::chooseModel);
+ title=edit("Tender title",false);manualTools.addView(title);
+ deadline=edit("Deadline YYYY-MM-DD (optional)",false);manualTools.addView(deadline);
+ body=edit("Tender document text / technical scope",true);manualTools.addView(body);
+ addManualButton("Import PDF tender (offline text extraction)",()->{Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("application/pdf");i.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,OPEN_PDF);});
+ addManualButton("Import TXT document",()->{Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("text/plain");i.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,OPEN_TXT);});
+ addManualButton("Score and save tender",this::save);
+ addManualButton("Analyze with OpenRouter AI",this::analyze);
+ addManualButton("Export shortlist CSV",()->{Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("text/csv");i.putExtra(Intent.EXTRA_TITLE,"tender-shortlist.csv");startActivityForResult(i,SAVE_CSV);});
 
  saved=text("",14);saved.setTextColor(Color.WHITE);root.addView(saved);refresh();
  }
