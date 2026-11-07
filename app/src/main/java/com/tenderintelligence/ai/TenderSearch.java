@@ -26,7 +26,7 @@ public final class TenderSearch {
   try(OutputStream out=c.getOutputStream()){out.write(payload.toString().getBytes(StandardCharsets.UTF_8));}
   int status=c.getResponseCode();InputStream in=status>=400?c.getErrorStream():c.getInputStream();if(in==null)throw new IOException("HTTP "+status);
   ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] buf=new byte[8192];int n;try(InputStream input=in){while((n=input.read(buf))!=-1){if(out.size()+n>2000000)throw new IOException("Response too large");out.write(buf,0,n);}}
-  c.disconnect();String data=new String(out.toByteArray(),StandardCharsets.UTF_8);if(status>=400)throw new IOException("HTTP "+status+" "+data.substring(0,Math.min(160,data.length())));return data;
+  c.disconnect();String data=new String(out.toByteArray(),StandardCharsets.UTF_8);if(status>=400)throw new IOException("HTTP "+status+" from search provider (response body hidden to protect API credentials)");return data;
  }
  private static void accept(JSONArray source,boolean serper,LinkedHashMap<String,JSONObject> found,Stats stats)throws Exception{
   for(int i=0;i<source.length();i++){JSONObject item=source.optJSONObject(i);if(item==null)continue;
