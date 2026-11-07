@@ -48,9 +48,9 @@ public class MainActivity extends Activity {
    TenderFilter.Result filtered=TenderFilter.apply(enriched);
    runOnUiThread(()->{
     lastResults.clear();lastResults.addAll(filtered.accepted);renderSearchCards();
-    StringBuilder summary=new StringBuilder("Requests: "+r.stats.requests+" | Found: "+enriched.size()+" | Relevant: "+filtered.accepted.size()+" | Blocked: "+(r.stats.blocked+filtered.blocked)+" | Expired: "+filtered.expired+" | Duplicates: "+filtered.duplicates);
+    StringBuilder summary=new StringBuilder("Requests: "+r.stats.requests+" | Found: "+enriched.size()+" | Relevant: "+filtered.accepted.size()+" | Blocked: "+(r.stats.blocked+filtered.blocked)+" | Expired hidden: "+filtered.expired+" | Unknown deadline hidden: "+filtered.unknown+" | Duplicates: "+filtered.duplicates);
     for(String err:r.stats.errors)summary.append("\nProvider error: ").append(err);
-    status.setText(summary.toString());if(kpiFound!=null)kpiFound.setText(String.valueOf(filtered.accepted.size()));if(kpiFiltered!=null)kpiFiltered.setText(String.valueOf(r.stats.blocked+filtered.blocked+filtered.expired+filtered.duplicates));
+    status.setText(summary.toString());if(kpiFound!=null)kpiFound.setText(String.valueOf(filtered.accepted.size()));if(kpiFiltered!=null)kpiFiltered.setText(String.valueOf(r.stats.blocked+filtered.blocked+filtered.expired+filtered.unknown+filtered.duplicates));
 
    });
   }catch(Exception e){runOnUiThread(()->status.setText("Search error: "+e.getMessage()));}
@@ -115,7 +115,7 @@ public class MainActivity extends Activity {
  statsRow();
  sectionLabel("Tender Scanner");
  TextView scanTitle=text("GeM Tender Discovery",17);scanTitle.setTextColor(Color.WHITE);scanTitle.setTypeface(null,1);root.addView(scanTitle);
- TextView disclaimer=text("Search Tavily indexes for GeM bid candidates only. This is not a direct live GeM crawler; confirm every bid and deadline on GeM.",12);disclaimer.setTextColor(Color.rgb(159,178,205));root.addView(disclaimer);
+ TextView disclaimer=text("Search Tavily indexes for GeM bid candidates only. Expired and unknown-deadline results are hidden. This is not a live multi-page GeM crawler; confirm bid status on GeM.",12);disclaimer.setTextColor(Color.rgb(159,178,205));root.addView(disclaimer);
  tavilyKey=edit("Tavily API key",false);tavilyKey.setInputType(129);
  serperKey=edit("Serper API key",false);serperKey.setInputType(129);
  addSecondaryButton("⚙ API Keys & Provider Settings",this::showApiSettings);
