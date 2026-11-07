@@ -24,10 +24,10 @@ public class GemBrowserActivity extends Activity {
   getWindow().setStatusBarColor(Color.rgb(6,10,18));
   LinearLayout page=new LinearLayout(this);page.setOrientation(1);page.setBackgroundColor(Color.rgb(6,10,18));setContentView(page);page.setOnApplyWindowInsetsListener((v,insets)->{int top=android.os.Build.VERSION.SDK_INT>=30?insets.getInsets(android.view.WindowInsets.Type.statusBars()).top:insets.getSystemWindowInsetTop();v.setPadding(0,top,0,0);return insets;});
   TextView heading=new TextView(this);heading.setText("GeM Bid Search");heading.setTextSize(19);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(Color.WHITE);heading.setPadding(16,8,16,4);page.addView(heading);
-  TextView note=new TextView(this);note.setText("Choose a keyword, tap Search, then review GeM bid results.");note.setTextColor(Color.LTGRAY);note.setPadding(16,0,16,2);page.addView(note);
+  TextView note=new TextView(this);note.setText("Search GeM bids using the selected equipment keyword.");note.setTextColor(Color.LTGRAY);note.setPadding(16,0,16,2);page.addView(note);
   LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.HORIZONTAL);page.addView(controls);
   Button back=button("Back");controls.addView(back,new LinearLayout.LayoutParams(0,40,1));back.setOnClickListener(v->{if(browser.canGoBack())browser.goBack();else finish();});
-  Button home=button("GeM home");controls.addView(home,new LinearLayout.LayoutParams(0,52,1));home.setOnClickListener(v->browser.loadUrl(GEM));
+  Button home=button("GeM home");controls.addView(home,new LinearLayout.LayoutParams(0,40,1));home.setOnClickListener(v->browser.loadUrl(GEM));
   Button reload=button("Reload");controls.addView(reload,new LinearLayout.LayoutParams(0,52,1));reload.setOnClickListener(v->browser.reload());
   Spinner picker=new Spinner(this);
   String[] options={"Choose equipment keyword","Heat exchanger","Condenser","Sample cooler","Oil cooler","SWAS cooler","Air cooler","Water cooler","Tube bundle","U tube bundle","Cooling coil","Chiller","Radiator","Dryer","Heater","Economizer","Ejector","Evaporator","Tank","Pressure vessel"};
@@ -44,21 +44,22 @@ public class GemBrowserActivity extends Activity {
    state.setText("Submitting GeM bid search…");
    ((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(term.getWindowToken(),0);
    term.clearFocus();
-   String js="(function(){"+
+   String js="(function(){try{"+
     "var inputs=Array.from(document.querySelectorAll('input')).filter(e=>{var r=e.getBoundingClientRect();return r.width>100&&r.height>0&&!e.disabled});"+
-    "var el=inputs.find(e=>/searchBid|search_bid|bid_search|search_bid/i.test((e.id||'')+' '+(e.name||'')))||inputs.find(e=>{var r=e.getBoundingClientRect();var p=e.parentElement;return p&&/contains/i.test((p.parentElement&&p.parentElement.innerText||'').slice(0,90))&&r.width>100})||inputs.find(e=>/heat exchanger|oil cooler|bid listing/i.test(e.value||''))||inputs.filter(e=>/text|search/i.test(e.type||'text')).slice(-1)[0];"+
+    "var el=inputs.find(e=>/searchBid|search_bid|bid_search/i.test((e.id||'')+' '+(e.name||'')))||inputs.find(e=>/heat exchanger|head exchanger|oil cooler/i.test(e.value||''))||inputs.find(e=>{var p=e.parentElement;return p&&/contains/i.test((p.parentElement&&p.parentElement.innerText||'').slice(0,90))})||inputs.filter(e=>/text|search/i.test(e.type||'text')).slice(-1)[0];"+
     "if(!el)return 'NO_BID_INPUT';"+
     "var setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(el,"+org.json.JSONObject.quote(q)+");"+
     "el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));"+
     "var parent=el.parentElement;var btn=null;for(var i=0;i<4&&parent;i++,parent=parent.parentElement){"+
-    "var buttons=Array.from(parent.querySelectorAll('button,input[type=submit],a')).filter(e=>{var r=e.getBoundingClientRect();return r.width>0&&r.height>0});"+
-    "btn=buttons.find(e=>/search/i.test((e.title||'')+' '+(e.getAttribute('aria-label')||'')+' '+(e.className||'')+' '+(e.innerText||'')))||buttons.find(e=>e.querySelector('.fa-search,.glyphicon-search,.bi-search,svg'));"+
+    "var buttons=Array.from(parent.querySelectorAll('button,input[type=submit]')).filter(e=>{var r=e.getBoundingClientRect();return r.width>0&&r.height>0});"+
+    "btn=buttons.find(e=>/search|submit/i.test((e.id||'')+' '+(e.title||'')+' '+(e.className||'')+' '+(e.getAttribute('aria-label')||'')))||buttons.find(e=>e.querySelector('.fa-search,.glyphicon-search,.bi-search,svg'));"+
     "if(btn)break;}"+
+    "if(!btn){var r=el.getBoundingClientRect();btn=Array.from(document.querySelectorAll('button')).find(e=>{var b=e.getBoundingClientRect();return b.width>20&&b.height>20&&b.left>=r.right-5&&b.left<r.right+150&&Math.abs(b.top-r.top)<40})}"+
     "if(!btn)return 'BID_INPUT_SET_BUT_BUTTON_NOT_FOUND';"+
-    "btn.click();return 'SEARCH_CLICKED';"+
-    "})()";
+    "el.blur();btn.click();return 'SEARCH_CLICKED';"+
+    "}catch(e){return 'ERROR:'+e.message}})()";
    browser.evaluateJavascript(js,result->{
-    if(result.contains("SEARCH_CLICKED"))state.setText("GeM search requested for "+q+". Check results below.");
+    if(result.contains("SEARCH_CLICKED"))state.setText("GeM search requested for "+q+". Scroll down to check bid results.");
     else if(result.contains("NO_BID_INPUT"))state.setText("GeM bid search field not found. Use the search box inside the webpage.");
     else state.setText("Keyword entered, but GeM's search button was not detected. Tap the blue magnifying glass beside GeM's bid search field.");
    });
@@ -91,7 +92,7 @@ public class GemBrowserActivity extends Activity {
   browser.setDownloadListener((url,userAgent,disposition,mime,length)->{Uri uri=Uri.parse(url);if(safe(uri))startActivity(new Intent(Intent.ACTION_VIEW,uri));else state.setText("Download blocked: external URL");});
   browser.loadUrl(GEM);
  }
- private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(12);return b;}
+ private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(12);b.setTextColor(Color.BLACK);return b;}
  @Override public void onBackPressed(){if(browser!=null&&browser.canGoBack())browser.goBack();else super.onBackPressed();}
  @Override protected void onDestroy(){if(browser!=null){browser.destroy();browser=null;}super.onDestroy();}
 }
