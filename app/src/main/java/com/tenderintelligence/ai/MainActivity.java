@@ -38,7 +38,7 @@ public class MainActivity extends Activity {
  void officialPortals(){startActivity(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(TenderSearch.GEM_URL)));}
  void showKeywords(){TextView info=text(EquipmentKeywords.list(),14);info.setTextColor(Color.WHITE);info.setPadding(dp(16),dp(12),dp(16),dp(12));ScrollView scroll=new ScrollView(this);scroll.addView(info);new AlertDialog.Builder(this).setTitle("Equipment keywords — GeM only").setView(scroll).setPositiveButton("Done",null).show();}
  void searchTenders(){
-  status.setText("Searching live public GeM bid listings across pages...");
+  status.setText("Connecting to GeM. If this fails, the error will appear here.");
  pool.execute(()->{
   try{
    TenderSearch.Result r=TenderSearch.scan();
@@ -48,10 +48,10 @@ public class MainActivity extends Activity {
     lastResults.clear();lastResults.addAll(filtered.accepted);renderSearchCards();
     StringBuilder summary=new StringBuilder("GeM pages: "+r.stats.pages+" | Found: "+enriched.size()+" | Relevant: "+filtered.accepted.size()+" | Blocked: "+(r.stats.blocked+filtered.blocked)+" | Expired hidden: "+filtered.expired+" | Unknown deadline hidden: "+filtered.unknown+" | Duplicates: "+filtered.duplicates);
     for(String err:r.stats.errors)summary.append("\nProvider error: ").append(err);
-    status.setText(summary.toString());if(kpiFound!=null)kpiFound.setText(String.valueOf(filtered.accepted.size()));if(kpiFiltered!=null)kpiFiltered.setText(String.valueOf(r.stats.blocked+filtered.blocked+filtered.expired+filtered.unknown+filtered.duplicates));
+    if(filtered.accepted.isEmpty())summary.append("\nNo usable open bids found. GeM may have changed its public endpoint, or bid deadlines may be missing. This does NOT mean there are no tenders.");status.setText(summary.toString());if(kpiFound!=null)kpiFound.setText(String.valueOf(filtered.accepted.size()));if(kpiFiltered!=null)kpiFiltered.setText(String.valueOf(r.stats.blocked+filtered.blocked+filtered.expired+filtered.unknown+filtered.duplicates));
 
    });
-  }catch(Exception e){runOnUiThread(()->status.setText("Search error: "+e.getMessage()));}
+  }catch(Exception e){runOnUiThread(()->status.setText("GeM connection failed: "+e.getClass().getSimpleName()+" — "+e.getMessage()+"\nPlease share this error text. The direct GeM endpoint is not yet verified."));}
  });
  }
  void renderSearchCards(){
