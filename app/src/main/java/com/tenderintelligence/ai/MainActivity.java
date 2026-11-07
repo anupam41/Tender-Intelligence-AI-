@@ -15,7 +15,7 @@ import java.util.concurrent.*;
 
 public class MainActivity extends Activity {
  final ExecutorService pool=Executors.newSingleThreadExecutor();
- LinearLayout root; EditText key, model, title, deadline, body, tavilyKey, serperKey; TextView status, saved; LinearLayout resultCards;
+ LinearLayout root; EditText key, model, title, deadline, body, tavilyKey, serperKey; TextView status, saved; LinearLayout resultCards, shortlistCards; EditText resultFilter; final ArrayList<JSONObject> lastResults=new ArrayList<>();
  final ArrayList<String> records=new ArrayList<>();
  final String[] keywords={"heat exchanger","shell and tube","tube bundle","condenser","surface condenser","cooler","oil cooler","air cooler","water cooler","intercooler","aftercooler","pressure vessel","storage vessel","storage tank","receiver","reactor","column","tower","separator","scrubber","demister","evaporator","reboiler","heater","feedwater heater","air preheater","economizer","radiator","chiller","heat recovery","waste heat","steam generator","boiler","tube sheet","tubesheet","baffle","tube expansion","tube replacement","retubing","tube insertion","fabrication","mechanical equipment","process equipment","piping","shell","fin tube"};
  static final int OPEN_TXT=8, SAVE_CSV=9, OPEN_PDF=10;
@@ -30,14 +30,36 @@ public class MainActivity extends Activity {
    ArrayList<JSONObject> enriched=new ArrayList<>();for(JSONObject item:r.tenders)enriched.add(TenderDetails.enrich(item));
    TenderFilter.Result filtered=TenderFilter.apply(enriched);
    runOnUiThread(()->{
-    resultCards.removeAllViews();
+    lastResults.clear();lastResults.addAll(filtered.accepted);renderSearchCards();
     StringBuilder summary=new StringBuilder("Requests: "+r.stats.requests+" | Found: "+enriched.size()+" | Relevant: "+filtered.accepted.size()+" | Blocked: "+(r.stats.blocked+filtered.blocked)+" | Expired: "+filtered.expired+" | Duplicates: "+filtered.duplicates);
     for(String err:r.stats.errors)summary.append("\\nProvider error: ").append(err);
     status.setText(summary.toString());
-    for(JSONObject item:filtered.accepted)addResultCard(item);
+
    });
   }catch(Exception e){runOnUiThread(()->status.setText("Search error: "+e.getMessage()));}
  });
+ }
+ void renderSearchCards(){
+ if(resultCards==null)return;resultCards.removeAllViews();
+ String q=resultFilter==null?"":resultFilter.getText().toString().trim().toLowerCase(Locale.ROOT);
+ int count=0;for(JSONObject item:lastResults){String hay=(item.optString("title")+" "+item.optString("bidId")+" "+item.optString("snippet")).toLowerCase(Locale.ROOT);if(!hay.contains(q))continue;if(count++>=100)break;addResultCard(item);}
+ if(count==0){TextView empty=text("No matching search results. Try another term or run a search.",13);empty.setTextColor(Color.rgb(190,204,223));resultCards.addView(empty);}
+ }
+ void renderShortlist(){
+ if(shortlistCards==null)return;shortlistCards.removeAllViews();
+ if(records.isEmpty()){TextView empty=text("No saved tenders yet.",13);empty.setTextColor(Color.rgb(190,204,223));shortlistCards.addView(empty);return;}
+ for(int i=records.size()-1;i>=0;i--){
+  try{
+   JSONObject j=new JSONObject(records.get(i));final int index=i;
+   LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(16,12,16,12);card.setBackgroundColor(Color.rgb(22,35,56));
+   LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,6,0,6);shortlistCards.addView(card,lp);
+   TextView name=text(j.optString("title","Untitled tender"),15);name.setTextColor(Color.WHITE);card.addView(name);
+   String state=j.optString("verification","MANUAL_ENTRY_UNVERIFIED");
+   TextView detail=text("Status: "+state+"\\nBid: "+j.optString("bidId","Not identified")+" | Deadline: "+j.optString("deadline","Unknown")+"\\n"+j.optString("verdict","Review required"),12);detail.setTextColor(Color.rgb(62,218,190));card.addView(detail);
+   String url=j.optString("url");if(TenderSearch.allowed(url)){Button open=new Button(this);open.setText("Open official-domain source");card.addView(open);open.setOnClickListener(v->startActivity(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(url))));}
+   Button remove=new Button(this);remove.setText("Remove from shortlist");card.addView(remove);remove.setOnClickListener(v->{records.remove(index);persist();refresh();});
+  }catch(Exception ignored){}
+ }
  }
  void addResultCard(JSONObject j){
  LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(18,16,18,16);card.setBackgroundColor(Color.rgb(22,35,56));
@@ -60,7 +82,7 @@ public class MainActivity extends Activity {
  ScrollView sc=new ScrollView(this);root=new LinearLayout(this);root.setOrientation(1);root.setPadding(22,18,22,26);sc.addView(root);setContentView(sc);
  root.setBackgroundColor(Color.rgb(10,18,35));
  TextView heading=text("Aditya Udyog Official\\nTender Radar",25);heading.setTextColor(Color.WHITE);heading.setTypeface(null,1);root.addView(heading);
- TextView subtitle=text("Official Government & PSU tender intelligence • Verified sources only",13);subtitle.setTextColor(Color.rgb(159,178,205));root.addView(subtitle);
+ TextView subtitle=text("Official-domain tender discovery • verification required",13);subtitle.setTextColor(Color.rgb(159,178,205));root.addView(subtitle);
  TextView banner=text("🔒 OFFICIAL SOURCE ALLOWLIST\\nGeM • CPPP • IREPS • BHEL • NTPC • IOCL • SAIL",13);banner.setTextColor(Color.rgb(29,220,180));root.addView(banner);
  TextView scanTitle=text("1-Tap Official Government & PSU Tender Scanner",20);scanTitle.setTextColor(Color.WHITE);scanTitle.setTypeface(null,1);root.addView(scanTitle);
  TextView disclaimer=text("Search Tavily/Serper indexes for official-domain tender candidates. Results are DISCOVERED, not verified active bids. Provider errors are shown.",12);disclaimer.setTextColor(Color.rgb(159,178,205));root.addView(disclaimer);
@@ -68,7 +90,11 @@ public class MainActivity extends Activity {
  serperKey=edit("Serper API key (memory only)",false);serperKey.setInputType(129);root.addView(serperKey);
  addButton("🚀 1-TAP SEARCH OFFICIAL DOMAINS",this::searchTenders);
  addButton("Browse official tender portals",this::officialPortals);
+ resultFilter=edit("Filter results by title, bid ID or equipment...",false);root.addView(resultFilter);
  resultCards=new LinearLayout(this);resultCards.setOrientation(1);root.addView(resultCards);
+ resultFilter.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){renderSearchCards();}public void afterTextChanged(android.text.Editable e){}});
+ TextView shortlistHeading=text("Saved shortlist — review required",19);shortlistHeading.setTextColor(Color.WHITE);root.addView(shortlistHeading);
+ shortlistCards=new LinearLayout(this);shortlistCards.setOrientation(1);root.addView(shortlistCards);
  TextView stats=text("✓ Saved official tenders: "+records.size()+"    •    45 industrial keywords",13);stats.setTextColor(Color.rgb(29,220,180));root.addView(stats);
  TextView section=text("Tender Import & AI Analysis",20);section.setTextColor(Color.WHITE);root.addView(section);
  key=edit("OpenRouter API key (memory only)",false);key.setInputType(129);root.addView(key);
@@ -85,7 +111,7 @@ public class MainActivity extends Activity {
  status=text("Ready. Import or paste a tender to begin.",14);status.setTextColor(Color.rgb(29,220,180));root.addView(status);
  saved=text("",14);saved.setTextColor(Color.WHITE);root.addView(saved);refresh();
  }
- void refresh(){StringBuilder s=new StringBuilder("Saved tenders: "+records.size()+"\n");for(int i=records.size()-1;i>=0&&i>=records.size()-20;i--){try{JSONObject j=new JSONObject(records.get(i));s.append("\n").append(j.optString("title")).append(" • ").append(j.optString("verdict")).append(" • ").append(j.optString("deadline")).append("\n");}catch(Exception ignored){}}saved.setText(s.toString());}
+ void refresh(){renderShortlist();StringBuilder s=new StringBuilder("Saved tenders: "+records.size()+"\n");for(int i=records.size()-1;i>=0&&i>=records.size()-20;i--){try{JSONObject j=new JSONObject(records.get(i));s.append("\n").append(j.optString("title")).append(" • ").append(j.optString("verdict")).append(" • ").append(j.optString("deadline")).append("\n");}catch(Exception ignored){}}saved.setText(s.toString());}
  void loadRecords(){String raw=getPreferences(0).getString("records","[]");try{JSONArray a=new JSONArray(raw);for(int i=0;i<a.length();i++)records.add(a.getString(i));}catch(Exception ignored){}}
  void persist(){getPreferences(0).edit().putString("records",new JSONArray(records).toString()).apply();}
  int score(String value){int score=0;String t=value.toLowerCase(Locale.ROOT);for(String k:keywords)if(t.contains(k))score+=20;return Math.min(100,score);}
