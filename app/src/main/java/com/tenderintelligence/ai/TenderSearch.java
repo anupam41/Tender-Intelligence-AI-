@@ -25,7 +25,7 @@ public final class TenderSearch {
   int code=c.getResponseCode();InputStream stream=code>=400?c.getErrorStream():c.getInputStream();StringBuilder result=new StringBuilder();
   if(stream!=null)try(InputStream in=stream){byte[] buf=new byte[8192];int n;while((n=in.read(buf))!=-1){if(result.length()+n>2000000)throw new IOException("GeM response too large");result.append(new String(buf,0,n,StandardCharsets.UTF_8));}}
   String setCookie=c.getHeaderField("Set-Cookie");c.disconnect();
-  if(code==403)throw new IOException("GeM session rejected (403); retry the scan");
+  if(code==403)throw new IOException("GeM denied automated access (HTTP 403). Use the official GeM website; repeating requests will not fix access.");
   if(code>=400&&code!=404)throw new IOException("GeM HTTP "+code);
   if(data==null&&setCookie!=null)sessionCookie=setCookie.split(";",2)[0];
   return result.toString();
@@ -79,7 +79,7 @@ public final class TenderSearch {
      }
      if(p*10>=inner.optInt("numFound",0)||docs.length()<10)break;
      try{Thread.sleep(650);}catch(InterruptedException e){Thread.currentThread().interrupt();return new Result(new ArrayList<>(found.values()),stats);}
-    }catch(Exception e){stats.errors.add("GeM "+query+" page "+p+": "+e.getMessage());break;}
+    }catch(Exception e){if(e.getMessage()!=null&&e.getMessage().contains("403"))throw e;stats.errors.add("GeM "+query+" page "+p+": "+e.getMessage());break;}
    }
   }
   progress.update("GeM search finished. Checking closing dates and removing duplicates…");
