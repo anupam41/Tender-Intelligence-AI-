@@ -23,13 +23,14 @@ public final class TenderFilter {
   if(!relevant)return "No strong equipment match";
   if(!Pattern.compile("\\b(tender|bid|nit|rfq|enquiry|procurement|supply of|retubing)\\b",Pattern.CASE_INSENSITIVE).matcher(all).find())return "No tender evidence";
   if("EXPIRED".equals(j.optString("deadlineStatus")))return "Closing date appears past; check for extensions";
+  if(!"DATE_FOUND_UNVERIFIED".equals(j.optString("deadlineStatus")))return "Deadline unknown — hidden from open-bid results";
   return "";
  }
- public static final class Result{public final ArrayList<JSONObject> accepted=new ArrayList<>();public int blocked,duplicates,expired;public final ArrayList<String> reasons=new ArrayList<>();}
+ public static final class Result{public final ArrayList<JSONObject> accepted=new ArrayList<>();public int blocked,duplicates,expired,unknown;public final ArrayList<String> reasons=new ArrayList<>();}
  public static Result apply(List<JSONObject> items){
   Result result=new Result();LinkedHashSet<String> seen=new LinkedHashSet<>();
   for(JSONObject j:items){
-   String reason=reason(j);if(!reason.isEmpty()){if(reason.startsWith("Closing date"))result.expired++;else result.blocked++;if(result.reasons.size()<8)result.reasons.add(reason);continue;}
+   String reason=reason(j);if(!reason.isEmpty()){if(reason.startsWith("Closing date"))result.expired++;else if(reason.startsWith("Deadline unknown"))result.unknown++;else result.blocked++;if(result.reasons.size()<8)result.reasons.add(reason);continue;}
    String key=normalizedKey(j);if(!seen.add(key)){result.duplicates++;continue;}
    result.accepted.add(j);
   }
