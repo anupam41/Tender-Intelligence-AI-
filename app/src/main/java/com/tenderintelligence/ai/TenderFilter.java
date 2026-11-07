@@ -19,7 +19,7 @@ public final class TenderFilter {
   String title=j.optString("title").toLowerCase(Locale.ROOT),snippet=j.optString("snippet").toLowerCase(Locale.ROOT),all=title+" "+snippet;
   for(String x:REJECT)if(title.contains(x))return "Unrelated item: "+x;
   if(all.contains("issn")||all.contains("literature review"))return "Research or journal content";
-  boolean relevant=false;for(String x:STRONG)if(all.contains(x)){relevant=true;break;}
+  boolean relevant=EquipmentKeywords.matches(all);
   if(!relevant)return "No strong equipment match";
   if(!Pattern.compile("\\b(tender|bid|nit|rfq|enquiry|procurement|supply of|retubing)\\b",Pattern.CASE_INSENSITIVE).matcher(all).find())return "No tender evidence";
   if("EXPIRED".equals(j.optString("deadlineStatus")))return "Closing date appears past; check for extensions";
