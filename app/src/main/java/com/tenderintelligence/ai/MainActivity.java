@@ -18,7 +18,7 @@ import java.util.concurrent.*;
 
 public class MainActivity extends Activity {
  final ExecutorService pool=Executors.newSingleThreadExecutor();
- LinearLayout root; EditText key, model, title, deadline, body; TextView status, saved; LinearLayout resultCards, shortlistCards; TextView kpiFound,kpiFiltered,kpiSaved; EditText resultFilter; final ArrayList<JSONObject> lastResults=new ArrayList<>();
+ LinearLayout root; EditText key, model, title, deadline, body; TextView status, saved; LinearLayout resultCards, shortlistCards; TextView kpiFound,kpiFiltered,kpiSaved; EditText resultFilter; Button scanButton; volatile boolean scanRunning=false; final ArrayList<JSONObject> lastResults=new ArrayList<>();
  final ArrayList<String> records=new ArrayList<>();
  final String[] keywords={"heat exchanger","shell and tube","tube bundle","condenser","surface condenser","cooler","oil cooler","air cooler","water cooler","intercooler","aftercooler","pressure vessel","storage vessel","storage tank","receiver","reactor","column","tower","separator","scrubber","demister","evaporator","reboiler","heater","feedwater heater","air preheater","economizer","radiator","chiller","heat recovery","waste heat","steam generator","boiler","tube sheet","tubesheet","baffle","tube expansion","tube replacement","retubing","tube insertion","fabrication","mechanical equipment","process equipment","piping","shell","fin tube"};
  static final int OPEN_TXT=8, SAVE_CSV=9, OPEN_PDF=10;
@@ -38,20 +38,22 @@ public class MainActivity extends Activity {
  void officialPortals(){startActivity(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(TenderSearch.GEM_URL)));}
  void showKeywords(){TextView info=text(EquipmentKeywords.list(),14);info.setTextColor(Color.WHITE);info.setPadding(dp(16),dp(12),dp(16),dp(12));ScrollView scroll=new ScrollView(this);scroll.addView(info);new AlertDialog.Builder(this).setTitle("Equipment keywords — GeM only").setView(scroll).setPositiveButton("Done",null).show();}
  void searchTenders(){
-  status.setText("Connecting to GeM. If this fails, the error will appear here.");
+  if(scanRunning){status.setText("A GeM scan is already running. Please wait.");return;}
+  scanRunning=true;if(scanButton!=null){scanButton.setEnabled(false);scanButton.setText("SEARCHING GEM — PLEASE WAIT");}
+  status.setText("Connecting to GeM… Scanning public bid pages. This may take several minutes.");
  pool.execute(()->{
   try{
-   TenderSearch.Result r=TenderSearch.scan();
+   TenderSearch.Result r=TenderSearch.scan((message)->runOnUiThread(()->status.setText(message)));
    ArrayList<JSONObject> enriched=new ArrayList<>();for(JSONObject item:r.tenders)enriched.add(TenderDetails.enrich(item));
    TenderFilter.Result filtered=TenderFilter.apply(enriched);
    runOnUiThread(()->{
     lastResults.clear();lastResults.addAll(filtered.accepted);renderSearchCards();
     StringBuilder summary=new StringBuilder("GeM pages: "+r.stats.pages+" | Found: "+enriched.size()+" | Relevant: "+filtered.accepted.size()+" | Blocked: "+(r.stats.blocked+filtered.blocked)+" | Expired hidden: "+filtered.expired+" | Unknown deadline hidden: "+filtered.unknown+" | Duplicates: "+filtered.duplicates);
     for(String err:r.stats.errors)summary.append("\nProvider error: ").append(err);
-    if(filtered.accepted.isEmpty())summary.append("\nNo usable open bids found. GeM may have changed its public endpoint, or bid deadlines may be missing. This does NOT mean there are no tenders.");status.setText(summary.toString());if(kpiFound!=null)kpiFound.setText(String.valueOf(filtered.accepted.size()));if(kpiFiltered!=null)kpiFiltered.setText(String.valueOf(r.stats.blocked+filtered.blocked+filtered.expired+filtered.unknown+filtered.duplicates));
+    if(filtered.accepted.isEmpty())summary.append("\nNo usable open bids found. GeM may have changed its public endpoint, or bid deadlines may be missing. This does NOT mean there are no tenders.");status.setText(summary.toString());scanRunning=false;if(scanButton!=null){scanButton.setEnabled(true);scanButton.setText("🚀 SEARCH GEM TENDERS");}if(kpiFound!=null)kpiFound.setText(String.valueOf(filtered.accepted.size()));if(kpiFiltered!=null)kpiFiltered.setText(String.valueOf(r.stats.blocked+filtered.blocked+filtered.expired+filtered.unknown+filtered.duplicates));
 
    });
-  }catch(Exception e){runOnUiThread(()->status.setText("GeM connection failed: "+e.getClass().getSimpleName()+" — "+e.getMessage()+"\nPlease share this error text. The direct GeM endpoint is not yet verified."));}
+  }catch(Exception e){runOnUiThread(()->{status.setText("GeM connection failed: "+e.getClass().getSimpleName()+" — "+e.getMessage()+"\nPlease share this error text. The direct GeM endpoint is not yet verified.");scanRunning=false;if(scanButton!=null){scanButton.setEnabled(true);scanButton.setText("🚀 SEARCH GEM TENDERS");}});}
  });
  }
  void renderSearchCards(){
@@ -97,6 +99,7 @@ public class MainActivity extends Activity {
  TextView statCell(LinearLayout row,String label,String value,int color){LinearLayout cell=new LinearLayout(this);cell.setOrientation(1);cell.setPadding(dp(10),dp(10),dp(6),dp(10));cell.setBackground(panel(Color.rgb(15,23,42),Color.rgb(51,65,85),12));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(dp(2),dp(5),dp(2),dp(5));row.addView(cell,lp);TextView name=text(label,11);name.setTextColor(Color.rgb(148,163,184));cell.addView(name);TextView count=text(value,23);count.setTypeface(null,Typeface.BOLD);count.setTextColor(color);cell.addView(count);return count;}
  TextView text(String s,int size){TextView v=new TextView(this);v.setText(s);v.setTextSize(size);v.setTextColor(Color.rgb(29,41,57));v.setPadding(0,10,0,10);return v;}
  EditText edit(String hint, boolean multi){EditText e=new EditText(this);e.setHint(hint);e.setTextColor(Color.WHITE);e.setHintTextColor(Color.rgb(148,163,184));e.setBackground(panel(Color.rgb(15,23,42),Color.rgb(51,65,85),10));e.setPadding(dp(12),dp(10),dp(12),dp(10));if(multi){e.setMinLines(5);e.setGravity(Gravity.TOP);e.setInputType( android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);}return e;}
+ Button addScanButton(String label,Runnable fn){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextColor(Color.rgb(4,18,28));b.setTypeface(null,Typeface.BOLD);b.setBackground(panel(Color.rgb(45,212,191),Color.rgb(34,211,238),14));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(52));lp.setMargins(0,dp(5),0,dp(5));root.addView(b,lp);b.setOnClickListener(v->fn.run());return b;}
  void addSecondaryButton(String label,Runnable fn){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(13);b.setTextColor(Color.rgb(165,243,252));b.setBackground(panel(Color.rgb(15,23,42),Color.rgb(51,65,85),12));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(44));lp.setMargins(0,dp(4),0,dp(4));root.addView(b,lp);b.setOnClickListener(v->fn.run());}
  void addButton(String label,Runnable fn){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextColor(Color.rgb(4,18,28));b.setTypeface(null,Typeface.BOLD);b.setBackground(panel(Color.rgb(45,212,191),Color.rgb(34,211,238),14));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(52));lp.setMargins(0,dp(5),0,dp(5));root.addView(b,lp);b.setOnClickListener(v->fn.run());}
  void draw(){
@@ -116,7 +119,8 @@ public class MainActivity extends Activity {
  TextView disclaimer=text("Direct GeM ongoing-bid search (up to 3 pages per equipment group). Closed and unknown-deadline bids are hidden. Verify each bid on GeM.",12);disclaimer.setTextColor(Color.rgb(159,178,205));root.addView(disclaimer);
  
  addSecondaryButton("⚙ Optional OpenRouter AI Key",this::showApiSettings);
- addButton("🚀 SEARCH GEM TENDERS",this::searchTenders);
+ scanButton=addScanButton("🚀 SEARCH GEM TENDERS",this::searchTenders);
+ status=text("Ready to scan GeM. Tap Search GeM Tenders.",14);status.setTextColor(Color.rgb(45,212,191));status.setTextIsSelectable(true);root.addView(status);
  addSecondaryButton("Browse all GeM bid pages",this::officialPortals);
  addSecondaryButton("View equipment keyword categories",this::showKeywords);
  sectionLabel("GeM tender results");
@@ -138,7 +142,7 @@ public class MainActivity extends Activity {
  addButton("Score and save tender",this::save);
  addButton("Analyze with OpenRouter AI",this::analyze);
  addButton("Export shortlist CSV",()->{Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("text/csv");i.putExtra(Intent.EXTRA_TITLE,"tender-shortlist.csv");startActivityForResult(i,SAVE_CSV);});
- status=text("Ready. Import or paste a tender to begin.",14);status.setTextColor(Color.rgb(29,220,180));root.addView(status);
+
  saved=text("",14);saved.setTextColor(Color.WHITE);root.addView(saved);refresh();
  }
  void refresh(){renderShortlist();if(kpiSaved!=null)kpiSaved.setText(String.valueOf(records.size()));StringBuilder s=new StringBuilder("Saved tenders: "+records.size()+"\n");for(int i=records.size()-1;i>=0&&i>=records.size()-20;i--){try{JSONObject j=new JSONObject(records.get(i));s.append("\n").append(j.optString("title")).append(" • ").append(j.optString("verdict")).append(" • ").append(j.optString("deadline")).append("\n");}catch(Exception ignored){}}saved.setText(s.toString());}
