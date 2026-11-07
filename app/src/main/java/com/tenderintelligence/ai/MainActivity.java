@@ -18,33 +18,32 @@ import java.util.concurrent.*;
 
 public class MainActivity extends Activity {
  final ExecutorService pool=Executors.newSingleThreadExecutor();
- LinearLayout root; EditText key, model, title, deadline, body, tavilyKey, serperKey; TextView status, saved; LinearLayout resultCards, shortlistCards; TextView kpiFound,kpiFiltered,kpiSaved; EditText resultFilter; final ArrayList<JSONObject> lastResults=new ArrayList<>();
+ LinearLayout root; EditText key, model, title, deadline, body, tavilyKey; TextView status, saved; LinearLayout resultCards, shortlistCards; TextView kpiFound,kpiFiltered,kpiSaved; EditText resultFilter; final ArrayList<JSONObject> lastResults=new ArrayList<>();
  final ArrayList<String> records=new ArrayList<>();
  final String[] keywords={"heat exchanger","shell and tube","tube bundle","condenser","surface condenser","cooler","oil cooler","air cooler","water cooler","intercooler","aftercooler","pressure vessel","storage vessel","storage tank","receiver","reactor","column","tower","separator","scrubber","demister","evaporator","reboiler","heater","feedwater heater","air preheater","economizer","radiator","chiller","heat recovery","waste heat","steam generator","boiler","tube sheet","tubesheet","baffle","tube expansion","tube replacement","retubing","tube insertion","fabrication","mechanical equipment","process equipment","piping","shell","fin tube"};
  static final int OPEN_TXT=8, SAVE_CSV=9, OPEN_PDF=10;
  @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(Color.rgb(6,10,18));getWindow().setNavigationBarColor(Color.rgb(6,10,18));loadRecords();draw();}
  void showApiSettings(){
   LinearLayout layout=new LinearLayout(this);layout.setOrientation(1);layout.setPadding(dp(18),dp(8),dp(18),dp(8));
-  TextView info=text("Keys are held in memory only and are not saved. Enter at least one search-provider key to scan.",13);info.setTextColor(Color.rgb(190,204,223));layout.addView(info);
+  TextView info=text("Keys are held in memory only and are not saved. Enter your Tavily key to discover GeM bids. OpenRouter is optional for AI analysis.",13);info.setTextColor(Color.rgb(190,204,223));layout.addView(info);
   EditText tav=edit("Tavily API key",false);tav.setInputType(129);tav.setText(tavilyKey.getText());layout.addView(tav);
-  EditText ser=edit("Serper API key",false);ser.setInputType(129);ser.setText(serperKey.getText());layout.addView(ser);
   EditText router=edit("OpenRouter API key",false);router.setInputType(129);router.setText(key.getText());layout.addView(router);
   CheckBox reveal=new CheckBox(this);reveal.setText("Show keys");reveal.setTextColor(Color.WHITE);layout.addView(reveal);
-  reveal.setOnCheckedChangeListener((v,checked)->{int type=checked?InputType.TYPE_CLASS_TEXT:129;for(EditText field:new EditText[]{tav,ser,router}){field.setInputType(type);field.setSelection(field.length());}});
+  reveal.setOnCheckedChangeListener((v,checked)->{int type=checked?InputType.TYPE_CLASS_TEXT:129;for(EditText field:new EditText[]{tav,router}){field.setInputType(type);field.setSelection(field.length());}});
   ScrollView scroll=new ScrollView(this);scroll.addView(layout);
   new AlertDialog.Builder(this).setTitle("API Keys & Provider Settings").setView(scroll)
-   .setNeutralButton("Clear keys",(d,w)->{tavilyKey.setText("");serperKey.setText("");key.setText("");status.setText("API keys cleared.");})
+   .setNeutralButton("Clear keys",(d,w)->{tavilyKey.setText("");key.setText("");status.setText("API keys cleared.");})
    .setNegativeButton("Cancel",null)
-   .setPositiveButton("Save for this session",(d,w)->{tavilyKey.setText(tav.getText());serperKey.setText(ser.getText());key.setText(router.getText());status.setText("API settings updated for this session.");}).show();
+   .setPositiveButton("Save for this session",(d,w)->{tavilyKey.setText(tav.getText());key.setText(router.getText());status.setText("API settings updated for this session.");}).show();
  }
  void officialPortals(){startActivity(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(TenderSearch.GEM_URL)));}
  void showKeywords(){TextView info=text(EquipmentKeywords.list(),14);info.setTextColor(Color.WHITE);info.setPadding(dp(16),dp(12),dp(16),dp(12));ScrollView scroll=new ScrollView(this);scroll.addView(info);new AlertDialog.Builder(this).setTitle("Equipment keywords — GeM only").setView(scroll).setPositiveButton("Done",null).show();}
  void searchTenders(){
- String t=tavilyKey.getText().toString().trim(),ser=serperKey.getText().toString().trim();
- status.setText("Searching official-domain indexes...");
+ String t=tavilyKey.getText().toString().trim();
+ status.setText("Searching indexed GeM pages with Tavily...");
  pool.execute(()->{
   try{
-   TenderSearch.Result r=TenderSearch.scan(t,ser);
+   TenderSearch.Result r=TenderSearch.scan(t);
    ArrayList<JSONObject> enriched=new ArrayList<>();for(JSONObject item:r.tenders)enriched.add(TenderDetails.enrich(item));
    TenderFilter.Result filtered=TenderFilter.apply(enriched);
    runOnUiThread(()->{
@@ -112,16 +111,16 @@ public class MainActivity extends Activity {
  root.setBackgroundColor(Color.rgb(6,10,18));
  TextView heading=text("Aditya Udyog Official\nTender Radar",25);heading.setTextColor(Color.WHITE);heading.setTypeface(null,1);root.addView(heading);
  TextView subtitle=text("Official-domain tender discovery • verification required",13);subtitle.setTextColor(Color.rgb(159,178,205));root.addView(subtitle);
- TextView banner=text("🔒 GEM ONLY • bidplus.gem.gov.in",13);banner.setTextColor(Color.rgb(29,220,180));root.addView(banner);
+ TextView banner=text("🔒 GEM ONLY • bidplus.gem.gov.in • Multiple GeM pages may exist",13);banner.setTextColor(Color.rgb(29,220,180));root.addView(banner);
  statsRow();
  sectionLabel("Tender Scanner");
  TextView scanTitle=text("GeM Tender Discovery",17);scanTitle.setTextColor(Color.WHITE);scanTitle.setTypeface(null,1);root.addView(scanTitle);
- TextView disclaimer=text("Search Tavily/Serper indexes for GeM bid candidates only. This is not a direct live GeM crawler; confirm every bid and deadline on GeM.",12);disclaimer.setTextColor(Color.rgb(159,178,205));root.addView(disclaimer);
+ TextView disclaimer=text("Search Tavily indexes for GeM bid candidates only. This is not a direct live GeM crawler; confirm every bid and deadline on GeM.",12);disclaimer.setTextColor(Color.rgb(159,178,205));root.addView(disclaimer);
  tavilyKey=edit("Tavily API key",false);tavilyKey.setInputType(129);
  serperKey=edit("Serper API key",false);serperKey.setInputType(129);
  addSecondaryButton("⚙ API Keys & Provider Settings",this::showApiSettings);
  addButton("🚀 SEARCH GEM TENDERS",this::searchTenders);
- addSecondaryButton("Open GeM all-bids page",this::officialPortals);
+ addSecondaryButton("Browse all GeM bid pages",this::officialPortals);
  addSecondaryButton("View equipment keyword categories",this::showKeywords);
  sectionLabel("GeM tender results");
  resultFilter=edit("Filter results by title, bid ID or equipment...",false);root.addView(resultFilter);
