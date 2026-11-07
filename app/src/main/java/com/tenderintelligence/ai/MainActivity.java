@@ -35,7 +35,7 @@ public class MainActivity extends Activity {
    .setNegativeButton("Cancel",null)
    .setPositiveButton("Save for this session",(d,w)->{key.setText(router.getText());status.setText("API settings updated for this session.");}).show();
  }
- void officialPortals(){startActivity(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(TenderSearch.GEM_URL)));}
+ void officialPortals(){startActivity(new Intent(this,GemBrowserActivity.class));}
  void showKeywords(){TextView info=text(EquipmentKeywords.list(),14);info.setTextColor(Color.WHITE);info.setPadding(dp(16),dp(12),dp(16),dp(12));ScrollView scroll=new ScrollView(this);scroll.addView(info);new AlertDialog.Builder(this).setTitle("Equipment keywords — GeM only").setView(scroll).setPositiveButton("Done",null).show();}
  void searchTenders(){
   if(scanRunning){status.setText("A GeM scan is already running. Please wait.");return;}
@@ -116,12 +116,12 @@ public class MainActivity extends Activity {
  TextView banner=text("GeM • Public bid discovery",13);banner.setTextColor(Color.rgb(29,220,180));root.addView(banner);
  statsRow();
 
- TextView disclaimer=text("GeM currently rejects direct automated requests on some connections. Search results require official verification.",12);disclaimer.setTextColor(Color.rgb(159,178,205));root.addView(disclaimer);
+ TextView disclaimer=text("Browse GeM with its own search and pagination. Automatic scanning is paused because GeM returns HTTP 403.",12);disclaimer.setTextColor(Color.rgb(159,178,205));root.addView(disclaimer);
  
  
- scanButton=addScanButton("🚀 SEARCH GEM TENDERS",this::searchTenders);
- status=text("Ready to scan GeM. Tap Search GeM Tenders.",14);status.setTextColor(Color.rgb(45,212,191));status.setTextIsSelectable(true);root.addView(status);
- addSecondaryButton("Open official GeM bids in browser",this::officialPortals);
+ scanButton=addScanButton("OPEN GEM TENDER SEARCH",this::officialPortals);
+ status=text("GeM blocks the automated endpoint (403). Browse public bids in the built-in browser; automatic document shortlisting is not available yet.",13);status.setTextColor(Color.rgb(45,212,191));status.setTextIsSelectable(true);root.addView(status);
+ addSecondaryButton("Open GeM in external browser",()->startActivity(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(TenderSearch.GEM_URL))));
  addSecondaryButton("Equipment keyword categories",this::showKeywords);
  sectionLabel("GeM tender results");
  resultFilter=edit("Filter results by title, bid ID or equipment...",false);root.addView(resultFilter);
