@@ -115,7 +115,6 @@ public class MainActivity extends Activity {
  TextView scanTitle=text("GeM Tender Discovery",17);scanTitle.setTextColor(Color.WHITE);scanTitle.setTypeface(null,1);root.addView(scanTitle);
  TextView disclaimer=text("Direct GeM ongoing-bid search (up to 3 pages per equipment group). Closed and unknown-deadline bids are hidden. Verify each bid on GeM.",12);disclaimer.setTextColor(Color.rgb(159,178,205));root.addView(disclaimer);
  
- serperKey=edit("Serper API key",false);serperKey.setInputType(129);
  addSecondaryButton("⚙ Optional OpenRouter AI Key",this::showApiSettings);
  addButton("🚀 SEARCH GEM TENDERS",this::searchTenders);
  addSecondaryButton("Browse all GeM bid pages",this::officialPortals);
