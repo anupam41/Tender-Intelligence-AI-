@@ -37,7 +37,8 @@ public class MainActivity extends Activity {
    .setNegativeButton("Cancel",null)
    .setPositiveButton("Save for this session",(d,w)->{tavilyKey.setText(tav.getText());serperKey.setText(ser.getText());key.setText(router.getText());status.setText("API settings updated for this session.");}).show();
  }
- void officialPortals(){String[] names={"GeM — bidplus.gem.gov.in","CPPP — eprocure.gov.in","CPPP — etenders.gov.in","IREPS — ireps.gov.in","BHEL — tenders.bhel.com","NTPC — ntpctender.ntpc.co.in","IOCL — iocletenders.nic.in","SAIL — sailtenders.co.in"};String[] urls={"https://bidplus.gem.gov.in/all-bids","https://eprocure.gov.in/eprocure/app","https://etenders.gov.in/eprocure/app","https://www.ireps.gov.in/","https://tenders.bhel.com/","https://ntpctender.ntpc.co.in/","https://iocletenders.nic.in/","https://sailtenders.co.in/"};new AlertDialog.Builder(this).setTitle("Official tender portals").setItems(names,(dialog,which)->{Intent i=new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(urls[which]));startActivity(i);}).setNegativeButton("Cancel",null).show();}
+ void officialPortals(){startActivity(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(TenderSearch.GEM_URL)));}
+ void showKeywords(){TextView info=text(EquipmentKeywords.list(),14);info.setTextColor(Color.WHITE);info.setPadding(dp(16),dp(12),dp(16),dp(12));ScrollView scroll=new ScrollView(this);scroll.addView(info);new AlertDialog.Builder(this).setTitle("Equipment keywords — GeM only").setView(scroll).setPositiveButton("Done",null).show();}
  void searchTenders(){
  String t=tavilyKey.getText().toString().trim(),ser=serperKey.getText().toString().trim();
  status.setText("Searching official-domain indexes...");
@@ -111,23 +112,24 @@ public class MainActivity extends Activity {
  root.setBackgroundColor(Color.rgb(6,10,18));
  TextView heading=text("Aditya Udyog Official\nTender Radar",25);heading.setTextColor(Color.WHITE);heading.setTypeface(null,1);root.addView(heading);
  TextView subtitle=text("Official-domain tender discovery • verification required",13);subtitle.setTextColor(Color.rgb(159,178,205));root.addView(subtitle);
- TextView banner=text("🔒 OFFICIAL SOURCE ALLOWLIST\nGeM • CPPP • IREPS • BHEL • NTPC • IOCL • SAIL",13);banner.setTextColor(Color.rgb(29,220,180));root.addView(banner);
+ TextView banner=text("🔒 GEM ONLY • bidplus.gem.gov.in",13);banner.setTextColor(Color.rgb(29,220,180));root.addView(banner);
  statsRow();
  sectionLabel("Tender Scanner");
- TextView scanTitle=text("1-Tap Official Government & PSU Tender Scanner",17);scanTitle.setTextColor(Color.WHITE);scanTitle.setTypeface(null,1);root.addView(scanTitle);
- TextView disclaimer=text("Search Tavily/Serper indexes for official-domain tender candidates. Results are DISCOVERED, not verified active bids. Provider errors are shown.",12);disclaimer.setTextColor(Color.rgb(159,178,205));root.addView(disclaimer);
+ TextView scanTitle=text("GeM Tender Discovery",17);scanTitle.setTextColor(Color.WHITE);scanTitle.setTypeface(null,1);root.addView(scanTitle);
+ TextView disclaimer=text("Search Tavily/Serper indexes for GeM bid candidates only. This is not a direct live GeM crawler; confirm every bid and deadline on GeM.",12);disclaimer.setTextColor(Color.rgb(159,178,205));root.addView(disclaimer);
  tavilyKey=edit("Tavily API key",false);tavilyKey.setInputType(129);
  serperKey=edit("Serper API key",false);serperKey.setInputType(129);
  addSecondaryButton("⚙ API Keys & Provider Settings",this::showApiSettings);
- addButton("🚀 1-TAP SCAN OFFICIAL GOV/PSU PORTALS",this::searchTenders);
- addSecondaryButton("Browse official tender portals",this::officialPortals);
- sectionLabel("Official-domain tender results");
+ addButton("🚀 SEARCH GEM TENDERS",this::searchTenders);
+ addSecondaryButton("Open GeM all-bids page",this::officialPortals);
+ addSecondaryButton("View equipment keyword categories",this::showKeywords);
+ sectionLabel("GeM tender results");
  resultFilter=edit("Filter results by title, bid ID or equipment...",false);root.addView(resultFilter);
  resultCards=new LinearLayout(this);resultCards.setOrientation(1);root.addView(resultCards);
  resultFilter.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){renderSearchCards();}public void afterTextChanged(android.text.Editable e){}});
  TextView shortlistHeading=text("Saved shortlist — review required",19);shortlistHeading.setPadding(0,dp(20),0,dp(8));shortlistHeading.setTextColor(Color.WHITE);root.addView(shortlistHeading);
  shortlistCards=new LinearLayout(this);shortlistCards.setOrientation(1);root.addView(shortlistCards);
- TextView stats=text("Shortlisted for review: "+records.size()+"    •    45 industrial keywords",13);stats.setTextColor(Color.rgb(29,220,180));root.addView(stats);
+ TextView stats=text("Shortlisted for review: "+records.size()+" • Equipment categories from supplied PDF",13);stats.setTextColor(Color.rgb(29,220,180));root.addView(stats);
  TextView section=text("Tender Import & AI Analysis",20);section.setTextColor(Color.WHITE);section.setPadding(0,dp(22),0,dp(8));root.addView(section);
  key=edit("OpenRouter API key",false);key.setInputType(129);
  model=edit("Model ID (e.g. openai/gpt-4o-mini)",false);model.setText(getPreferences(0).getString("model_id","openai/gpt-4o-mini"));root.addView(model);model.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){getPreferences(0).edit().putString("model_id",s.toString()).apply();}public void afterTextChanged(android.text.Editable e){}});
