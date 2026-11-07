@@ -57,11 +57,15 @@ public final class TenderSearch {
  }
  public static final class Stats{public int requests,blocked,pages;public final ArrayList<String> errors=new ArrayList<>();}
  public static final class Result{public final ArrayList<JSONObject> tenders;public final Stats stats;Result(ArrayList<JSONObject> a,Stats s){tenders=a;stats=s;}}
- public static Result scan()throws Exception{
+ public interface Progress{void update(String message);}
+ public static Result scan(Progress progress)throws Exception{
   Stats stats=new Stats();LinkedHashMap<String,JSONObject> found=new LinkedHashMap<>();
+  progress.update("Opening GeM public bid listings and starting a session…");
   String token=startSession();
   for(String query:QUERIES){
+   progress.update("Searching GeM for: "+query+" • "+found.size()+" matching bids collected");
    for(int p=1;p<=MAX_PAGES_PER_QUERY;p++){
+    progress.update("GeM: "+query+" • page "+p+"/"+MAX_PAGES_PER_QUERY+" • "+found.size()+" candidates");
     try{
      JSONObject response=page(token,query,p);stats.requests++;stats.pages++;
      if(response.optInt("code",0)==404)break;
@@ -78,6 +82,7 @@ public final class TenderSearch {
     }catch(Exception e){stats.errors.add("GeM "+query+" page "+p+": "+e.getMessage());break;}
    }
   }
+  progress.update("GeM search finished. Checking closing dates and removing duplicates…");
   return new Result(new ArrayList<>(found.values()),stats);
  }
 }
