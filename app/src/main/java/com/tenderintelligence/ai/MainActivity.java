@@ -28,12 +28,13 @@ public class MainActivity extends Activity {
   try{
    TenderSearch.Result r=TenderSearch.scan(t,ser);
    ArrayList<JSONObject> enriched=new ArrayList<>();for(JSONObject item:r.tenders)enriched.add(TenderDetails.enrich(item));
+   TenderFilter.Result filtered=TenderFilter.apply(enriched);
    runOnUiThread(()->{
     resultCards.removeAllViews();
-    StringBuilder summary=new StringBuilder("Requests: "+r.stats.requests+" | Candidates: "+enriched.size()+" | Filtered: "+r.stats.blocked);
+    StringBuilder summary=new StringBuilder("Requests: "+r.stats.requests+" | Found: "+enriched.size()+" | Relevant: "+filtered.accepted.size()+" | Blocked: "+(r.stats.blocked+filtered.blocked)+" | Expired: "+filtered.expired+" | Duplicates: "+filtered.duplicates);
     for(String err:r.stats.errors)summary.append("\\nProvider error: ").append(err);
     status.setText(summary.toString());
-    for(JSONObject item:enriched)addResultCard(item);
+    for(JSONObject item:filtered.accepted)addResultCard(item);
    });
   }catch(Exception e){runOnUiThread(()->status.setText("Search error: "+e.getMessage()));}
  });
@@ -47,7 +48,7 @@ public class MainActivity extends Activity {
  TextView snippet=text(j.optString("snippet"),12);snippet.setTextColor(Color.rgb(190,204,223));snippet.setMaxLines(5);card.addView(snippet);
  Button open=new Button(this);open.setText("Open source");card.addView(open);open.setOnClickListener(v->{String url=j.optString("url");if(TenderSearch.allowed(url))startActivity(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(url)));});
  Button saveButton=new Button(this);saveButton.setText("Save to shortlist");card.addView(saveButton);saveButton.setOnClickListener(v->{
- try{String url=j.optString("url");for(String rec:records){JSONObject existing=new JSONObject(rec);if(url.equals(existing.optString("url"))){status.setText("Already saved.");return;}}
+ try{String url=j.optString("url");for(String rec:records){JSONObject existing=new JSONObject(rec);if(TenderFilter.normalizedKey(j).equals(TenderFilter.normalizedKey(existing))){status.setText("Already saved.");return;}}
  JSONObject record=new JSONObject(j.toString());record.put("verdict","REVIEW — NOT VERIFIED");record.put("text",j.optString("snippet"));records.add(record.toString());persist();refresh();status.setText("Saved for review. Source and deadline are not independently verified.");}
  catch(Exception e){status.setText("Save error: "+e.getMessage());}
  });
