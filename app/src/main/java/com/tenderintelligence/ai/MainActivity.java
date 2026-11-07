@@ -15,12 +15,13 @@ import java.util.concurrent.*;
 
 public class MainActivity extends Activity {
  final ExecutorService pool=Executors.newSingleThreadExecutor();
- LinearLayout root; EditText key, model, title, deadline, body; TextView status, saved;
+ LinearLayout root; EditText key, model, title, deadline, body, tavilyKey, serperKey; TextView status, saved;
  final ArrayList<String> records=new ArrayList<>();
  final String[] keywords={"heat exchanger","shell and tube","tube bundle","condenser","surface condenser","cooler","oil cooler","air cooler","water cooler","intercooler","aftercooler","pressure vessel","storage vessel","storage tank","receiver","reactor","column","tower","separator","scrubber","demister","evaporator","reboiler","heater","feedwater heater","air preheater","economizer","radiator","chiller","heat recovery","waste heat","steam generator","boiler","tube sheet","tubesheet","baffle","tube expansion","tube replacement","retubing","tube insertion","fabrication","mechanical equipment","process equipment","piping","shell","fin tube"};
  static final int OPEN_TXT=8, SAVE_CSV=9;
  @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(Color.rgb(23,92,211));loadRecords();draw();}
  void officialPortals(){String[] names={"GeM — bidplus.gem.gov.in","CPPP — eprocure.gov.in","CPPP — etenders.gov.in","IREPS — ireps.gov.in","BHEL — tenders.bhel.com","NTPC — ntpctender.ntpc.co.in","IOCL — iocletenders.nic.in","SAIL — sailtenders.co.in"};String[] urls={"https://bidplus.gem.gov.in/all-bids","https://eprocure.gov.in/eprocure/app","https://etenders.gov.in/eprocure/app","https://www.ireps.gov.in/","https://tenders.bhel.com/","https://ntpctender.ntpc.co.in/","https://iocletenders.nic.in/","https://sailtenders.co.in/"};new AlertDialog.Builder(this).setTitle("Official tender portals").setItems(names,(dialog,which)->{Intent i=new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(urls[which]));startActivity(i);}).setNegativeButton("Cancel",null).show();}
+ void searchTenders(){String t=tavilyKey.getText().toString().trim(),s=serperKey.getText().toString().trim();background(()->{TenderSearch.Result r=TenderSearch.scan(t,s);StringBuilder out=new StringBuilder("Requests: "+r.stats.requests+" • Candidates: "+r.tenders.size()+" • Filtered: "+r.stats.blocked+"\\n");for(String error:r.stats.errors)out.append("ERROR: ").append(error).append("\\n");for(JSONObject item:r.tenders){out.append("\\n• ").append(item.optString("title")).append("\\n").append(item.optString("status")).append("\\n").append(item.optString("url")).append("\\n");}return out.toString();});}
  TextView text(String s,int size){TextView v=new TextView(this);v.setText(s);v.setTextSize(size);v.setTextColor(Color.rgb(29,41,57));v.setPadding(0,10,0,10);return v;}
  EditText edit(String hint, boolean multi){EditText e=new EditText(this);e.setHint(hint);e.setTextColor(Color.WHITE);e.setHintTextColor(Color.rgb(148,163,184));if(multi){e.setMinLines(5);e.setGravity(Gravity.TOP);e.setInputType( android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);}return e;}
  void addButton(String label,Runnable fn){Button b=new Button(this);b.setText(label);root.addView(b);b.setAllCaps(false);b.setOnClickListener(v->fn.run());}
@@ -31,8 +32,11 @@ public class MainActivity extends Activity {
  TextView subtitle=text("Official Government & PSU tender intelligence • Verified sources only",13);subtitle.setTextColor(Color.rgb(159,178,205));root.addView(subtitle);
  TextView banner=text("🔒 OFFICIAL SOURCE ALLOWLIST\\nGeM • CPPP • IREPS • BHEL • NTPC • IOCL • SAIL",13);banner.setTextColor(Color.rgb(29,220,180));root.addView(banner);
  TextView scanTitle=text("1-Tap Official Government & PSU Tender Scanner",20);scanTitle.setTextColor(Color.WHITE);scanTitle.setTypeface(null,1);root.addView(scanTitle);
- TextView disclaimer=text("Scan opens official tender portals. Automated multi-portal crawling is not enabled yet. Only imported or manually verified notices are scored.",12);disclaimer.setTextColor(Color.rgb(159,178,205));root.addView(disclaimer);
- addButton("🚀 OPEN OFFICIAL TENDER PORTALS",this::officialPortals);
+ TextView disclaimer=text("Search Tavily/Serper indexes for official-domain tender candidates. Results are DISCOVERED, not verified active bids. Provider errors are shown.",12);disclaimer.setTextColor(Color.rgb(159,178,205));root.addView(disclaimer);
+ tavilyKey=edit("Tavily API key (memory only)",false);tavilyKey.setInputType(129);root.addView(tavilyKey);
+ serperKey=edit("Serper API key (memory only)",false);serperKey.setInputType(129);root.addView(serperKey);
+ addButton("🚀 1-TAP SEARCH OFFICIAL DOMAINS",this::searchTenders);
+ addButton("Browse official tender portals",this::officialPortals);
  TextView stats=text("✓ Saved official tenders: "+records.size()+"    •    45 industrial keywords",13);stats.setTextColor(Color.rgb(29,220,180));root.addView(stats);
  TextView section=text("Tender Import & AI Analysis",20);section.setTextColor(Color.WHITE);root.addView(section);
  key=edit("OpenRouter API key (memory only)",false);key.setInputType(129);root.addView(key);
