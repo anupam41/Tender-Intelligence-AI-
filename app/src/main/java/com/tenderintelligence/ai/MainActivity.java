@@ -22,7 +22,7 @@ public class MainActivity extends Activity {
  @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(Color.rgb(23,92,211));loadRecords();draw();}
  void officialPortals(){String[] names={"GeM — bidplus.gem.gov.in","CPPP — eprocure.gov.in","CPPP — etenders.gov.in","IREPS — ireps.gov.in","BHEL — tenders.bhel.com","NTPC — ntpctender.ntpc.co.in","IOCL — iocletenders.nic.in","SAIL — sailtenders.co.in"};String[] urls={"https://bidplus.gem.gov.in/all-bids","https://eprocure.gov.in/eprocure/app","https://etenders.gov.in/eprocure/app","https://www.ireps.gov.in/","https://tenders.bhel.com/","https://ntpctender.ntpc.co.in/","https://iocletenders.nic.in/","https://sailtenders.co.in/"};new AlertDialog.Builder(this).setTitle("Official tender portals").setItems(names,(dialog,which)->{Intent i=new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(urls[which]));startActivity(i);}).setNegativeButton("Cancel",null).show();}
  TextView text(String s,int size){TextView v=new TextView(this);v.setText(s);v.setTextSize(size);v.setTextColor(Color.rgb(29,41,57));v.setPadding(0,10,0,10);return v;}
- EditText edit(String hint, boolean multi){EditText e=new EditText(this);e.setHint(hint);if(multi){e.setMinLines(5);e.setGravity(Gravity.TOP);e.setInputType( android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);}return e;}
+ EditText edit(String hint, boolean multi){EditText e=new EditText(this);e.setHint(hint);e.setTextColor(Color.WHITE);e.setHintTextColor(Color.rgb(148,163,184));if(multi){e.setMinLines(5);e.setGravity(Gravity.TOP);e.setInputType( android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);}return e;}
  void addButton(String label,Runnable fn){Button b=new Button(this);b.setText(label);root.addView(b);b.setAllCaps(false);b.setOnClickListener(v->fn.run());}
  void draw(){
  ScrollView sc=new ScrollView(this);root=new LinearLayout(this);root.setOrientation(1);root.setPadding(22,18,22,26);sc.addView(root);setContentView(sc);
@@ -45,8 +45,8 @@ public class MainActivity extends Activity {
  addButton("Score and save tender",this::save);
  addButton("Analyze with OpenRouter AI",this::analyze);
  addButton("Export shortlist CSV",()->{Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("text/csv");i.putExtra(Intent.EXTRA_TITLE,"tender-shortlist.csv");startActivityForResult(i,SAVE_CSV);});
- status=text("Ready. Import or paste a tender to begin.",14);root.addView(status);
- saved=text("",14);root.addView(saved);refresh();
+ status=text("Ready. Import or paste a tender to begin.",14);status.setTextColor(Color.rgb(29,220,180));root.addView(status);
+ saved=text("",14);saved.setTextColor(Color.WHITE);root.addView(saved);refresh();
  }
  void refresh(){StringBuilder s=new StringBuilder("Saved tenders: "+records.size()+"\n");for(int i=records.size()-1;i>=0&&i>=records.size()-20;i--){try{JSONObject j=new JSONObject(records.get(i));s.append("\n").append(j.optString("title")).append(" • ").append(j.optString("verdict")).append(" • ").append(j.optString("deadline")).append("\n");}catch(Exception ignored){}}saved.setText(s.toString());}
  void loadRecords(){String raw=getPreferences(0).getString("records","[]");try{JSONArray a=new JSONArray(raw);for(int i=0;i<a.length();i++)records.add(a.getString(i));}catch(Exception ignored){}}
