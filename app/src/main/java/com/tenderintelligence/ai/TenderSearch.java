@@ -19,23 +19,23 @@ public final class TenderSearch {
   ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] buf=new byte[8192];int n;try(InputStream input=in){while((n=input.read(buf))!=-1){if(out.size()+n>2000000)throw new IOException("Response too large");out.write(buf,0,n);}}
   c.disconnect();String data=new String(out.toByteArray(),StandardCharsets.UTF_8);if(status>=400)throw new IOException("HTTP "+status+" from search provider (response body hidden to protect API credentials)");return data;
  }
- private static void accept(JSONArray source,boolean serper,LinkedHashMap<String,JSONObject> found,Stats stats)throws Exception{
+ private static void accept(JSONArray source,LinkedHashMap<String,JSONObject> found,Stats stats)throws Exception{
   for(int i=0;i<source.length();i++){JSONObject item=source.optJSONObject(i);if(item==null)continue;
-   String url=item.optString(serper?"link":"url"),title=item.optString("title"),snippet=item.optString(serper?"snippet":"content");
+   String url=item.optString("url"),title=item.optString("title"),snippet=item.optString("content");
    if(!allowed(url)){stats.blocked++;continue;}String text=(title+" "+snippet).toLowerCase(Locale.ROOT);
    boolean relevant=EquipmentKeywords.matches(text);for(String term:NEGATIVE)if(text.contains(term)){relevant=false;break;}
    if(!relevant){stats.blocked++;continue;}if(!(text.matches("(?s).*(tender|bid|procurement|enquiry|rfq|nit|gem/\\d{4}/b/).*"))){stats.blocked++;continue;}
-   JSONObject record=new JSONObject();record.put("title",title);record.put("url",url);record.put("snippet",snippet);record.put("status","DISCOVERED — deadline unverified");record.put("source",serper?"Serper":"Tavily");found.put(url,record);
+   JSONObject record=new JSONObject();record.put("title",title);record.put("url",url);record.put("snippet",snippet);record.put("status","DISCOVERED — deadline unverified");record.put("source","Tavily");found.put(url,record);
   }
  }
  public static final class Stats{public int requests,blocked;public final ArrayList<String> errors=new ArrayList<>();}
  public static final class Result{public final ArrayList<JSONObject> tenders;public final Stats stats;Result(ArrayList<JSONObject> a,Stats s){tenders=a;stats=s;}}
- public static Result scan(String tavily,String serper)throws Exception{
+ public static Result scan(String tavily)throws Exception{
   Stats stats=new Stats();LinkedHashMap<String,JSONObject> found=new LinkedHashMap<>();
-  if(tavily.isEmpty()&&serper.isEmpty())throw new IllegalArgumentException("Enter a Tavily or Serper API key.");
+  if(tavily.isEmpty())throw new IllegalArgumentException("Enter a Tavily API key.");
   for(String batch:BATCHES){
-   if(!tavily.isEmpty())try{JSONObject p=new JSONObject().put("api_key",tavily).put("query",batch+" tender bid GeM").put("search_depth","basic").put("max_results",8).put("include_domains",new JSONArray(HOSTS));stats.requests++;JSONObject response=new JSONObject(post("https://api.tavily.com/search",p,null,null));accept(response.optJSONArray("results")==null?new JSONArray():response.getJSONArray("results"),false,found,stats);}catch(Exception e){stats.errors.add("Tavily: "+e.getMessage());}
-   if(!serper.isEmpty())try{StringBuilder sites=new StringBuilder("(");for(int j=0;j<HOSTS.length;j++){if(j>0)sites.append(" OR ");sites.append("site:").append(HOSTS[j]);}sites.append(")");JSONObject p=new JSONObject().put("q",batch+" tender bid "+sites).put("gl","in").put("num",10);stats.requests++;JSONObject response=new JSONObject(post("https://google.serper.dev/search",p,"X-API-KEY",serper));accept(response.optJSONArray("organic")==null?new JSONArray():response.getJSONArray("organic"),true,found,stats);}catch(Exception e){stats.errors.add("Serper: "+e.getMessage());}
+   if(!tavily.isEmpty())try{JSONObject p=new JSONObject().put("api_key",tavily).put("query","site:bidplus.gem.gov.in "+batch+" tender bid").put("search_depth","basic").put("max_results",8).put("include_domains",new JSONArray(HOSTS));stats.requests++;JSONObject response=new JSONObject(post("https://api.tavily.com/search",p,null,null));accept(response.optJSONArray("results")==null?new JSONArray():response.getJSONArray("results"),found,stats);}catch(Exception e){stats.errors.add("Tavily: "+e.getMessage());}
+
   }
   return new Result(new ArrayList<>(found.values()),stats);
  }
