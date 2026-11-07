@@ -24,13 +24,18 @@ public class MainActivity extends Activity {
  static final int OPEN_TXT=8, SAVE_CSV=9, OPEN_PDF=10;
  @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(Color.rgb(6,10,18));getWindow().setNavigationBarColor(Color.rgb(6,10,18));loadRecords();draw();}
  void showApiSettings(){
-  LinearLayout layout=new LinearLayout(this);layout.setOrientation(1);layout.setPadding(dp(18),dp(10),dp(18),dp(4));
-  TextView info=text("API keys are kept only in app memory. They are not saved to disk. They will be cleared when the app process ends. The selected model ID is saved locally.",13);info.setTextColor(Color.rgb(190,204,223));layout.addView(info);
-  CheckBox reveal=new CheckBox(this);reveal.setText("Show API keys");reveal.setTextColor(Color.WHITE);layout.addView(reveal);
-  reveal.setOnCheckedChangeListener((button,checked)->{int type=checked?InputType.TYPE_CLASS_TEXT:InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD;for(EditText field:new EditText[]{tavilyKey,serperKey,key}){int pos=field.getSelectionStart();field.setInputType(type);field.setSelection(Math.max(0,Math.min(pos,field.length())));}});
-  new AlertDialog.Builder(this).setTitle("API Keys & Provider Settings").setView(layout)
-   .setNeutralButton("Clear all keys",(d,w)->{tavilyKey.setText("");serperKey.setText("");key.setText("");status.setText("All API keys cleared from input fields.");})
-   .setPositiveButton("Done",null).show();
+  LinearLayout layout=new LinearLayout(this);layout.setOrientation(1);layout.setPadding(dp(18),dp(8),dp(18),dp(8));
+  TextView info=text("Keys are held in memory only and are not saved. Enter at least one search-provider key to scan.",13);info.setTextColor(Color.rgb(190,204,223));layout.addView(info);
+  EditText tav=edit("Tavily API key",false);tav.setInputType(129);tav.setText(tavilyKey.getText());layout.addView(tav);
+  EditText ser=edit("Serper API key",false);ser.setInputType(129);ser.setText(serperKey.getText());layout.addView(ser);
+  EditText router=edit("OpenRouter API key",false);router.setInputType(129);router.setText(key.getText());layout.addView(router);
+  CheckBox reveal=new CheckBox(this);reveal.setText("Show keys");reveal.setTextColor(Color.WHITE);layout.addView(reveal);
+  reveal.setOnCheckedChangeListener((v,checked)->{int type=checked?InputType.TYPE_CLASS_TEXT:129;for(EditText field:new EditText[]{tav,ser,router}){field.setInputType(type);field.setSelection(field.length());}});
+  ScrollView scroll=new ScrollView(this);scroll.addView(layout);
+  new AlertDialog.Builder(this).setTitle("API Keys & Provider Settings").setView(scroll)
+   .setNeutralButton("Clear keys",(d,w)->{tavilyKey.setText("");serperKey.setText("");key.setText("");status.setText("API keys cleared.");})
+   .setNegativeButton("Cancel",null)
+   .setPositiveButton("Save for this session",(d,w)->{tavilyKey.setText(tav.getText());serperKey.setText(ser.getText());key.setText(router.getText());status.setText("API settings updated for this session.");}).show();
  }
  void officialPortals(){String[] names={"GeM — bidplus.gem.gov.in","CPPP — eprocure.gov.in","CPPP — etenders.gov.in","IREPS — ireps.gov.in","BHEL — tenders.bhel.com","NTPC — ntpctender.ntpc.co.in","IOCL — iocletenders.nic.in","SAIL — sailtenders.co.in"};String[] urls={"https://bidplus.gem.gov.in/all-bids","https://eprocure.gov.in/eprocure/app","https://etenders.gov.in/eprocure/app","https://www.ireps.gov.in/","https://tenders.bhel.com/","https://ntpctender.ntpc.co.in/","https://iocletenders.nic.in/","https://sailtenders.co.in/"};new AlertDialog.Builder(this).setTitle("Official tender portals").setItems(names,(dialog,which)->{Intent i=new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(urls[which]));startActivity(i);}).setNegativeButton("Cancel",null).show();}
  void searchTenders(){
@@ -89,35 +94,42 @@ public class MainActivity extends Activity {
  }
  GradientDrawable panel(int fill,int stroke,int radius){GradientDrawable d=new GradientDrawable();d.setColor(fill);d.setCornerRadius(dp(radius));d.setStroke(dp(1),stroke);return d;}
  int dp(int n){return Math.round(getResources().getDisplayMetrics().density*n);}
- void sectionLabel(String label){TextView t=text(label,18);t.setTypeface(null,Typeface.BOLD);t.setTextColor(Color.WHITE);root.addView(t);}
+ void sectionLabel(String label){TextView t=text(label,18);t.setPadding(0,dp(20),0,dp(8));t.setTypeface(null,Typeface.BOLD);t.setTextColor(Color.WHITE);root.addView(t);}
  void statsRow(){LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);root.addView(row);kpiFound=statCell(row,"Relevant","0",Color.rgb(52,211,153));kpiFiltered=statCell(row,"Filtered","0",Color.rgb(251,113,133));kpiSaved=statCell(row,"Shortlisted",String.valueOf(records.size()),Color.rgb(34,211,238));}
  TextView statCell(LinearLayout row,String label,String value,int color){LinearLayout cell=new LinearLayout(this);cell.setOrientation(1);cell.setPadding(dp(10),dp(10),dp(6),dp(10));cell.setBackground(panel(Color.rgb(15,23,42),Color.rgb(51,65,85),12));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(dp(2),dp(5),dp(2),dp(5));row.addView(cell,lp);TextView name=text(label,11);name.setTextColor(Color.rgb(148,163,184));cell.addView(name);TextView count=text(value,23);count.setTypeface(null,Typeface.BOLD);count.setTextColor(color);cell.addView(count);return count;}
  TextView text(String s,int size){TextView v=new TextView(this);v.setText(s);v.setTextSize(size);v.setTextColor(Color.rgb(29,41,57));v.setPadding(0,10,0,10);return v;}
  EditText edit(String hint, boolean multi){EditText e=new EditText(this);e.setHint(hint);e.setTextColor(Color.WHITE);e.setHintTextColor(Color.rgb(148,163,184));e.setBackground(panel(Color.rgb(15,23,42),Color.rgb(51,65,85),10));e.setPadding(dp(12),dp(10),dp(12),dp(10));if(multi){e.setMinLines(5);e.setGravity(Gravity.TOP);e.setInputType( android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);}return e;}
+ void addSecondaryButton(String label,Runnable fn){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(13);b.setTextColor(Color.rgb(165,243,252));b.setBackground(panel(Color.rgb(15,23,42),Color.rgb(51,65,85),12));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(44));lp.setMargins(0,dp(4),0,dp(4));root.addView(b,lp);b.setOnClickListener(v->fn.run());}
  void addButton(String label,Runnable fn){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextColor(Color.rgb(4,18,28));b.setTypeface(null,Typeface.BOLD);b.setBackground(panel(Color.rgb(45,212,191),Color.rgb(34,211,238),14));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(52));lp.setMargins(0,dp(5),0,dp(5));root.addView(b,lp);b.setOnClickListener(v->fn.run());}
  void draw(){
- ScrollView sc=new ScrollView(this);root=new LinearLayout(this);root.setOrientation(1);root.setPadding(22,18,22,26);sc.addView(root);setContentView(sc);
+ ScrollView sc=new ScrollView(this);root=new LinearLayout(this);root.setOrientation(1);root.setPadding(dp(16),dp(20),dp(16),dp(26));sc.addView(root);setContentView(sc);
+ getWindow().getDecorView().setSystemUiVisibility(0);
+ sc.setClipToPadding(false);
+ int statusId=getResources().getIdentifier("status_bar_height","dimen","android");
+ int inset=statusId>0?getResources().getDimensionPixelSize(statusId):dp(26);
+ sc.setPadding(0,inset,0,0);
  root.setBackgroundColor(Color.rgb(6,10,18));
  TextView heading=text("Aditya Udyog Official\nTender Radar",25);heading.setTextColor(Color.WHITE);heading.setTypeface(null,1);root.addView(heading);
  TextView subtitle=text("Official-domain tender discovery • verification required",13);subtitle.setTextColor(Color.rgb(159,178,205));root.addView(subtitle);
  TextView banner=text("🔒 OFFICIAL SOURCE ALLOWLIST\nGeM • CPPP • IREPS • BHEL • NTPC • IOCL • SAIL",13);banner.setTextColor(Color.rgb(29,220,180));root.addView(banner);
  statsRow();
- TextView scanTitle=text("1-Tap Official Government & PSU Tender Scanner",20);scanTitle.setTextColor(Color.WHITE);scanTitle.setTypeface(null,1);root.addView(scanTitle);
+ sectionLabel("Tender Scanner");
+ TextView scanTitle=text("1-Tap Official Government & PSU Tender Scanner",17);scanTitle.setTextColor(Color.WHITE);scanTitle.setTypeface(null,1);root.addView(scanTitle);
  TextView disclaimer=text("Search Tavily/Serper indexes for official-domain tender candidates. Results are DISCOVERED, not verified active bids. Provider errors are shown.",12);disclaimer.setTextColor(Color.rgb(159,178,205));root.addView(disclaimer);
- tavilyKey=edit("Tavily API key (memory only)",false);tavilyKey.setInputType(129);root.addView(tavilyKey);
- serperKey=edit("Serper API key (memory only)",false);serperKey.setInputType(129);root.addView(serperKey);
- addButton("API Keys & Provider Settings",this::showApiSettings);
+ tavilyKey=edit("Tavily API key",false);tavilyKey.setInputType(129);
+ serperKey=edit("Serper API key",false);serperKey.setInputType(129);
+ addSecondaryButton("⚙ API Keys & Provider Settings",this::showApiSettings);
  addButton("🚀 1-TAP SCAN OFFICIAL GOV/PSU PORTALS",this::searchTenders);
- addButton("Browse official tender portals",this::officialPortals);
+ addSecondaryButton("Browse official tender portals",this::officialPortals);
  sectionLabel("Official-domain tender results");
  resultFilter=edit("Filter results by title, bid ID or equipment...",false);root.addView(resultFilter);
  resultCards=new LinearLayout(this);resultCards.setOrientation(1);root.addView(resultCards);
  resultFilter.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){renderSearchCards();}public void afterTextChanged(android.text.Editable e){}});
- TextView shortlistHeading=text("Saved shortlist — review required",19);shortlistHeading.setTextColor(Color.WHITE);root.addView(shortlistHeading);
+ TextView shortlistHeading=text("Saved shortlist — review required",19);shortlistHeading.setPadding(0,dp(20),0,dp(8));shortlistHeading.setTextColor(Color.WHITE);root.addView(shortlistHeading);
  shortlistCards=new LinearLayout(this);shortlistCards.setOrientation(1);root.addView(shortlistCards);
  TextView stats=text("Shortlisted for review: "+records.size()+"    •    45 industrial keywords",13);stats.setTextColor(Color.rgb(29,220,180));root.addView(stats);
- TextView section=text("Tender Import & AI Analysis",20);section.setTextColor(Color.WHITE);root.addView(section);
- key=edit("OpenRouter API key (memory only)",false);key.setInputType(129);root.addView(key);
+ TextView section=text("Tender Import & AI Analysis",20);section.setTextColor(Color.WHITE);section.setPadding(0,dp(22),0,dp(8));root.addView(section);
+ key=edit("OpenRouter API key",false);key.setInputType(129);
  model=edit("Model ID (e.g. openai/gpt-4o-mini)",false);model.setText(getPreferences(0).getString("model_id","openai/gpt-4o-mini"));root.addView(model);model.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){getPreferences(0).edit().putString("model_id",s.toString()).apply();}public void afterTextChanged(android.text.Editable e){}});
  addButton("Choose model from OpenRouter",this::chooseModel);
  title=edit("Tender title",false);root.addView(title);
