@@ -22,18 +22,22 @@ public class GemBrowserActivity extends Activity {
  @Override public void onCreate(Bundle bundle){
   super.onCreate(bundle);
   getWindow().setStatusBarColor(Color.rgb(6,10,18));
-  LinearLayout page=new LinearLayout(this);page.setOrientation(1);page.setBackgroundColor(Color.rgb(6,10,18));setContentView(page);
-  TextView heading=new TextView(this);heading.setText("GeM Public Bid Browser");heading.setTextSize(20);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(Color.WHITE);heading.setPadding(16,16,16,8);page.addView(heading);
+  LinearLayout page=new LinearLayout(this);page.setOrientation(1);page.setBackgroundColor(Color.rgb(6,10,18));setContentView(page);page.setOnApplyWindowInsetsListener((v,insets)->{int top=android.os.Build.VERSION.SDK_INT>=30?insets.getInsets(android.view.WindowInsets.Type.statusBars()).top:insets.getSystemWindowInsetTop();v.setPadding(0,top,0,0);return insets;});
+  TextView heading=new TextView(this);heading.setText("GeM Bid Search");heading.setTextSize(19);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(Color.WHITE);heading.setPadding(16,16,16,8);page.addView(heading);
   TextView note=new TextView(this);note.setText("Browse GeM pages manually. Use GeM's search and pagination. This browser does not automatically download or analyze tenders.");note.setTextColor(Color.LTGRAY);note.setPadding(16,0,16,8);page.addView(note);
   LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.HORIZONTAL);page.addView(controls);
   Button back=button("Back");controls.addView(back,new LinearLayout.LayoutParams(0,52,1));back.setOnClickListener(v->{if(browser.canGoBack())browser.goBack();else finish();});
   Button home=button("GeM home");controls.addView(home,new LinearLayout.LayoutParams(0,52,1));home.setOnClickListener(v->browser.loadUrl(GEM));
   Button reload=button("Reload");controls.addView(reload,new LinearLayout.LayoutParams(0,52,1));reload.setOnClickListener(v->browser.reload());
+  Spinner picker=new Spinner(this);
+  String[] options={"Choose equipment keyword","Heat exchanger","Condenser","Sample cooler","Oil cooler","SWAS cooler","Air cooler","Water cooler","Tube bundle","U tube bundle","Cooling coil","Chiller","Radiator","Dryer","Heater","Economizer","Ejector","Evaporator","Tank","Pressure vessel"};
+  picker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,options));page.addView(picker);
+  picker.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> parent){}public void onItemSelected(AdapterView<?> parent,View view,int position,long id){if(position>0)term.setText(options[position]);}});
   LinearLayout findRow=new LinearLayout(this);findRow.setOrientation(LinearLayout.HORIZONTAL);page.addView(findRow);
-  term=new EditText(this);term.setSingleLine(true);term.setTextColor(Color.WHITE);term.setHintTextColor(Color.LTGRAY);term.setHint("Search GeM bid keywords");findRow.addView(term,new LinearLayout.LayoutParams(0,54,1));
-  Button find=button("Find");findRow.addView(find);find.setOnClickListener(v->{
+  term=new EditText(this);term.setSingleLine(true);term.setTextColor(Color.WHITE);term.setHintTextColor(Color.LTGRAY);term.setHint("Or type equipment keyword");term.setTextSize(14);findRow.addView(term,new LinearLayout.LayoutParams(0,54,1));
+  Button find=button("Search");findRow.addView(find);find.setOnClickListener(v->{
    String q=term.getText().toString().trim();
-   if(q.isEmpty()){state.setText("Enter an equipment keyword first.");return;}
+   if(q.isEmpty()){state.setText("Select or type an equipment keyword first.");return;}
    state.setText("Submitting GeM bid search…");
    String js="(function(){"+
     "var fields=Array.from(document.querySelectorAll('input[type=text],input[type=search],input:not([type])'));"+
@@ -75,7 +79,7 @@ public class GemBrowserActivity extends Activity {
     if("https".equalsIgnoreCase(url.getScheme())){startActivity(new Intent(Intent.ACTION_VIEW,url));return true;}
     return true;
    }
-   @Override public void onPageFinished(WebView view,String url){state.setText("GeM page loaded. Find searches bid listings; Next requests the next results page.");}
+   @Override public void onPageFinished(WebView view,String url){state.setText("GeM loaded. Choose a keyword, then tap Search.");}
    @Override public void onReceivedError(WebView view,WebResourceRequest req,WebResourceError error){if(req.isForMainFrame())state.setText("Unable to load GeM in WebView. Try opening in your browser.");}
   });
   browser.setDownloadListener((url,userAgent,disposition,mime,length)->{Uri uri=Uri.parse(url);if(safe(uri))startActivity(new Intent(Intent.ACTION_VIEW,uri));else state.setText("Download blocked: external URL");});
