@@ -19,6 +19,11 @@ import java.nio.charset.StandardCharsets;
 /** User-driven browser for public GeM bid listings. Does not scrape or bypass access controls. */
 public class GemBrowserActivity extends Activity {
  private WebView browser;
+ private boolean autoCollecting=false;
+ private int autoPages=0,autoStalls=0;
+ private String autoSignature="";
+ private final android.os.Handler autoHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+ private Button autoButton;
  private EditText term;
  private TextView state;
  private final LinkedHashMap<String,JSONObject> collected=new LinkedHashMap<>();
@@ -79,6 +84,8 @@ public class GemBrowserActivity extends Activity {
   LinearLayout captureRow=new LinearLayout(this);captureRow.setOrientation(LinearLayout.HORIZONTAL);page.addView(captureRow);
   Button collect=button("Collect visible bids");captureRow.addView(collect,new LinearLayout.LayoutParams(0,dp(52),2));collect.setOnClickListener(v->collectVisible());
   Button review=button("Review shortlist");captureRow.addView(review,new LinearLayout.LayoutParams(0,dp(52),2));review.setOnClickListener(v->reviewCollected());
+  autoButton=button("Auto collect all pages");page.addView(autoButton,new LinearLayout.LayoutParams(-1,dp(48)));
+  autoButton.setOnClickListener(v->{if(autoCollecting)stopAutoCollect("Stopped by user.");else startAutoCollect();});
   collectedCount=new TextView(this);collectedCount.setTextColor(Color.rgb(45,212,191));collectedCount.setPadding(12,2,12,2);page.addView(collectedCount);
   restoreCollected();restoreAiReviews();updateCollectedCount();
   Button next=button("Next");findRow.addView(next);next.setOnClickListener(v->{
@@ -117,7 +124,8 @@ public class GemBrowserActivity extends Activity {
   JSONArray a=new JSONArray();for(JSONObject j:collected.values())a.put(j);
   getPreferences(0).edit().putString("gem_collected",a.toString()).apply();
  }
- private void collectVisible(){
+ private void collectVisible(){collectVisible(null);}
+ private void collectVisible(Runnable done){
   state.setText("Reading visible GeM listing cards…");
   String js="(function(){try{var found=[],seen={};"+
    "var ids=Array.from(document.querySelectorAll('a,span,strong,b,div')).filter(e=>e.children.length<3&&/GEM\\/20\\d{2}\\/B\\/\\d+/i.test(e.textContent||''));"+
@@ -140,10 +148,50 @@ public class GemBrowserActivity extends Activity {
      if(!collected.containsKey(id)){collected.put(id,j);added++;}
     }
     persistCollected();updateCollectedCount();
-    state.setText("Detected "+items.length()+" GeM bid IDs; saved "+added+" new bids. "+(items.length()==0?"No bid IDs detected in page DOM. Scroll to results and retry.":"Tap Next and collect again."));
+    state.setText("Detected "+items.length()+" GeM bid IDs; saved "+added+" new bids.");
+    if(done!=null)done.run();
    }catch(Exception e){state.setText("Could not parse bid cards. GeM page format may have changed.");}
   });
  }
+ private void stopAutoCollect(String message){
+  autoCollecting=false;autoHandler.removeCallbacksAndMessages(null);
+  if(autoButton!=null)autoButton.setText("Auto collect all pages");
+  state.setText(message+" Pages processed: "+autoPages+" • Total unique bids: "+collected.size());
+ }
+ private void startAutoCollect(){
+  if(browser==null)return;
+  autoCollecting=true;autoPages=0;autoStalls=0;autoSignature="";
+  autoButton.setText("Stop auto collection");
+  state.setText("Auto collection started. Keep the app open.");
+  autoHandler.postDelayed(this::autoStep,600);
+ }
+ private void autoStep(){
+  if(!autoCollecting)return;
+  String js="(function(){var cards=Array.from(document.querySelectorAll('a,span,strong,b,div')).filter(e=>e.children.length<3&&/GEM\\/20\\d{2}\\/B\\/\\d+/i.test(e.textContent||''));var ids=Array.from(new Set(cards.map(e=>(e.textContent||'').match(/GEM\\/20\\d{2}\\/B\\/\\d+/i)).filter(Boolean).map(m=>m[0])));var next=Array.from(document.querySelectorAll('a,button')).find(e=>{var t=(e.innerText||'').trim(),r=e.getBoundingClientRect();return r.width>0&&r.height>0&&!e.disabled&&e.getAttribute('aria-disabled')!=='true'&&!e.classList.contains('disabled')&&/^(next|next page|›|»|>)$/i.test(t)});return JSON.stringify({signature:ids.slice(0,4).join('|')+'#'+ids.length,count:ids.length,hasNext:!!next})})()";
+  browser.evaluateJavascript(js,result->{
+   if(!autoCollecting)return;
+   try{
+    JSONObject data=new JSONObject(new JSONArray("["+result+"]").getString(0));
+    String signature=data.optString("signature");int count=data.optInt("count");
+    if(count==0){if(++autoStalls>=8){stopAutoCollect("No GeM bid cards detected. Search first and wait for results.");return;}autoHandler.postDelayed(this::autoStep,1500);return;}
+    if(signature.equals(autoSignature)){if(++autoStalls>=8){stopAutoCollect("GeM results did not change. Pagination may be blocked.");return;}autoHandler.postDelayed(this::autoStep,1500);return;}
+    autoSignature=signature;autoStalls=0;autoPages++;
+    state.setText("Collecting page "+autoPages+"…");
+    collectVisible(()->{
+     if(!autoCollecting)return;
+     if(autoPages>=100){stopAutoCollect("Reached 100-page safety limit.");return;}
+     String nextJs="(function(){var a=Array.from(document.querySelectorAll('a,button')).find(e=>{var r=e.getBoundingClientRect();return r.width>0&&r.height>0&&!e.disabled&&e.getAttribute('aria-disabled')!=='true'&&!e.classList.contains('disabled')&&/^(next|next page|›|»|>)$/i.test((e.innerText||'').trim())});if(!a)return 'END';a.click();return 'NEXT'})()";
+     browser.evaluateJavascript(nextJs,out->{
+      if(!autoCollecting)return;
+      if(!out.contains("NEXT")){stopAutoCollect("Reached the last available page.");return;}
+      state.setText("Collected "+autoPages+" pages, "+collected.size()+" unique bids. Waiting for next GeM page…");
+      autoHandler.postDelayed(this::autoStep,1800);
+     });
+    });
+   }catch(Exception e){stopAutoCollect("Could not inspect GeM pagination.");}
+  });
+ }
+ @Override protected void onDestroy(){autoCollecting=false;autoHandler.removeCallbacksAndMessages(null);super.onDestroy();}
  private Date parsedDeadline(String value){
   try{SimpleDateFormat format=new SimpleDateFormat("dd-MM-yyyy h:mm a",Locale.ENGLISH);format.setLenient(false);return format.parse(value.trim());}catch(Exception e){return null;}
  }
