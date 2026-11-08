@@ -315,7 +315,7 @@ public class GemBrowserActivity extends Activity {
  private boolean autoReviewActive=false;
  private String currentReviewId="";
  private final Runnable autoReviewTask=()->{
-  if(autoReviewActive||aiConnectionPaused||openRouterKey==null||openRouterKey.trim().isEmpty()||!showingDashboard)return;
+  if(autoReviewActive||aiConnectionPaused||(openRouterKey.isEmpty()&&geminiKey.isEmpty()&&groqKey.isEmpty())||!showingDashboard)return;
   for(JSONObject bid:collected.values()){
    String id=bid.optString("bidId");
    if(!relevantTitle(bid.optString("title"))||aiReviews.containsKey(id)||analyzingBids.contains(id)||failedAutoReviews.contains(id)||apiFailedReviews.contains(id))continue;
@@ -330,7 +330,7 @@ public class GemBrowserActivity extends Activity {
   String id=bid.optString("bidId");
   if(analyzingBids.contains(id))return;
   if(aiReviews.containsKey(id)){showSavedReview(id);return;}
-  if(openRouterKey.trim().isEmpty()){state.setText("Add OpenRouter key in AI Settings to enable automatic analysis.");finishAutoReview();return;}
+  if(openRouterKey.isEmpty()&&geminiKey.isEmpty()&&groqKey.isEmpty()){state.setText("Add an AI provider key in Settings.");finishAutoReview();return;}
   analyzingBids.add(id);renderDashboard();
   EditText extracted=new EditText(this);
   extracted.addTextChangedListener(new android.text.TextWatcher(){
@@ -339,22 +339,11 @@ public class GemBrowserActivity extends Activity {
    public void afterTextChanged(android.text.Editable x){
     if(!"auto_pdf_ready".equals(extracted.getTag())||x.length()<80)return;
     extracted.setTag("ai_running");
-    String document=x.toString(),token=openRouterKey,modelId=getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free");\n    if(incompatibleAiModel(modelId)){state.setText("AI model is incompatible. Choose a chat model in Settings.");apiFailedReviews.add(id);aiConnectionPaused=true;analyzingBids.remove(id);renderDashboard();finishAutoReview();return;}
+    String document=x.toString(),token=openRouterKey,modelId=getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free");\n    if(geminiKey.isEmpty()&&groqKey.isEmpty()&&incompatibleAiModel(modelId)){state.setText("AI model is incompatible. Choose a chat model in Settings.");apiFailedReviews.add(id);aiConnectionPaused=true;analyzingBids.remove(id);renderDashboard();finishAutoReview();return;}
     state.setText("Analyzing "+id+" with AI…");
     new Thread(()->{
      try{
-      JSONObject payload=new JSONObject().put("model",modelId);
-      JSONArray messages=new JSONArray();
-      messages.put(new JSONObject().put("role","system").put("content","You review Indian industrial fabrication tenders for ADITYA UDYOG HEATXCHANGER PVT. LTD. Its user-supplied catalogue describes manufacturing, refurbishment and services for shell-and-tube, fin-tube and plate heat exchangers, condensers, turbine/generator/stator/oil/air coolers, LP/HP heaters, air preheaters, U-tube and copper/brass tube bundles, radiators, vaporizers, pressure vessels, storage tanks, reactors, blenders, expansion bellows, FRP cooling towers, and customized retubing, hydrojet cleaning and rubber/FRP lining. The facility catalogue lists plate rolling, tube flaring, MIG/TIG/ARC welding, machining, hydraulic press, NDT and third-party inspection arrangements. Treat these as claimed general capabilities, NOT proof of qualification for a specific tender. Prioritize manufacturing, refurbishment, retubing, tube bundles, heat transfer equipment and plant service work; reject unrelated household appliances, generic spare parts and standalone material supply unless document evidence establishes fabrication scope. Return these clearly labeled concise sections in order: Verdict (Relevant/Unclear/Not relevant); Buyer; Equipment; Quantity; Closing date; Scope; Fabrication fit (Suitable/Possible/Unclear/Not suitable, with reason); Missing specifications (drawings, material grades, dimensions, design pressure, tests and inspection only where not provided); Risks; Recommendation (Quote candidate/Manual review/Reject). Distinguish supply of spare tubes from fabrication of a complete exchanger, tube bundle or retubing. Only use supplied document evidence; mark unknown fields Not provided. Never invent specifications or claim the tender is verified. Distinguish industrial equipment from household appliances."));
-      messages.put(new JSONObject().put("role","user").put("content","GeM bid: "+bid.optString("bidId")+"\\nListing title: "+bid.optString("title")+"\\nClosing date from listing: "+bid.optString("deadlineText")+"\\nDocument excerpt:\\n"+document.substring(0,Math.min(document.length(),18000))));
-      payload.put("messages",messages);
-      HttpURLConnection conn=(HttpURLConnection)new URL("https://openrouter.ai/api/v1/chat/completions").openConnection();
-      conn.setRequestMethod("POST");conn.setConnectTimeout(20000);conn.setReadTimeout(60000);conn.setDoOutput(true);conn.setRequestProperty("Authorization","Bearer "+token);conn.setRequestProperty("Content-Type","application/json");
-      try(OutputStream out=conn.getOutputStream()){out.write(payload.toString().getBytes(StandardCharsets.UTF_8));}
-      int code=conn.getResponseCode();if(code>=400){conn.disconnect();throw new IOException("OpenRouter HTTP "+code);}
-      ByteArrayOutputStream output=new ByteArrayOutputStream();try(InputStream in=conn.getInputStream()){byte[] buf=new byte[4096];int n;while((n=in.read(buf))!=-1){if(output.size()+n>200000)throw new IOException("Response too large");output.write(buf,0,n);}}
-      conn.disconnect();
-      String response=new JSONObject(output.toString("UTF-8")).getJSONArray("choices").getJSONObject(0).getJSONObject("message").optString("content","No analysis returned");
+      String response=requestProviderReview("You review Indian industrial fabrication tenders for ADITYA UDYOG HEATXCHANGER PVT. LTD. Its user-supplied catalogue describes manufacturing, refurbishment and services for shell-and-tube, fin-tube and plate heat exchangers, condensers, turbine/generator/stator/oil/air coolers, LP/HP heaters, air preheaters, U-tube and copper/brass tube bundles, radiators, vaporizers, pressure vessels, storage tanks, reactors, blenders, expansion bellows, FRP cooling towers, and customized retubing, hydrojet cleaning and rubber/FRP lining. The facility catalogue lists plate rolling, tube flaring, MIG/TIG/ARC welding, machining, hydraulic press, NDT and third-party inspection arrangements. Treat these as claimed general capabilities, NOT proof of qualification for a specific tender. Prioritize manufacturing, refurbishment, retubing, tube bundles, heat transfer equipment and plant service work; reject unrelated household appliances, generic spare parts and standalone material supply unless document evidence establishes fabrication scope. Return these clearly labeled concise sections in order: Verdict (Relevant/Unclear/Not relevant); Buyer; Equipment; Quantity; Closing date; Scope; Fabrication fit (Suitable/Possible/Unclear/Not suitable, with reason); Missing specifications (drawings, material grades, dimensions, design pressure, tests and inspection only where not provided); Risks; Recommendation (Quote candidate/Manual review/Reject). Distinguish supply of spare tubes from fabrication of a complete exchanger, tube bundle or retubing. Only use supplied document evidence; mark unknown fields Not provided. Never invent specifications or claim the tender is verified. Distinguish industrial equipment from household appliances.","GeM bid: "+bid.optString("bidId")+"\\nListing title: "+bid.optString("title")+"\\nClosing date from listing: "+bid.optString("deadlineText")+"\\nDocument excerpt:\\n"+document.substring(0,Math.min(document.length(),18000)));
       runOnUiThread(()->{saveAiReview(bid,response,modelId);state.setText("AI review saved for "+bid.optString("bidId"));renderDashboard();});
 
      }catch(Exception e){runOnUiThread(()->{state.setText("AI connection failed for "+id+". Analysis paused until connection is restored in Settings.");apiFailedReviews.add(id);aiConnectionPaused=true;});}
