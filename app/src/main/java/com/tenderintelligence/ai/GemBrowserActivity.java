@@ -200,7 +200,7 @@ public class GemBrowserActivity extends Activity {
    }catch(Exception e){stopAutoCollect("Could not inspect GeM pagination.");}
   });
  }
- @Override protected void onDestroy(){autoCollecting=false;autoHandler.removeCallbacksAndMessages(null);super.onDestroy();}
+ @Override protected void onDestroy(){autoCollecting=false;autoHandler.removeCallbacksAndMessages(null);if(browser!=null){browser.destroy();browser=null;}super.onDestroy();}
  private Date parsedDeadline(String value){
   try{SimpleDateFormat format=new SimpleDateFormat("dd-MM-yyyy h:mm a",Locale.ENGLISH);format.setLenient(false);return format.parse(value.trim());}catch(Exception e){return null;}
  }
@@ -394,5 +394,4 @@ public class GemBrowserActivity extends Activity {
  private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
  private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(12);b.setTextColor(Color.BLACK);b.setMinHeight(dp(44));b.setPadding(dp(4),0,dp(4),0);return b;}
  @Override public void onBackPressed(){if(browser!=null&&browser.canGoBack())browser.goBack();else super.onBackPressed();}
- @Override protected void onDestroy(){if(browser!=null){browser.destroy();browser=null;}super.onDestroy();}
 }
