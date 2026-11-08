@@ -60,9 +60,9 @@ public class GemBrowserActivity extends Activity {
  @Override public void onCreate(Bundle bundle){
   super.onCreate(bundle);
   getWindow().setStatusBarColor(Color.rgb(6,10,18));
-  LinearLayout page=new LinearLayout(this);page.setOrientation(1);page.setBackgroundColor(Color.rgb(6,10,18));setContentView(page);page.setOnApplyWindowInsetsListener((v,insets)->{int top=android.os.Build.VERSION.SDK_INT>=30?insets.getInsets(android.view.WindowInsets.Type.statusBars()).top:insets.getSystemWindowInsetTop();v.setPadding(0,top,0,0);return insets;});
-  TextView heading=new TextView(this);heading.setText("GeM Bid Search");heading.setTextSize(19);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(Color.WHITE);heading.setPadding(16,8,16,4);page.addView(heading);
-  TextView note=new TextView(this);note.setText("Find industrial tenders and review matching bids in one place.");note.setTextColor(Color.LTGRAY);note.setPadding(16,0,16,2);page.addView(note);
+  LinearLayout page=new LinearLayout(this);page.setOrientation(1);page.setBackgroundColor(Color.rgb(250,247,244));setContentView(page);page.setOnApplyWindowInsetsListener((v,insets)->{int top=android.os.Build.VERSION.SDK_INT>=30?insets.getInsets(android.view.WindowInsets.Type.statusBars()).top:insets.getSystemWindowInsetTop();v.setPadding(0,top,0,0);return insets;});
+  TextView heading=new TextView(this);heading.setText("Tender Radar");heading.setTextSize(26);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(Color.rgb(35,38,43));heading.setPadding(dp(20),dp(18),dp(20),dp(6));page.addView(heading);
+  TextView note=new TextView(this);note.setText("Discover industrial tenders • GeM");note.setTextColor(Color.rgb(108,110,116));note.setPadding(dp(20),0,dp(20),dp(16));page.addView(note);
   LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.HORIZONTAL);controls.setVisibility(View.GONE);page.addView(controls);
   Button back=button("Back");controls.addView(back,new LinearLayout.LayoutParams(0,40,1));back.setOnClickListener(v->{if(browser.canGoBack())browser.goBack();else finish();});
   Button home=button("GeM home");controls.addView(home,new LinearLayout.LayoutParams(0,40,1));home.setOnClickListener(v->browser.loadUrl(GEM));
@@ -107,11 +107,11 @@ public class GemBrowserActivity extends Activity {
   Button review=button("Tender dashboard");captureRow.addView(review,new LinearLayout.LayoutParams(0,dp(52),2));review.setOnClickListener(v->toggleDashboard());
   autoButton=button("Auto collect all pages");autoButton.setVisibility(View.GONE);page.addView(autoButton,new LinearLayout.LayoutParams(-1,dp(48)));
   autoButton.setOnClickListener(v->{if(autoCollecting){batchRunning=false;stopAutoCollect("Stopped by user.");}else startAutoCollect();});
-  batchButton=button("Find tenders • Scan equipment categories");page.addView(batchButton,new LinearLayout.LayoutParams(-1,dp(54)));
-  batchButton.setOnClickListener(v->{if(batchRunning){batchRunning=false;stopAutoCollect("Batch stopped.");batchButton.setText("Find tenders • Scan equipment categories");}else startBatch();});
+  batchButton=button("Find tenders");batchButton.setTextSize(17);batchButton.setTypeface(null,Typeface.BOLD);batchButton.setTextColor(Color.rgb(30,37,41));batchButton.setBackground(rounded(Color.rgb(255,132,17),22,Color.rgb(255,132,17)));page.addView(batchButton,new LinearLayout.LayoutParams(-1,dp(54)));
+  batchButton.setOnClickListener(v->{if(batchRunning){batchRunning=false;stopAutoCollect("Batch stopped.");batchButton.setText("Find tenders");}else startBatch();});
   scanProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);scanProgress.setMax(batchTerms.length);scanProgress.setProgress(0);scanProgress.setIndeterminate(false);page.addView(scanProgress,new LinearLayout.LayoutParams(-1,dp(5)));
-  scanProgressLabel=new TextView(this);scanProgressLabel.setTextColor(Color.rgb(165,243,252));scanProgressLabel.setPadding(dp(12),dp(7),dp(12),dp(7));scanProgressLabel.setText("Ready to scan • Results will appear below");page.addView(scanProgressLabel);
-  collectedCount=new TextView(this);collectedCount.setTextColor(Color.rgb(45,212,191));collectedCount.setPadding(12,2,12,2);page.addView(collectedCount);
+  scanProgressLabel=new TextView(this);scanProgressLabel.setTextColor(Color.rgb(100,88,74));scanProgressLabel.setPadding(dp(12),dp(7),dp(12),dp(7));scanProgressLabel.setText("Ready to scan • Results will appear below");page.addView(scanProgressLabel);
+  collectedCount=new TextView(this);collectedCount.setTextColor(Color.rgb(166,88,24));collectedCount.setPadding(12,2,12,2);page.addView(collectedCount);
   restoreCollected();restoreAiReviews();openRouterKey=readStoredKey();updateCollectedCount();
   Button next=button("Next");findRow.addView(next);next.setOnClickListener(v->{
    state.setText("Looking for GeM next results page…");
@@ -126,11 +126,11 @@ public class GemBrowserActivity extends Activity {
     else state.setText("Next-page control not found. Use GeM pagination inside the webpage.");
    });
   });
-  state=new TextView(this);state.setTextColor(Color.rgb(45,212,191));state.setText("Opening GeM…");state.setPadding(16,5,16,5);page.addView(state);
+  state=new TextView(this);state.setTextColor(Color.rgb(124,104,86));state.setText("Opening GeM…");state.setPadding(16,5,16,5);page.addView(state);
   FrameLayout contentLayer=new FrameLayout(this);page.addView(contentLayer,new LinearLayout.LayoutParams(-1,0,1));
   browser=new WebView(this);contentLayer.addView(browser,new FrameLayout.LayoutParams(-1,-1));
-  dashboard=new ScrollView(this);dashboard.setFillViewport(true);dashboard.setVisibility(View.VISIBLE);showingDashboard=true;dashboard.setBackgroundColor(Color.rgb(9,17,32));contentLayer.addView(dashboard,new FrameLayout.LayoutParams(-1,-1));
-  dashboardList=new LinearLayout(this);dashboardList.setOrientation(1);dashboardList.setPadding(dp(12),dp(12),dp(12),dp(20));dashboardList.setBackgroundColor(Color.rgb(9,17,32));dashboard.addView(dashboardList);
+  dashboard=new ScrollView(this);dashboard.setFillViewport(true);dashboard.setVisibility(View.VISIBLE);showingDashboard=true;dashboard.setBackgroundColor(Color.rgb(250,247,244));contentLayer.addView(dashboard,new FrameLayout.LayoutParams(-1,-1));
+  dashboardList=new LinearLayout(this);dashboardList.setOrientation(1);dashboardList.setPadding(dp(12),dp(12),dp(12),dp(20));dashboardList.setBackgroundColor(Color.rgb(250,247,244));dashboard.addView(dashboardList);
   WebSettings settings=browser.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);settings.setSupportZoom(true);settings.setBuiltInZoomControls(true);settings.setDisplayZoomControls(false);
   browser.setWebViewClient(new WebViewClient(){
    @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){
@@ -295,8 +295,8 @@ public class GemBrowserActivity extends Activity {
  private void renderDashboard(){
   if(dashboardList==null)return;
   dashboardList.removeAllViews();
-  int white=Color.WHITE,muted=Color.rgb(170,190,210),teal=Color.rgb(45,212,191);
-  dashboardList.addView(dashText("Tender Intelligence • Results",22,white));
+  int white=Color.rgb(34,39,46),muted=Color.rgb(110,117,126),teal=Color.rgb(193,96,17);
+  dashboardList.addView(dashText("Matching tenders",23,white));
   ArrayList<JSONObject> open=new ArrayList<>();int expired=0,missing=0,analyzed=0;
   Date now=new Date();
   for(JSONObject j:collected.values()){
@@ -321,7 +321,7 @@ public class GemBrowserActivity extends Activity {
    JSONObject ai=aiReviews.get(id);
    LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(10),dp(10),dp(10),dp(12));
    android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();
-   bg.setColor(Color.rgb(18,30,50));bg.setCornerRadius(dp(14));bg.setStroke(dp(1),Color.rgb(44,66,88));card.setBackground(bg);
+   bg.setColor(Color.WHITE);bg.setCornerRadius(dp(22));bg.setStroke(dp(1),Color.rgb(236,229,221));card.setBackground(bg);
    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,dp(7),0,dp(7));dashboardList.addView(card,cp);
    card.addView(dashText(title,17,white));
    card.addView(dashText(id+"\n"+workCategory(title),13,teal));
@@ -568,6 +568,7 @@ public class GemBrowserActivity extends Activity {
   }).start();
  }
  private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
+ private android.graphics.drawable.GradientDrawable rounded(int color,int radius,int border){android.graphics.drawable.GradientDrawable d=new android.graphics.drawable.GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));d.setStroke(dp(1),border);return d;}
  private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(12);b.setTextColor(Color.BLACK);b.setMinHeight(dp(44));b.setPadding(dp(4),0,dp(4),0);return b;}
  @Override public void onBackPressed(){if(browser!=null&&browser.canGoBack())browser.goBack();else super.onBackPressed();}
 }
