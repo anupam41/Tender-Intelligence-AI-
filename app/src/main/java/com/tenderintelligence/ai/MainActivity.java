@@ -57,13 +57,13 @@ public class MainActivity extends Activity {
  });
  }
  void renderSearchCards(){
- if(resultCards==null)return;resultCards.removeAllViews();
+ if(resultCards==null)return;resultCards.removeAllViews();((View)resultCards.getParent()).setVisibility(lastResults.isEmpty()?View.GONE:View.VISIBLE);
  String q=resultFilter==null?"":resultFilter.getText().toString().trim().toLowerCase(Locale.ROOT);
  int count=0;for(JSONObject item:lastResults){String hay=(item.optString("title")+" "+item.optString("bidId")+" "+item.optString("snippet")).toLowerCase(Locale.ROOT);if(!hay.contains(q))continue;if(count++>=100)break;addResultCard(item);}
  if(count==0){TextView empty=text("No matching search results. Try another term or run a search.",13);empty.setTextColor(Color.rgb(190,204,223));resultCards.addView(empty);}
  }
  void renderShortlist(){
- if(shortlistCards==null)return;shortlistCards.removeAllViews();
+ if(shortlistCards==null)return;shortlistCards.removeAllViews();((View)shortlistCards.getParent()).setVisibility(records.isEmpty()?View.GONE:View.VISIBLE);
  if(records.isEmpty()){TextView empty=text("No saved tenders yet.",13);empty.setTextColor(Color.rgb(190,204,223));shortlistCards.addView(empty);return;}
  for(int i=records.size()-1;i>=0;i--){
   try{
@@ -113,26 +113,26 @@ public class MainActivity extends Activity {
  root.setBackgroundColor(Color.rgb(6,10,18));
  TextView heading=text("Aditya Udyog • Tender Radar",23);heading.setTextColor(Color.WHITE);heading.setTypeface(null,1);root.addView(heading);
  
- TextView banner=text("GeM • Public bid discovery",13);banner.setTextColor(Color.rgb(29,220,180));root.addView(banner);
- statsRow();
+ TextView banner=text("Industrial tender discovery • GeM",13);banner.setTextColor(Color.rgb(29,220,180));root.addView(banner);
 
- TextView disclaimer=text("Browse GeM with its own search and pagination. Automatic scanning is paused because GeM returns HTTP 403.",12);disclaimer.setTextColor(Color.rgb(159,178,205));root.addView(disclaimer);
+
  
- 
- scanButton=addScanButton("OPEN GEM TENDER SEARCH",this::officialPortals);
- status=text("GeM blocks the automated endpoint (403). Browse public bids in the built-in browser; automatic document shortlisting is not available yet.",13);status.setTextColor(Color.rgb(45,212,191));status.setTextIsSelectable(true);root.addView(status);
- addSecondaryButton("Open GeM in external browser",()->startActivity(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(TenderSearch.GEM_URL))));
- addSecondaryButton("Equipment keyword categories",this::showKeywords);
- sectionLabel("GeM tender results");
- resultFilter=edit("Filter results by title, bid ID or equipment...",false);root.addView(resultFilter);
- resultCards=new LinearLayout(this);resultCards.setOrientation(1);root.addView(resultCards);
+ scanButton=addScanButton("FIND TENDERS",this::officialPortals);
+ status=text("Scan GeM equipment groups and review collected bids.",13);status.setTextColor(Color.rgb(45,212,191));status.setTextIsSelectable(true);root.addView(status);
+ LinearLayout resultsSection=new LinearLayout(this);resultsSection.setOrientation(1);root.addView(resultsSection);
+ TextView resultsHeading=text("GeM tender results",19);resultsHeading.setTextColor(Color.WHITE);resultsSection.addView(resultsHeading);
+ resultFilter=edit("Filter results by title, bid ID or equipment...",false);resultsSection.addView(resultFilter);
+ resultCards=new LinearLayout(this);resultCards.setOrientation(1);resultsSection.addView(resultCards);resultsSection.setVisibility(lastResults.isEmpty()?View.GONE:View.VISIBLE);
  resultFilter.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){renderSearchCards();}public void afterTextChanged(android.text.Editable e){}});
- TextView shortlistHeading=text("Saved shortlist — review required",19);shortlistHeading.setPadding(0,dp(20),0,dp(8));shortlistHeading.setTextColor(Color.WHITE);root.addView(shortlistHeading);
- shortlistCards=new LinearLayout(this);shortlistCards.setOrientation(1);root.addView(shortlistCards);
+ LinearLayout shortlistSection=new LinearLayout(this);shortlistSection.setOrientation(1);root.addView(shortlistSection);
+ TextView shortlistHeading=text("Saved shortlist",19);shortlistHeading.setPadding(0,dp(20),0,dp(8));shortlistHeading.setTextColor(Color.WHITE);shortlistSection.addView(shortlistHeading);
+ shortlistCards=new LinearLayout(this);shortlistCards.setOrientation(1);shortlistSection.addView(shortlistCards);shortlistSection.setVisibility(records.isEmpty()?View.GONE:View.VISIBLE);
  
- addSecondaryButton("⚙ OpenRouter AI settings",this::showApiSettings);
- addSecondaryButton("Manual PDF analysis (optional) ▾",()->{boolean visible=manualTools.getVisibility()!=View.VISIBLE;manualTools.setVisibility(visible?View.VISIBLE:View.GONE);});
+ addSecondaryButton("Tools & settings ▾",()->{boolean visible=manualTools.getVisibility()!=View.VISIBLE;manualTools.setVisibility(visible?View.VISIBLE:View.GONE);});
  manualTools=new LinearLayout(this);manualTools.setOrientation(1);manualTools.setVisibility(View.GONE);root.addView(manualTools);
+ addManualButton("OpenRouter AI settings",this::showApiSettings);
+ addManualButton("Equipment keyword categories",this::showKeywords);
+ addManualButton("Open GeM externally",()->startActivity(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(TenderSearch.GEM_URL))));
  
  key=edit("OpenRouter API key",false);key.setInputType(129);
  model=edit("Model ID (e.g. openai/gpt-4o-mini)",false);model.setText(getPreferences(0).getString("model_id","openai/gpt-4o-mini"));manualTools.addView(model);model.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){getPreferences(0).edit().putString("model_id",s.toString()).apply();}public void afterTextChanged(android.text.Editable e){}});
@@ -146,7 +146,7 @@ public class MainActivity extends Activity {
  addManualButton("Analyze with OpenRouter AI",this::analyze);
  addManualButton("Export shortlist CSV",()->{Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("text/csv");i.putExtra(Intent.EXTRA_TITLE,"tender-shortlist.csv");startActivityForResult(i,SAVE_CSV);});
 
- saved=text("",14);saved.setTextColor(Color.WHITE);root.addView(saved);refresh();
+ saved=text("",14);saved.setTextColor(Color.WHITE);manualTools.addView(saved);refresh();
  }
  void refresh(){renderShortlist();if(kpiSaved!=null)kpiSaved.setText(String.valueOf(records.size()));StringBuilder s=new StringBuilder("Saved tenders: "+records.size()+"\n");for(int i=records.size()-1;i>=0&&i>=records.size()-20;i--){try{JSONObject j=new JSONObject(records.get(i));s.append("\n").append(j.optString("title")).append(" • ").append(j.optString("verdict")).append(" • ").append(j.optString("deadline")).append("\n");}catch(Exception ignored){}}saved.setText(s.toString());}
  void loadRecords(){String raw=getPreferences(0).getString("records","[]");try{JSONArray a=new JSONArray(raw);for(int i=0;i<a.length();i++)records.add(a.getString(i));}catch(Exception ignored){}}
