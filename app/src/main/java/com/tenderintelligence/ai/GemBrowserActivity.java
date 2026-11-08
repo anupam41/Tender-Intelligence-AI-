@@ -143,7 +143,7 @@ public class GemBrowserActivity extends Activity {
    @Override public void onReceivedError(WebView view,WebResourceRequest req,WebResourceError error){if(req.isForMainFrame())state.setText("Unable to load GeM in WebView. Try opening in your browser.");}
   });
   browser.setDownloadListener((url,userAgent,disposition,mime,length)->{Uri uri=Uri.parse(url);if(safe(uri))startActivity(new Intent(Intent.ACTION_VIEW,uri));else state.setText("Download blocked: external URL");});
-  browser.loadUrl(GEM);renderDashboard();
+  browser.loadUrl(GEM);renderDashboard();scheduleAutoReview();
  }
  private void updateCollectedCount(){if(collectedCount!=null){int matches=0;for(JSONObject j:collected.values())if(relevantTitle(j.optString("title")))matches++;collectedCount.setText("Collected: "+collected.size()+" • Title matches: "+matches+" • Review closing dates");}}
  private void restoreCollected(){
@@ -178,7 +178,7 @@ public class GemBrowserActivity extends Activity {
      String url=j.optString("url");if(!safe(Uri.parse(url)))j.put("url",GEM);
      if(!collected.containsKey(id)){collected.put(id,j);added++;}else{JSONObject old=collected.get(id);if(old!=null){if(old.optString("buyer").isEmpty()&&!j.optString("buyer").isEmpty())old.put("buyer",j.optString("buyer"));if(old.optJSONArray("documentLinks")==null&&j.optJSONArray("documentLinks")!=null)old.put("documentLinks",j.optJSONArray("documentLinks"));}}
     }
-    persistCollected();updateCollectedCount();if(showingDashboard)renderDashboard();
+    persistCollected();updateCollectedCount();if(showingDashboard)renderDashboard();scheduleAutoReview();
     state.setText("Detected "+items.length()+" GeM bid IDs; saved "+added+" new bids.");
     if(done!=null)done.run();
    }catch(Exception e){state.setText("Could not parse bid cards. GeM page format may have changed.");}
@@ -295,11 +295,25 @@ public class GemBrowserActivity extends Activity {
  }
 
  private final java.util.HashSet<String> analyzingBids=new java.util.HashSet<>();
+ private final java.util.HashSet<String> failedAutoReviews=new java.util.HashSet<>();
+ private boolean autoReviewActive=false;
+ private final Runnable autoReviewTask=()->{
+  if(autoReviewActive||openRouterKey==null||openRouterKey.trim().isEmpty()||!showingDashboard)return;
+  for(JSONObject bid:collected.values()){
+   String id=bid.optString("bidId");
+   if(!relevantTitle(bid.optString("title"))||aiReviews.containsKey(id)||analyzingBids.contains(id)||failedAutoReviews.contains(id))continue;
+   Date due=parsedDeadline(bid.optString("deadlineText"));
+   if(due==null||!due.after(new Date()))continue;
+   autoReviewActive=true;analyzeInline(bid);return;
+  }
+ };
+ private void scheduleAutoReview(){autoHandler.removeCallbacks(autoReviewTask);autoHandler.postDelayed(autoReviewTask,900);}
+ private void finishAutoReview(){autoReviewActive=false;scheduleAutoReview();}
  private void analyzeInline(JSONObject bid){
   String id=bid.optString("bidId");
   if(analyzingBids.contains(id))return;
   if(aiReviews.containsKey(id)){showSavedReview(id);return;}
-  if(openRouterKey.trim().isEmpty()){new android.app.AlertDialog.Builder(this).setTitle("AI setup required").setMessage("Add your OpenRouter key in AI Settings, then tap Analyze tender again.").setPositiveButton("AI Settings",(d,w)->showAiSettings()).setNegativeButton("Cancel",null).show();return;}
+  if(openRouterKey.trim().isEmpty()){state.setText("Add OpenRouter key in AI Settings to enable automatic analysis.");finishAutoReview();return;}
   analyzingBids.add(id);renderDashboard();
   EditText extracted=new EditText(this);
   extracted.addTextChangedListener(new android.text.TextWatcher(){
@@ -326,8 +340,8 @@ public class GemBrowserActivity extends Activity {
       String response=new JSONObject(output.toString("UTF-8")).getJSONArray("choices").getJSONObject(0).getJSONObject("message").optString("content","No analysis returned");
       runOnUiThread(()->{saveAiReview(bid,response,modelId);state.setText("AI review saved for "+bid.optString("bidId"));renderDashboard();});
 
-     }catch(Exception e){runOnUiThread(()->{state.setText("AI review failed for "+id+": "+e.getMessage());new android.app.AlertDialog.Builder(GemBrowserActivity.this).setTitle("AI analysis unavailable").setMessage("Could not analyze this bid. Check your connection and AI settings.").setPositiveButton("OK",null).show();});}
-     finally{runOnUiThread(()->{analyzingBids.remove(id);renderDashboard();});}
+     }catch(Exception e){runOnUiThread(()->{state.setText("AI review failed for "+id+": "+e.getMessage());failedAutoReviews.add(id);});}
+     finally{runOnUiThread(()->{analyzingBids.remove(id);renderDashboard();finishAutoReview();});}
     }).start();
    }
   });
@@ -345,7 +359,7 @@ public class GemBrowserActivity extends Activity {
   if(dashboardList==null)return;
   dashboardList.removeAllViews();
   int white=Color.rgb(27,45,49),muted=Color.rgb(103,121,125),teal=Color.rgb(0,139,126);
-  dashboardList.addView(dashText("Matching tenders",23,white));
+  dashboardList.addView(dashText("Tender Radar • Live results",23,white));
   ArrayList<JSONObject> open=new ArrayList<>();int expired=0,missing=0,analyzed=0;
   Date now=new Date();
   for(JSONObject j:collected.values()){
@@ -361,7 +375,7 @@ public class GemBrowserActivity extends Activity {
    Date ad=parsedDeadline(a.optString("deadlineText")),bd=parsedDeadline(b.optString("deadlineText"));
    return ad==null||bd==null?0:ad.compareTo(bd);
   });
-  dashboardList.addView(dashText(collected.size()+" collected   •   "+open.size()+" open title matches   •   "+analyzed+" AI reviewed",15,teal));
+  dashboardList.addView(dashText(open.size()+" matches   •   "+analyzed+" reviewed   •   "+Math.max(0,open.size()-analyzed)+" pending",15,teal));
   dashboardList.addView(dashText(expired+" expired hidden • "+missing+" missing dates hidden\nTitle matching is preliminary; verify bid documents and GeM dates.",12,muted));
 
   if(open.isEmpty())dashboardList.addView(dashText("No open matching tenders found. Run a GeM search and collect results.",15,white));
@@ -375,11 +389,11 @@ public class GemBrowserActivity extends Activity {
    card.addView(dashText(title,18,white));
    if(analyzingBids.contains(id)){ProgressBar spinner=new ProgressBar(this);spinner.setIndeterminate(true);spinner.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(teal));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(28),dp(28));sp.setMargins(0,dp(4),0,dp(4));card.addView(spinner,sp);card.addView(dashText("Reading document / AI processing…",12,teal));}
    card.addView(dashText(id+"\n"+workCategory(title),13,teal));
-   card.addView(dashText("Buyer: not captured from listing\nClosing: "+due+"\nPriority: "+qualificationLabel(bid)+" (title-based)\nAI: "+(ai==null?"Not reviewed":ai.optString("verdict","Needs review")+" • "+ai.optInt("score",0)+"/100 indicative"),13,muted));
+   card.addView(dashText("Closing  "+due+"\n"+(ai==null?(analyzingBids.contains(id)?"AI reviewing…":failedAutoReviews.contains(id)?"Document unavailable • Manual review needed":"Queued for automatic AI review"):ai.optString("verdict","Needs review")+" • AI assessment (indicative)"),13,muted));
    LinearLayout actions=new LinearLayout(this);actions.setOrientation(0);card.addView(actions);
-   Button openBid=button("Bid details");openBid.setTextColor(Color.rgb(38,91,91));openBid.setBackground(glass(0xffeaf6f4,18));LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(0,dp(48),1);openLp.setMargins(0,0,dp(6),0);actions.addView(openBid,openLp);openBid.setOnClickListener(v->openBidPdf(bid));
-   Button analyze=button(analyzingBids.contains(id)?"Analyzing…":ai==null?"Analyze tender":ai.optInt("score",0)+"% • Summary");analyze.setTextColor(Color.WHITE);analyze.setTypeface(null,Typeface.BOLD);analyze.setBackground(rounded(Color.rgb(0,164,146),18,Color.rgb(0,164,146)));LinearLayout.LayoutParams analyzeLp=new LinearLayout.LayoutParams(0,dp(48),1);analyzeLp.setMargins(dp(6),0,0,0);actions.addView(analyze,analyzeLp);
-   analyze.setEnabled(!analyzingBids.contains(id));analyze.setOnClickListener(v->analyzeInline(bid));
+   Button openBid=button("View PDF");openBid.setTextColor(Color.rgb(38,91,91));openBid.setBackground(glass(0xffeaf6f4,18));LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(0,dp(48),1);openLp.setMargins(0,0,dp(6),0);actions.addView(openBid,openLp);openBid.setOnClickListener(v->openBidPdf(bid));
+   Button analyze=button(analyzingBids.contains(id)?"Analyzing…":ai==null?(failedAutoReviews.contains(id)?"Retry AI review":"AI pending…"):ai.optInt("score",0)+"% • Summary");analyze.setTextColor(Color.WHITE);analyze.setTypeface(null,Typeface.BOLD);analyze.setBackground(rounded(Color.rgb(0,164,146),18,Color.rgb(0,164,146)));LinearLayout.LayoutParams analyzeLp=new LinearLayout.LayoutParams(0,dp(48),1);analyzeLp.setMargins(dp(6),0,0,0);actions.addView(analyze,analyzeLp);
+   analyze.setEnabled(!analyzingBids.contains(id));analyze.setOnClickListener(v->{if(aiReviews.containsKey(id))showSavedReview(id);else{failedAutoReviews.remove(id);analyzeInline(bid);}});
   }
  }
  private void reviewCollected(){
