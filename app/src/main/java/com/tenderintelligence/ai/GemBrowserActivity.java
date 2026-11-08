@@ -496,7 +496,7 @@ public class GemBrowserActivity extends Activity {
  }
  private void showAiSettings(){
   LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(20),dp(12),dp(20),dp(8));
-  TextView info=new TextView(this);info.setText("OpenRouter AI connection\\nYour API key is stored only on this device when Remember is enabled.");info.setTextColor(Color.DKGRAY);content.addView(info);
+  TextView info=new TextView(this);info.setText("OpenRouter AI connection\nYour API key is stored only on this device when Remember is enabled.");info.setTextColor(Color.DKGRAY);content.addView(info);
   EditText api=new EditText(this);api.setHint("OpenRouter API key");api.setSingleLine(true);api.setInputType(129);api.setText(openRouterKey);content.addView(api);
   EditText model=new EditText(this);model.setSingleLine(true);model.setHint("Model ID");model.setText(getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free"));content.addView(model);
   CheckBox remember=new CheckBox(this);remember.setText("Remember key securely (Android Keystore)");remember.setChecked(getPreferences(0).getBoolean("remember_openrouter_key",false));content.addView(remember);
