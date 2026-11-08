@@ -377,7 +377,7 @@ public class GemBrowserActivity extends Activity {
    card.addView(dashText(id+"\n"+workCategory(title),13,teal));
    card.addView(dashText("Buyer: not captured from listing\nClosing: "+due+"\nPriority: "+qualificationLabel(bid)+" (title-based)\nAI: "+(ai==null?"Not reviewed":ai.optString("verdict","Needs review")+" • "+ai.optInt("score",0)+"/100 indicative"),13,muted));
    LinearLayout actions=new LinearLayout(this);actions.setOrientation(0);card.addView(actions);
-   Button openBid=button("Bid details");openBid.setTextColor(Color.rgb(38,91,91));openBid.setBackground(glass(0xffeaf6f4,18));LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(0,dp(48),1);openLp.setMargins(0,0,dp(6),0);actions.addView(openBid,openLp);openBid.setOnClickListener(v->showBidActions(bid));
+   Button openBid=button("Bid details");openBid.setTextColor(Color.rgb(38,91,91));openBid.setBackground(glass(0xffeaf6f4,18));LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(0,dp(48),1);openLp.setMargins(0,0,dp(6),0);actions.addView(openBid,openLp);openBid.setOnClickListener(v->openBidPdf(bid));
    Button analyze=button(analyzingBids.contains(id)?"Analyzing…":ai==null?"Analyze tender":ai.optInt("score",0)+"% • Summary");analyze.setTextColor(Color.WHITE);analyze.setTypeface(null,Typeface.BOLD);analyze.setBackground(rounded(Color.rgb(0,164,146),18,Color.rgb(0,164,146)));LinearLayout.LayoutParams analyzeLp=new LinearLayout.LayoutParams(0,dp(48),1);analyzeLp.setMargins(dp(6),0,0,0);actions.addView(analyze,analyzeLp);
    analyze.setEnabled(!analyzingBids.contains(id));analyze.setOnClickListener(v->analyzeInline(bid));
   }
@@ -409,14 +409,16 @@ public class GemBrowserActivity extends Activity {
    .setPositiveButton("Close",null)
    .setNeutralButton("Clear collected bids",(d,w)->new android.app.AlertDialog.Builder(this).setTitle("Clear collected bids?").setNegativeButton("Cancel",null).setPositiveButton("Clear",(x,y)->{collected.clear();persistCollected();updateCollectedCount();}).show()).show();
  }
- private void showBidActions(JSONObject bid){
-  String id=bid.optString("bidId");
-  new android.app.AlertDialog.Builder(this).setTitle(id).setItems(new String[]{"Open GeM bid","Analyze tender text with OpenRouter AI","View saved AI assessment","Available document links"},(d,which)->{
-   if(which==0){String url=bid.optString("url");Uri uri=Uri.parse(url);if(safe(uri)&&!GEM.equals(url))startActivity(new Intent(Intent.ACTION_VIEW,uri));else{browser.loadUrl(GEM);state.setText("GeM direct link unavailable. Search bid ID: "+id);}}
-   else if(which==1)showAiDialog(bid);
-   else if(which==2)showSavedReview(id);
-   else showDocumentLinks(bid);
-  }).setNegativeButton("Cancel",null).show();
+ private void openBidPdf(JSONObject bid){
+  String id=bid.optString("bidId","");
+  java.util.regex.Matcher match=java.util.regex.Pattern.compile("(?i)^GEM/20\\d{2}/B/(\\d+)$").matcher(id);
+  if(!match.matches()){state.setText("Cannot identify a GeM PDF for this bid.");return;}
+  String link="https://bidplus.gem.gov.in/showbidDocument/"+match.group(1);
+  try{
+   Intent view=new Intent(Intent.ACTION_VIEW,Uri.parse(link));
+   startActivity(view);
+   state.setText("Opening official GeM bid document for "+id+". Download depends on GeM access.");
+  }catch(Exception e){state.setText("No browser available to open the GeM bid document.");}
  }
  private void showDocumentLinks(JSONObject bid){
   JSONArray links=bid.optJSONArray("documentLinks");
