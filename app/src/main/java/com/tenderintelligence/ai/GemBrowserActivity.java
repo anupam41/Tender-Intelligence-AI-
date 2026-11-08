@@ -44,6 +44,9 @@ public class GemBrowserActivity extends Activity {
  private ProgressBar scanProgress;
  private ScanRing scanRing;
  private TextView bidTotalValue,matchTotalValue;
+ private LinearLayout heroContent;
+ private boolean darkMode(){return (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;}
+ private int themeColor(int light,int dark){return darkMode()?dark:light;}
  private TextView scanProgressLabel;
  private boolean scanMode=true;
  private EditText term;
@@ -61,11 +64,11 @@ public class GemBrowserActivity extends Activity {
  }
  @Override public void onCreate(Bundle bundle){
   super.onCreate(bundle);
-  getWindow().setStatusBarColor(Color.rgb(244,250,247));getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-  LinearLayout page=new LinearLayout(this);page.setOrientation(1);page.setBackgroundColor(Color.rgb(244,250,247));setContentView(page);page.setOnApplyWindowInsetsListener((v,insets)->{int top=android.os.Build.VERSION.SDK_INT>=30?insets.getInsets(android.view.WindowInsets.Type.statusBars()).top:insets.getSystemWindowInsetTop();v.setPadding(0,top,0,0);return insets;});
-  TextView heading=new TextView(this);heading.setText("Tender Radar");heading.setTextSize(30);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(Color.rgb(22,39,43));heading.setPadding(dp(24),dp(18),dp(24),dp(4));page.addView(heading);
-  TextView note=new TextView(this);note.setText("Discover industrial tenders • GeM");note.setTextColor(Color.rgb(101,120,125));note.setPadding(dp(24),0,dp(24),dp(18));page.addView(note);
-  Button aiSettingsButton=button("⚙");aiSettingsButton.setTextSize(14);aiSettingsButton.setTextColor(Color.rgb(25,93,92));aiSettingsButton.setBackground(glass(0xffe8f7f5,28));aiSettingsButton.setElevation(dp(2));LinearLayout.LayoutParams settingsLp=new LinearLayout.LayoutParams(-1,dp(48));settingsLp.setMargins(dp(20),0,dp(20),dp(12));page.addView(aiSettingsButton,settingsLp);aiSettingsButton.setOnClickListener(v->showAiSettings());
+  getWindow().setStatusBarColor(themeColor(0xfff4faf7,0xff0a121a));getWindow().setNavigationBarColor(themeColor(0xfff4faf7,0xff0a121a));getWindow().getDecorView().setSystemUiVisibility(darkMode()?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+  LinearLayout page=new LinearLayout(this);page.setOrientation(1);page.setBackgroundColor(themeColor(0xfff4faf7,0xff0a121a));setContentView(page);page.setOnApplyWindowInsetsListener((v,insets)->{int top=android.os.Build.VERSION.SDK_INT>=30?insets.getInsets(android.view.WindowInsets.Type.statusBars()).top:insets.getSystemWindowInsetTop();v.setPadding(0,top,0,0);return insets;});
+  TextView heading=new TextView(this);heading.setText("Tender Radar");heading.setTextSize(30);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(themeColor(0xff16272b,0xffeaf8f5));heading.setPadding(dp(24),dp(18),dp(24),dp(4));page.addView(heading);
+  TextView note=new TextView(this);note.setText("Discover industrial tenders • GeM");note.setTextColor(themeColor(0xff65787d,0xff9bb2b6));note.setPadding(dp(24),0,dp(24),dp(18));page.addView(note);
+  Button aiSettingsButton=button("⚙");aiSettingsButton.setTextSize(14);aiSettingsButton.setTextColor(themeColor(0xff195d5c,0xffb7f1e8));aiSettingsButton.setBackground(glass(themeColor(0xffe8f7f5,0xff162a30),28));aiSettingsButton.setElevation(dp(2));LinearLayout.LayoutParams settingsLp=new LinearLayout.LayoutParams(-1,dp(48));settingsLp.setMargins(dp(20),0,dp(20),dp(12));page.addView(aiSettingsButton,settingsLp);aiSettingsButton.setOnClickListener(v->showAiSettings());
   LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.HORIZONTAL);controls.setVisibility(View.GONE);page.addView(controls);
   Button back=button("Back");controls.addView(back,new LinearLayout.LayoutParams(0,40,1));back.setOnClickListener(v->{if(browser.canGoBack())browser.goBack();else finish();});
   Button home=button("GeM home");controls.addView(home,new LinearLayout.LayoutParams(0,40,1));home.setOnClickListener(v->browser.loadUrl(GEM));
@@ -134,8 +137,15 @@ public class GemBrowserActivity extends Activity {
   state=new TextView(this);state.setTextColor(Color.rgb(102,119,121));state.setText("Opening GeM…");state.setPadding(dp(24),dp(4),dp(24),dp(10));state.setTextSize(12);page.addView(state);
   FrameLayout contentLayer=new FrameLayout(this);page.addView(contentLayer,new LinearLayout.LayoutParams(-1,0,1));
   browser=new WebView(this);contentLayer.addView(browser,new FrameLayout.LayoutParams(-1,-1));
-  dashboard=new ScrollView(this);dashboard.setFillViewport(true);dashboard.setVisibility(View.VISIBLE);showingDashboard=true;dashboard.setBackgroundColor(Color.rgb(244,250,247));contentLayer.addView(dashboard,new FrameLayout.LayoutParams(-1,-1));
-  dashboardList=new LinearLayout(this);dashboardList.setOrientation(1);dashboardList.setPadding(dp(20),dp(14),dp(20),dp(24));dashboardList.setBackgroundColor(Color.rgb(244,250,247));dashboard.addView(dashboardList);
+  dashboard=new ScrollView(this);dashboard.setFillViewport(true);dashboard.setVisibility(View.VISIBLE);showingDashboard=true;dashboard.setBackgroundColor(themeColor(0xfff4faf7,0xff0a121a));contentLayer.addView(dashboard,new FrameLayout.LayoutParams(-1,-1));
+  dashboardList=new LinearLayout(this);dashboardList.setOrientation(1);dashboardList.setPadding(dp(20),dp(14),dp(20),dp(24));dashboardList.setBackgroundColor(themeColor(0xfff4faf7,0xff0a121a));dashboard.addView(dashboardList);
+  heroContent=new LinearLayout(this);heroContent.setOrientation(1);dashboardList.addView(heroContent);
+  for(View item:new View[]{heading,note,aiSettingsButton,scanRing,statsStrip,batchButton,scanProgress,scanProgressLabel,collectedCount,state}){android.view.ViewGroup parent=(android.view.ViewGroup)item.getParent();if(parent!=null)parent.removeView(item);heroContent.addView(item);}
+  heading.setPadding(dp(4),dp(10),0,dp(2));note.setPadding(dp(4),0,0,dp(14));
+  aiSettingsButton.setText("⚙  Settings");aiSettingsButton.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(48)));
+  scanRing.setLayoutParams(new LinearLayout.LayoutParams(dp(208),dp(208)));((LinearLayout.LayoutParams)scanRing.getLayoutParams()).gravity=Gravity.CENTER_HORIZONTAL;
+  statsStrip.setPadding(0,dp(8),0,dp(12));batchButton.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(60)));
+  scanProgressLabel.setPadding(dp(4),dp(12),0,dp(4));collectedCount.setPadding(dp(4),0,0,dp(4));state.setPadding(dp(4),dp(4),0,dp(18));
   WebSettings settings=browser.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);settings.setSupportZoom(true);settings.setBuiltInZoomControls(true);settings.setDisplayZoomControls(false);
   browser.setWebViewClient(new WebViewClient(){
    @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){
@@ -373,16 +383,16 @@ public class GemBrowserActivity extends Activity {
  private void addMetric(LinearLayout row,String value,String label,int color){
   LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);tile.setGravity(Gravity.CENTER_VERTICAL);
   tile.setPadding(dp(10),dp(10),dp(6),dp(10));
-  tile.setBackground(glass(0xfff9fffd,18));
+  tile.setBackground(glass(themeColor(0xfff9fffd,0xff1a3036),18));
   LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(70),1);
   lp.setMargins(0,0,dp(6),0);row.addView(tile,lp);
-  TextView count=new TextView(this);count.setText(value);count.setTextSize(21);count.setTypeface(null,Typeface.BOLD);count.setTextColor(color);tile.addView(count);
-  TextView caption=new TextView(this);caption.setText(label);caption.setTextSize(11);caption.setTextColor(0xff71858a);tile.addView(caption);
+  TextView count=new TextView(this);count.setText(value);count.setTextSize(21);count.setTypeface(null,Typeface.BOLD);count.setTextColor(darkMode()?0xff7de4d7:color);tile.addView(count);
+  TextView caption=new TextView(this);caption.setText(label);caption.setTextSize(11);caption.setTextColor(themeColor(0xff71858a,0xffa3bdc1));tile.addView(caption);
  }
  private void renderDashboard(){
   if(dashboardList==null)return;
-  dashboardList.removeAllViews();
-  int white=Color.rgb(27,45,49),muted=Color.rgb(103,121,125),teal=Color.rgb(0,139,126);
+  while(dashboardList.getChildCount()>1)dashboardList.removeViewAt(1);
+  int white=themeColor(0xff1b2d31,0xffeff9f8),muted=themeColor(0xff67797d,0xff9fb4b7),teal=themeColor(0xff008b7e,0xff57d7c6);
   TextView resultsHeading=dashText("Matching tenders",24,white);resultsHeading.setTypeface(null,Typeface.BOLD);dashboardList.addView(resultsHeading);
   ArrayList<JSONObject> open=new ArrayList<>();int expired=0,missing=0,analyzed=0;
   Date now=new Date();
@@ -408,7 +418,7 @@ public class GemBrowserActivity extends Activity {
    JSONObject ai=aiReviews.get(id);
    LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(18),dp(16),dp(18),dp(18));
    android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();
-   bg.setColor(Color.rgb(251,255,254));bg.setCornerRadius(dp(26));bg.setStroke(dp(1),Color.rgb(217,234,231));card.setBackground(bg);card.setElevation(dp(2));
+   bg.setColor(themeColor(0xfffbfffe,0xff14242c));bg.setCornerRadius(dp(26));bg.setStroke(dp(1),themeColor(0xffd9eae7,0xff29434a));card.setBackground(bg);card.setElevation(dp(2));
    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,dp(7),0,dp(10));dashboardList.addView(card,cp);
    TextView cardTitle=dashText(title,18,white);cardTitle.setTypeface(null,Typeface.BOLD);cardTitle.setMaxLines(2);cardTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);card.addView(cardTitle);
    if(analyzingBids.contains(id)){ProgressBar spinner=new ProgressBar(this);spinner.setIndeterminate(true);spinner.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(teal));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(28),dp(28));sp.setMargins(0,dp(4),0,dp(4));card.addView(spinner,sp);card.addView(dashText("Reading document / AI processing…",12,teal));}
@@ -706,10 +716,10 @@ public class GemBrowserActivity extends Activity {
    catch(Exception e){runOnUiThread(()->{target.setText("");new android.app.AlertDialog.Builder(this).setTitle("PDF import failed").setMessage(e.getMessage()).setPositiveButton("OK",null).show();});}
   }).start();
  }
- private TextView addGlassStat(LinearLayout parent,String label){LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);tile.setGravity(Gravity.CENTER);tile.setBackground(glass(0xffe7f7f3,24));tile.setElevation(dp(3));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(80),1);lp.setMargins(dp(4),0,dp(4),0);parent.addView(tile,lp);TextView value=new TextView(this);value.setText("0");value.setTextSize(27);value.setTypeface(null,Typeface.BOLD);value.setTextColor(0xff183e3b);tile.addView(value);TextView caption=new TextView(this);caption.setText(label);caption.setTextSize(12);caption.setTextColor(0xff6b8080);tile.addView(caption);return value;}
- private class ScanRing extends View {private int value=0;private final android.graphics.Paint paint=new android.graphics.Paint(3);ScanRing(){super(GemBrowserActivity.this);setLayerType(View.LAYER_TYPE_SOFTWARE,null);}void setValue(int v){value=Math.max(0,Math.min(batchTerms.length,v));invalidate();}@Override protected void onDraw(android.graphics.Canvas c){super.onDraw(c);float w=getWidth(),h=getHeight(),cx=w/2,cy=h/2,r=Math.min(w,h)*.40f;paint.setStyle(android.graphics.Paint.Style.STROKE);paint.setStrokeWidth(dp(15));paint.setStrokeCap(android.graphics.Paint.Cap.ROUND);paint.setColor(0xffc9eae4);c.drawCircle(cx,cy,r,paint);paint.setShader(new android.graphics.LinearGradient(0,0,w,h,0xff0d998e,0xff49d3bf,android.graphics.Shader.TileMode.CLAMP));c.drawArc(cx-r,cy-r,cx+r,cy+r,-90,360f*value/batchTerms.length,false,paint);paint.setShader(null);paint.setStyle(android.graphics.Paint.Style.FILL);paint.setColor(0xff1c3034);paint.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));paint.setTextAlign(android.graphics.Paint.Align.CENTER);paint.setTextSize(dp(44));c.drawText(value+"/"+batchTerms.length,cx,cy+dp(4),paint);paint.setTypeface(Typeface.create("sans-serif",Typeface.NORMAL));paint.setTextSize(dp(12));c.drawText("Equipment groups",cx,cy+dp(28),paint);c.drawText("scanned",cx,cy+dp(44),paint);}}
+ private TextView addGlassStat(LinearLayout parent,String label){LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);tile.setGravity(Gravity.CENTER);tile.setBackground(glass(themeColor(0xffe7f7f3,0xff1a3036),24));tile.setElevation(dp(3));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(80),1);lp.setMargins(dp(4),0,dp(4),0);parent.addView(tile,lp);TextView value=new TextView(this);value.setText("0");value.setTextSize(27);value.setTypeface(null,Typeface.BOLD);value.setTextColor(themeColor(0xff183e3b,0xffe3fcf8));tile.addView(value);TextView caption=new TextView(this);caption.setText(label);caption.setTextSize(12);caption.setTextColor(0xff6b8080);tile.addView(caption);return value;}
+ private class ScanRing extends View {private int value=0;private final android.graphics.Paint paint=new android.graphics.Paint(3);ScanRing(){super(GemBrowserActivity.this);setLayerType(View.LAYER_TYPE_SOFTWARE,null);}void setValue(int v){value=Math.max(0,Math.min(batchTerms.length,v));invalidate();}@Override protected void onDraw(android.graphics.Canvas c){super.onDraw(c);float w=getWidth(),h=getHeight(),cx=w/2,cy=h/2,r=Math.min(w,h)*.40f;paint.setStyle(android.graphics.Paint.Style.STROKE);paint.setStrokeWidth(dp(15));paint.setStrokeCap(android.graphics.Paint.Cap.ROUND);paint.setColor(themeColor(0xffc9eae4,0xff294d52));c.drawCircle(cx,cy,r,paint);paint.setShader(new android.graphics.LinearGradient(0,0,w,h,0xff0d998e,0xff49d3bf,android.graphics.Shader.TileMode.CLAMP));c.drawArc(cx-r,cy-r,cx+r,cy+r,-90,360f*value/batchTerms.length,false,paint);paint.setShader(null);paint.setStyle(android.graphics.Paint.Style.FILL);paint.setColor(themeColor(0xff1c3034,0xffe9f8f5));paint.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));paint.setTextAlign(android.graphics.Paint.Align.CENTER);paint.setTextSize(dp(44));c.drawText(value+"/"+batchTerms.length,cx,cy+dp(4),paint);paint.setTypeface(Typeface.create("sans-serif",Typeface.NORMAL));paint.setTextSize(dp(12));c.drawText("Equipment groups",cx,cy+dp(28),paint);c.drawText("scanned",cx,cy+dp(44),paint);}}
  private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
- private android.graphics.drawable.GradientDrawable glass(int color,int radius){android.graphics.drawable.GradientDrawable g=new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,new int[]{0xfffcffff,color,0xffe2f3f0});g.setCornerRadius(dp(radius));g.setStroke(dp(1),0xffd5e9e6);return g;}
+ private android.graphics.drawable.GradientDrawable glass(int color,int radius){android.graphics.drawable.GradientDrawable g=new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,darkMode()?new int[]{0xff263f46,color,0xff13262e}:new int[]{0xfffcffff,color,0xffe2f3f0});g.setCornerRadius(dp(radius));g.setStroke(dp(1),themeColor(0xffd5e9e6,0xff38555d));return g;}
  private android.graphics.drawable.GradientDrawable rounded(int color,int radius,int border){android.graphics.drawable.GradientDrawable d=new android.graphics.drawable.GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));d.setStroke(dp(1),border);return d;}
  private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(12);b.setTextColor(Color.BLACK);b.setMinHeight(dp(44));b.setPadding(dp(4),0,dp(4),0);return b;}
  @Override public void onBackPressed(){if(browser!=null&&browser.canGoBack())browser.goBack();else super.onBackPressed();}
