@@ -164,7 +164,7 @@ public class GemBrowserActivity extends Activity {
    "var item=text.match(/Items?\\s*:\\s*([^\\n]+)/i),end=text.match(/End Date\\s*:\\s*(\\d{2}-\\d{2}-\\d{4}(?:\\s+\\d{1,2}:\\d{2}\\s*(?:AM|PM))?)/i);"+
    "var anchor=node.closest('a[href]')||Array.from(card.querySelectorAll('a[href]')).find(a=>(a.textContent||'').includes(match[0]));"+
    "var buyerMatch=text.match(/Department Name And Address\\s*:\\s*([^\\n]+)(?:\\n([^\\n]+))?/i);var buyer=buyerMatch?((buyerMatch[2]||buyerMatch[1]||'').trim()):'';"+
-   "var docs=Array.from(card.querySelectorAll('a[href]')).filter(a=>/\\.pdf(?:[?#]|$)|download.*(bid|document|specification|atc)/i.test(a.href||'')).map(a=>a.href).filter(u=>/^https:\\/\\/([a-z0-9-]+\\.)*gem\\.gov\\.in(?:[:\\/]|$)/i.test(u)).slice(0,3);"+
+   "var docs=Array.from(card.querySelectorAll('a[href]')).filter(a=>/\\.pdf(?:[?#]|$)|showbidDocument\\/\\d+|download.*(bid|document|specification|atc)/i.test(a.href||'')).map(a=>a.href).filter(u=>/^https:\\/\\/([a-z0-9-]+\\.)*gem\\.gov\\.in(?:[:\\/]|$)/i.test(u)).slice(0,3);"+
    "seen[match[0]]=true;found.push({bidId:match[0],title:item?item[1].trim():'GeM bid',deadlineText:end?end[1].trim():'',buyer:buyer,documentLinks:docs,url:anchor?anchor.href:'',source:'GeM visible listing'});if(found.length>=100)break;}"+
    "return JSON.stringify({items:found,matchedNodes:ids.length});}catch(e){return JSON.stringify({error:e.message})}})()";
   browser.evaluateJavascript(js,result->{
@@ -489,7 +489,7 @@ public class GemBrowserActivity extends Activity {
      while((n=in.read(buf))!=-1){total+=n;if(total>12*1024*1024)throw new IOException("PDF exceeds 12 MB");out.write(buf,0,n);}
     }
     PdfTenderReader.Result result=PdfTenderReader.read(this,Uri.fromFile(file));
-    runOnUiThread(()->{target.setText(result.text);trigger.setEnabled(true);state.setText("GeM PDF extracted ("+result.pages+" pages). Review scope and tap Analyze.");});
+    runOnUiThread(()->{target.setTag("auto_pdf_ready");target.setText(result.text);trigger.setEnabled(true);state.setText("GeM PDF extracted ("+result.pages+" pages). Review scope and tap Analyze.");});
    }catch(Exception e){String message=e.getMessage();runOnUiThread(()->{target.setText("");trigger.setEnabled(true);new android.app.AlertDialog.Builder(this).setTitle("Automatic PDF retrieval unavailable").setMessage(message+"\\nThis GeM document may require a browser session. You can still import it manually.").setPositiveButton("OK",null).show();});}
    finally{if(conn!=null)conn.disconnect();if(file!=null)file.delete();}
   }).start();
@@ -560,13 +560,12 @@ public class GemBrowserActivity extends Activity {
      String mime=conn.getContentType();if(mime==null||!mime.toLowerCase(Locale.ROOT).contains("pdf"))throw new IOException("GeM did not return a PDF");
      file=File.createTempFile("gem_public_",".pdf",getCacheDir());try(InputStream in=conn.getInputStream();OutputStream out=new FileOutputStream(file)){byte[] buf=new byte[8192];int n;long total=0;while((n=in.read(buf))!=-1){total+=n;if(total>12*1024*1024)throw new IOException("PDF exceeds 12 MB");out.write(buf,0,n);}}conn.disconnect();
      PdfTenderReader.Result result=PdfTenderReader.read(this,Uri.fromFile(file));String extracted=result.text;
-     runOnUiThread(()->{scope.setText(extracted);fetchPdf.setEnabled(true);state.setText("Public PDF extracted: "+result.pages+" pages. Review before analyzing.");});
+     runOnUiThread(()->{scope.setTag("auto_pdf_ready");scope.setText(extracted);fetchPdf.setEnabled(true);state.setText("Public PDF extracted: "+result.pages+" pages. Review before analyzing.");});
     }catch(Exception e){String error=e.getMessage();runOnUiThread(()->{scope.setText("");fetchPdf.setEnabled(true);new android.app.AlertDialog.Builder(this).setTitle("Cannot read public PDF").setMessage(error+"\nUse Import tender PDF if the GeM link requires a session.").setPositiveButton("OK",null).show();});}
     finally{if(file!=null)file.delete();}
    }).start();
   });
   ScrollView scroll=new ScrollView(this);scroll.addView(layout);
-  loadPublicPdfInto(bid,scope,automatic);
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("AI technical review: "+bid.optString("bidId")).setView(scroll)
    .setNegativeButton("Cancel",null).setPositiveButton("Analyze",null).create();
   dialog.setOnShowListener(ignored->dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
@@ -596,7 +595,18 @@ public class GemBrowserActivity extends Activity {
      }catch(Exception e){runOnUiThread(()->{progress.dismiss();state.setText("AI review failed: "+e.getMessage());new android.app.AlertDialog.Builder(this).setTitle("OpenRouter analysis failed").setMessage(e.getMessage()+"\nCheck model availability, API key and internet connection.").setPositiveButton("OK",null).show();});}
     }).start();
    }));
+  scope.addTextChangedListener(new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence t,int start,int count,int after){}
+   public void onTextChanged(CharSequence t,int start,int before,int count){}
+   public void afterTextChanged(android.text.Editable t){
+    if("auto_pdf_ready".equals(scope.getTag())&&t.length()>=80){
+     scope.setTag(null);
+     scope.post(()->{if(dialog.isShowing())dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).performClick();});
+    }
+   }
+  });
   dialog.show();
+  loadPublicPdfInto(bid,scope,automatic);
  }
  @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
   super.onActivityResult(requestCode,resultCode,data);
