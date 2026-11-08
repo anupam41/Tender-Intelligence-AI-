@@ -9,12 +9,17 @@ import android.net.Uri;
 import android.view.*;
 import android.webkit.*;
 import android.widget.*;
+import org.json.*;
+import java.text.*;
+import java.util.*;
 
 /** User-driven browser for public GeM bid listings. Does not scrape or bypass access controls. */
 public class GemBrowserActivity extends Activity {
  private WebView browser;
  private EditText term;
  private TextView state;
+ private final LinkedHashMap<String,JSONObject> collected=new LinkedHashMap<>();
+ private TextView collectedCount;
  private static final String GEM="https://bidplus.gem.gov.in/all-bids";
  private boolean safe(Uri uri){
   return uri!=null&&"https".equalsIgnoreCase(uri.getScheme())&&"bidplus.gem.gov.in".equalsIgnoreCase(uri.getHost());
@@ -64,6 +69,11 @@ public class GemBrowserActivity extends Activity {
     else state.setText("Keyword entered, but GeM's search button was not detected. Tap the blue magnifying glass beside GeM's bid search field.");
    });
   });
+  LinearLayout captureRow=new LinearLayout(this);captureRow.setOrientation(LinearLayout.HORIZONTAL);page.addView(captureRow);
+  Button collect=button("Collect visible bids");captureRow.addView(collect,new LinearLayout.LayoutParams(0,44,2));collect.setOnClickListener(v->collectVisible());
+  Button review=button("Review shortlist");captureRow.addView(review,new LinearLayout.LayoutParams(0,44,2));review.setOnClickListener(v->reviewCollected());
+  collectedCount=new TextView(this);collectedCount.setTextColor(Color.rgb(45,212,191));collectedCount.setPadding(12,2,12,2);page.addView(collectedCount);
+  restoreCollected();updateCollectedCount();
   Button next=button("Next");findRow.addView(next);next.setOnClickListener(v->{
    state.setText("Looking for GeM next results page…");
    String js="(function(){"+
@@ -91,6 +101,50 @@ public class GemBrowserActivity extends Activity {
   });
   browser.setDownloadListener((url,userAgent,disposition,mime,length)->{Uri uri=Uri.parse(url);if(safe(uri))startActivity(new Intent(Intent.ACTION_VIEW,uri));else state.setText("Download blocked: external URL");});
   browser.loadUrl(GEM);
+ }
+ private void updateCollectedCount(){if(collectedCount!=null)collectedCount.setText("Collected: "+collected.size()+" unique bids • Review dates on GeM");}
+ private void restoreCollected(){
+  try{JSONArray a=new JSONArray(getPreferences(0).getString("gem_collected","[]"));for(int i=0;i<a.length();i++){JSONObject j=a.optJSONObject(i);if(j!=null&&!j.optString("bidId").isEmpty())collected.put(j.optString("bidId"),j);}}catch(Exception ignored){}
+ }
+ private void persistCollected(){
+  JSONArray a=new JSONArray();for(JSONObject j:collected.values())a.put(j);
+  getPreferences(0).edit().putString("gem_collected",a.toString()).apply();
+ }
+ private void collectVisible(){
+  state.setText("Reading visible GeM listing cards…");
+  String js="(function(){try{var found=[];var seen={};"+
+   "var nodes=Array.from(document.querySelectorAll('div,article,li')).filter(e=>e.children.length>0&&e.innerText&&/BID\\\\s*NO\\\\s*:/i.test(e.innerText));"+
+   "for(var el of nodes){var text=el.innerText||'';if(text.length>1400||text.length<40)continue;"+
+   "var match=text.match(/GEM\\\\/20\\\\d{2}\\\\/B\\\\/\\\\d+/i);if(!match||seen[match[0]])continue;seen[match[0]]=true;"+
+   "var link=Array.from(el.querySelectorAll('a[href]')).find(a=>(a.textContent||'').includes(match[0]));"+
+   "var item=text.match(/Items?\\\\s*:\\\\s*([^\\\\n]+)/i);var end=text.match(/End Date\\\\s*:\\\\s*([^\\\\n]+)/i);"+
+   "found.push({bidId:match[0],title:item?item[1].trim():'GeM bid',deadlineText:end?end[1].trim():'',url:link?link.href:'',source:'GeM visible listing'});"+
+   "if(found.length>=50)break;}return JSON.stringify(found);}catch(e){return JSON.stringify({error:e.message})}})()";
+  browser.evaluateJavascript(js,result->{
+   try{
+    String decoded=new JSONArray("["+result+"]").getString(0);
+    if(decoded.startsWith("{")){state.setText("Could not read GeM cards: "+decoded);return;}
+    JSONArray items=new JSONArray(decoded);int added=0;
+    for(int i=0;i<items.length();i++){
+     JSONObject j=items.optJSONObject(i);if(j==null)continue;String id=j.optString("bidId");
+     if(!id.matches("GEM/20\\d{2}/B/\\d+"))continue;
+     String url=j.optString("url");if(!safe(Uri.parse(url)))j.put("url",GEM);
+     if(!collected.containsKey(id)){collected.put(id,j);added++;}
+    }
+    persistCollected();updateCollectedCount();
+    state.setText("Collected "+added+" new bids from this page ("+items.length()+" detected). Tap Next, then Collect again.");
+   }catch(Exception e){state.setText("Could not parse bid cards. GeM page format may have changed.");}
+  });
+ }
+ private void reviewCollected(){
+  if(collected.isEmpty()){state.setText("No bids collected. Search GeM, then tap Collect visible bids.");return;}
+  StringBuilder message=new StringBuilder();
+  for(JSONObject j:collected.values()){
+   if(message.length()>15000){message.append("\\n…More bids saved locally");break;}
+   message.append(j.optString("bidId")).append("\\n").append(j.optString("title")).append("\\nClosing: ").append(j.optString("deadlineText","Not found")).append("\\n\\n");
+  }
+  new android.app.AlertDialog.Builder(this).setTitle("Collected GeM bids ("+collected.size()+")").setMessage(message.toString())
+   .setPositiveButton("Close",null).setNeutralButton("Clear list",(d,w)->new android.app.AlertDialog.Builder(this).setTitle("Clear collected bids?").setNegativeButton("Cancel",null).setPositiveButton("Clear",(a,b)->{collected.clear();persistCollected();updateCollectedCount();}).show()).show();
  }
  private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(12);b.setTextColor(Color.BLACK);return b;}
  @Override public void onBackPressed(){if(browser!=null&&browser.canGoBack())browser.goBack();else super.onBackPressed();}
