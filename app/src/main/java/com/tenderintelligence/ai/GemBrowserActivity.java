@@ -154,7 +154,9 @@ public class GemBrowserActivity extends Activity {
    "var text=card.innerText||'';if(text.length>6000)continue;"+
    "var item=text.match(/Items?\\s*:\\s*([^\\n]+)/i),end=text.match(/End Date\\s*:\\s*(\\d{2}-\\d{2}-\\d{4}(?:\\s+\\d{1,2}:\\d{2}\\s*(?:AM|PM))?)/i);"+
    "var anchor=node.closest('a[href]')||Array.from(card.querySelectorAll('a[href]')).find(a=>(a.textContent||'').includes(match[0]));"+
-   "seen[match[0]]=true;found.push({bidId:match[0],title:item?item[1].trim():'GeM bid',deadlineText:end?end[1].trim():'',url:anchor?anchor.href:'',source:'GeM visible listing'});if(found.length>=100)break;}"+
+   "var buyerMatch=text.match(/Department Name And Address\\s*:\\s*([^\\n]+)(?:\\n([^\\n]+))?/i);var buyer=buyerMatch?((buyerMatch[2]||buyerMatch[1]||'').trim()):'';"+
+   "var docs=Array.from(card.querySelectorAll('a[href]')).filter(a=>/\\.pdf(?:[?#]|$)|download.*(bid|document|specification|atc)/i.test(a.href||'')).map(a=>a.href).filter(u=>/^https:\\/\\/([a-z0-9-]+\\.)*gem\\.gov\\.in(?:[:\\/]|$)/i.test(u)).slice(0,3);"+
+   "seen[match[0]]=true;found.push({bidId:match[0],title:item?item[1].trim():'GeM bid',deadlineText:end?end[1].trim():'',buyer:buyer,documentLinks:docs,url:anchor?anchor.href:'',source:'GeM visible listing'});if(found.length>=100)break;}"+
    "return JSON.stringify({items:found,matchedNodes:ids.length});}catch(e){return JSON.stringify({error:e.message})}})()";
   browser.evaluateJavascript(js,result->{
    try{
@@ -165,7 +167,7 @@ public class GemBrowserActivity extends Activity {
      JSONObject j=items.optJSONObject(i);if(j==null)continue;String id=j.optString("bidId");
      if(!id.matches("GEM/20\\d{2}/B/\\d+"))continue;
      String url=j.optString("url");if(!safe(Uri.parse(url)))j.put("url",GEM);
-     if(!collected.containsKey(id)){collected.put(id,j);added++;}
+     if(!collected.containsKey(id)){collected.put(id,j);added++;}else{JSONObject old=collected.get(id);if(old!=null){if(old.optString("buyer").isEmpty()&&!j.optString("buyer").isEmpty())old.put("buyer",j.optString("buyer"));if(old.optJSONArray("documentLinks")==null&&j.optJSONArray("documentLinks")!=null)old.put("documentLinks",j.optJSONArray("documentLinks"));}}
     }
     persistCollected();updateCollectedCount();if(showingDashboard)renderDashboard();
     state.setText("Detected "+items.length()+" GeM bid IDs; saved "+added+" new bids.");
@@ -349,11 +351,20 @@ public class GemBrowserActivity extends Activity {
  }
  private void showBidActions(JSONObject bid){
   String id=bid.optString("bidId");
-  new android.app.AlertDialog.Builder(this).setTitle(id).setItems(new String[]{"Open GeM bid","Analyze tender text with OpenRouter AI","View saved AI assessment"},(d,which)->{
+  new android.app.AlertDialog.Builder(this).setTitle(id).setItems(new String[]{"Open GeM bid","Analyze tender text with OpenRouter AI","View saved AI assessment","Available document links"},(d,which)->{
    if(which==0){String url=bid.optString("url");Uri uri=Uri.parse(url);if(safe(uri)&&!GEM.equals(url))startActivity(new Intent(Intent.ACTION_VIEW,uri));else{browser.loadUrl(GEM);state.setText("GeM direct link unavailable. Search bid ID: "+id);}}
    else if(which==1)showAiDialog(bid);
-   else showSavedReview(id);
+   else if(which==2)showSavedReview(id);
+   else showDocumentLinks(bid);
   }).setNegativeButton("Cancel",null).show();
+ }
+ private void showDocumentLinks(JSONObject bid){
+  JSONArray links=bid.optJSONArray("documentLinks");
+  ArrayList<String> urls=new ArrayList<>();
+  if(links!=null)for(int i=0;i<links.length();i++){String u=links.optString(i);if(safe(Uri.parse(u)))urls.add(u);}
+  if(urls.isEmpty()){new android.app.AlertDialog.Builder(this).setTitle("GeM technical documents").setMessage("No public document URL was exposed on this listing card. Open the GeM bid and use its document/download section, then import the PDF for AI analysis. Login-only documents cannot be fetched automatically.").setPositiveButton("Open bid", (d,w)->{String url=bid.optString("url");browser.setVisibility(View.VISIBLE);dashboard.setVisibility(View.GONE);showingDashboard=false;browser.loadUrl(safe(Uri.parse(url))?url:GEM);}).setNegativeButton("Close",null).show();return;}
+  String[] labels=new String[urls.size()];for(int i=0;i<labels.length;i++)labels[i]="GeM document "+(i+1);
+  new android.app.AlertDialog.Builder(this).setTitle("Public document links").setItems(labels,(d,w)->startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(urls.get(w))))).setNegativeButton("Close",null).show();
  }
  private void restoreAiReviews(){
   try{JSONArray a=new JSONArray(getPreferences(0).getString("gem_ai_reviews","[]"));for(int i=0;i<a.length();i++){JSONObject j=a.optJSONObject(i);if(j!=null&&!j.optString("bidId").isEmpty())aiReviews.put(j.optString("bidId"),j);}}catch(Exception ignored){}
