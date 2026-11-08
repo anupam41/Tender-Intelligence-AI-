@@ -685,7 +685,7 @@ public class GemBrowserActivity extends Activity {
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("AI settings").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Save",null).create();
   dialog.setOnShowListener(ignored->dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
    String token=api.getText().toString().trim(),id=model.getText().toString().trim();
-   if(id.isEmpty()){model.setError("Enter model ID");return;}\n   if(incompatibleAiModel(id)){model.setError("Not a chat model");connection.setText(aiModelHelp());return;}
+   if(id.isEmpty()){model.setError("Enter model ID");return;}\n   if(!gemini.getText().toString().trim().isEmpty()||!groq.getText().toString().trim().isEmpty()){}else if(incompatibleAiModel(id)){model.setError("Not a chat model");connection.setText(aiModelHelp());return;}
    try{if(remember.isChecked()&&!token.isEmpty())storeKey(token);else clearStoredKey();}
    catch(Exception e){connection.setText("Secure storage failed: "+e.getClass().getSimpleName());return;}
 
@@ -698,7 +698,7 @@ public class GemBrowserActivity extends Activity {
    }catch(Exception e){connection.setText("Provider key storage failed");return;}
    geminiKey=g;groqKey=q;
    if(providersChanged){aiConnectionPaused=false;apiFailedReviews.clear();}
-   boolean changed=!token.equals(openRouterKey)||!id.equals(getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free"));openRouterKey=token;if(changed){aiConnectionPaused=false;apiFailedReviews.clear();}scheduleAutoReview();getPreferences(0).edit().putString("openrouter_model",id).apply();dialog.dismiss();
+   boolean changed=providersChanged||!token.equals(openRouterKey)||!id.equals(getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free"));openRouterKey=token;if(changed){aiConnectionPaused=false;apiFailedReviews.clear();}scheduleAutoReview();getPreferences(0).edit().putString("openrouter_model",id).apply();dialog.dismiss();
   }));
   dialog.show();
  }
