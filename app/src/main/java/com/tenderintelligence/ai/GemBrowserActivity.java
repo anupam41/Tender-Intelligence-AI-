@@ -63,6 +63,7 @@ public class GemBrowserActivity extends Activity {
   LinearLayout page=new LinearLayout(this);page.setOrientation(1);page.setBackgroundColor(Color.rgb(246,248,251));setContentView(page);page.setOnApplyWindowInsetsListener((v,insets)->{int top=android.os.Build.VERSION.SDK_INT>=30?insets.getInsets(android.view.WindowInsets.Type.statusBars()).top:insets.getSystemWindowInsetTop();v.setPadding(0,top,0,0);return insets;});
   TextView heading=new TextView(this);heading.setText("Tender Radar");heading.setTextSize(26);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(Color.rgb(35,38,43));heading.setPadding(dp(20),dp(18),dp(20),dp(6));page.addView(heading);
   TextView note=new TextView(this);note.setText("Discover industrial tenders • GeM");note.setTextColor(Color.rgb(108,110,116));note.setPadding(dp(20),0,dp(20),dp(16));page.addView(note);
+  Button settings=button("⚙ Settings");settings.setTextSize(14);settings.setTextColor(Color.rgb(31,54,72));settings.setBackground(rounded(Color.rgb(226,237,242),18,Color.rgb(209,224,232)));LinearLayout.LayoutParams settingsLp=new LinearLayout.LayoutParams(-1,dp(48));settingsLp.setMargins(dp(20),0,dp(20),dp(12));page.addView(settings,settingsLp);settings.setOnClickListener(v->showAiSettings());
   LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.HORIZONTAL);controls.setVisibility(View.GONE);page.addView(controls);
   Button back=button("Back");controls.addView(back,new LinearLayout.LayoutParams(0,40,1));back.setOnClickListener(v->{if(browser.canGoBack())browser.goBack();else finish();});
   Button home=button("GeM home");controls.addView(home,new LinearLayout.LayoutParams(0,40,1));home.setOnClickListener(v->browser.loadUrl(GEM));
@@ -493,13 +494,54 @@ public class GemBrowserActivity extends Activity {
    finally{if(conn!=null)conn.disconnect();if(file!=null)file.delete();}
   }).start();
  }
+ private void showAiSettings(){
+  LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(20),dp(12),dp(20),dp(8));
+  TextView info=new TextView(this);info.setText("OpenRouter AI connection\\nYour API key is stored only on this device when Remember is enabled.");info.setTextColor(Color.DKGRAY);content.addView(info);
+  EditText api=new EditText(this);api.setHint("OpenRouter API key");api.setSingleLine(true);api.setInputType(129);api.setText(openRouterKey);content.addView(api);
+  EditText model=new EditText(this);model.setSingleLine(true);model.setHint("Model ID");model.setText(getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free"));content.addView(model);
+  CheckBox remember=new CheckBox(this);remember.setText("Remember key securely (Android Keystore)");remember.setChecked(getPreferences(0).getBoolean("remember_openrouter_key",false));content.addView(remember);
+  TextView connection=new TextView(this);connection.setText("Connection not tested");connection.setTextColor(Color.DKGRAY);connection.setPadding(0,dp(12),0,dp(12));content.addView(connection);
+  Button test=button("Test AI connection");content.addView(test);
+  test.setOnClickListener(v->{
+   String token=api.getText().toString().trim(),modelId=model.getText().toString().trim();
+   if(token.isEmpty()){api.setError("Enter an API key");return;}
+   if(modelId.isEmpty()){model.setError("Enter a model ID");return;}
+   test.setEnabled(false);connection.setText("Connecting to OpenRouter…");
+   new Thread(()->{
+    HttpURLConnection conn=null;String message;
+    try{
+     conn=(HttpURLConnection)new URL("https://openrouter.ai/api/v1/chat/completions").openConnection();
+     conn.setRequestMethod("POST");conn.setConnectTimeout(15000);conn.setReadTimeout(35000);conn.setDoOutput(true);
+     conn.setRequestProperty("Authorization","Bearer "+token);conn.setRequestProperty("Content-Type","application/json");
+     JSONObject body=new JSONObject().put("model",modelId).put("max_tokens",12).put("messages",new JSONArray().put(new JSONObject().put("role","user").put("content","Reply OK")));
+     try(OutputStream out=conn.getOutputStream()){out.write(body.toString().getBytes(StandardCharsets.UTF_8));}
+     int code=conn.getResponseCode();
+     if(code>=200&&code<300){try(InputStream in=conn.getInputStream()){byte[] buf=new byte[2048];while(in.read(buf)!=-1){}}message="Connected successfully • model responded (HTTP "+code+")";}
+     else if(code==401||code==403)message="Authentication failed (HTTP "+code+"). Check your API key.";
+     else if(code==429)message="Rate limit reached (429). Try again later.";
+     else message="OpenRouter returned HTTP "+code+". Check model availability or account limits.";
+    }catch(Exception e){message="Connection failed: "+e.getClass().getSimpleName()+". Check internet access.";}
+    finally{if(conn!=null)conn.disconnect();}
+    final String result=message;runOnUiThread(()->{test.setEnabled(true);connection.setText(result);});
+   }).start();
+  });
+  Button forget=button("Forget saved API key");content.addView(forget);forget.setOnClickListener(v->{clearStoredKey();openRouterKey="";api.setText("");remember.setChecked(false);connection.setText("Saved key removed");});
+  ScrollView scroll=new ScrollView(this);scroll.addView(content);
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("AI settings").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Save",null).create();
+  dialog.setOnShowListener(ignored->dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+   String token=api.getText().toString().trim(),id=model.getText().toString().trim();
+   if(id.isEmpty()){model.setError("Enter model ID");return;}
+   try{if(remember.isChecked()&&!token.isEmpty())storeKey(token);else clearStoredKey();}
+   catch(Exception e){connection.setText("Secure storage failed: "+e.getClass().getSimpleName());return;}
+   openRouterKey=token;getPreferences(0).edit().putString("openrouter_model",id).apply();dialog.dismiss();
+  }));
+  dialog.show();
+ }
  private void showAiDialog(JSONObject bid){
   LinearLayout layout=new LinearLayout(this);layout.setOrientation(1);layout.setPadding(dp(16),dp(8),dp(16),dp(8));
   TextView explanation=new TextView(this);explanation.setText("The app will try to retrieve the public GeM bid document automatically. Your OpenRouter key can be stored securely on this device. If GeM does not expose the document, manual import remains available.");layout.addView(explanation);
-  EditText api=new EditText(this);api.setHint("OpenRouter API key");api.setSingleLine(true);api.setInputType(129);api.setText(openRouterKey);layout.addView(api);
-  EditText model=new EditText(this);model.setHint("OpenRouter model");model.setSingleLine(true);model.setText(getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free"));layout.addView(model);
-   CheckBox remember=new CheckBox(this);remember.setText("Remember API key securely on this device");remember.setChecked(getPreferences(0).getBoolean("remember_openrouter_key",false));layout.addView(remember);
-   Button forget=button("Forget saved API key");layout.addView(forget);forget.setOnClickListener(v->{clearStoredKey();openRouterKey="";api.setText("");remember.setChecked(false);state.setText("Saved OpenRouter key removed.");});
+  TextView provider=new TextView(this);provider.setText("AI provider: OpenRouter • "+getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free"));layout.addView(provider);
+  Button configure=button("AI settings / Test connection");layout.addView(configure);configure.setOnClickListener(v->showAiSettings());
   EditText scope=new EditText(this);scope.setHint("Tender text loads automatically when a public document is available");scope.setMinLines(5);scope.setMaxLines(12);layout.addView(scope);
   Button automatic=button("Auto-read available GeM tender PDF");layout.addView(automatic);automatic.setOnClickListener(v->loadPublicPdfInto(bid,scope,automatic));
   Button importPdf=button("Import tender PDF (no copying)");layout.addView(importPdf);
@@ -528,13 +570,11 @@ public class GemBrowserActivity extends Activity {
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("AI technical review: "+bid.optString("bidId")).setView(scroll)
    .setNegativeButton("Cancel",null).setPositiveButton("Analyze",null).create();
   dialog.setOnShowListener(ignored->dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
-    String token=api.getText().toString().trim(),modelId=model.getText().toString().trim(),document=scope.getText().toString().trim();
-    openRouterKey=token;
-    if(token.isEmpty()){api.setError("Enter OpenRouter API key");api.requestFocus();return;}
-    if(modelId.isEmpty()){model.setError("Enter model ID");model.requestFocus();return;}
+    String token=openRouterKey,modelId=getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free"),document=scope.getText().toString().trim();
+    if(token.isEmpty()){showAiSettings();return;}
+    if(modelId.isEmpty()){showAiSettings();return;}
     if(document.length()<80){scope.setError("Paste at least 80 characters of actual tender scope");scope.requestFocus();return;}
-    try{if(remember.isChecked())storeKey(token);else clearStoredKey();}catch(Exception e){new android.app.AlertDialog.Builder(this).setTitle("Could not securely save key").setMessage("Android Keystore failed. The key has not been saved. "+e.getClass().getSimpleName()).setPositiveButton("OK",null).show();return;}
-    getPreferences(0).edit().putString("openrouter_model",modelId).apply();
+
     dialog.dismiss();
     state.setText("Analyzing tender scope with OpenRouter…");
     android.app.AlertDialog progress=new android.app.AlertDialog.Builder(this).setTitle("Analyzing tender").setMessage("Contacting OpenRouter. This can take up to a minute.").setCancelable(false).create();progress.show();
