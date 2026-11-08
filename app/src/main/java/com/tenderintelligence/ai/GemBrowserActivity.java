@@ -15,14 +15,6 @@ import java.util.*;
 import java.net.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import android.security.keystore.KeyGenParameterSpec;
-import android.security.keystore.KeyProperties;
-import java.security.KeyStore;
-import javax.crypto.Cipher;
-import javax.crypto.KeyGenerator;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.GCMParameterSpec;
-import android.util.Base64;
 
 /** User-driven browser for public GeM bid listings. Does not scrape or bypass access controls. */
 public class GemBrowserActivity extends Activity {
@@ -54,7 +46,6 @@ public class GemBrowserActivity extends Activity {
  private final LinkedHashMap<String,JSONObject> collected=new LinkedHashMap<>();
  private TextView collectedCount;
  private static final String OMNI_URL="http://127.0.0.1:20128/v1/chat/completions";
- private static final String KEY_ALIAS="TenderIntelligenceOpenRouterKey";
  private EditText pendingPdfScope;
  private final LinkedHashMap<String,JSONObject> aiReviews=new LinkedHashMap<>();
  private static final int PICK_TENDER_PDF=4207;
