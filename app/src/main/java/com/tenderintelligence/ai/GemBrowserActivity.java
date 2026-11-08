@@ -142,7 +142,7 @@ public class GemBrowserActivity extends Activity {
   heroContent=new LinearLayout(this);heroContent.setOrientation(1);dashboardList.addView(heroContent);
   for(View item:new View[]{heading,note,aiSettingsButton,scanRing,statsStrip,batchButton,scanProgress,scanProgressLabel,collectedCount,state}){android.view.ViewGroup parent=(android.view.ViewGroup)item.getParent();if(parent!=null)parent.removeView(item);heroContent.addView(item);}
   heading.setPadding(dp(4),dp(10),0,dp(2));note.setPadding(dp(4),0,0,dp(14));
-  aiSettingsButton.setText("⚙  Settings");LinearLayout.LayoutParams settingsLp=new LinearLayout.LayoutParams(-1,dp(48));settingsLp.setMargins(dp(4),dp(2),dp(4),dp(12));aiSettingsButton.setLayoutParams(settingsLp);
+  aiSettingsButton.setText("⚙  Settings");LinearLayout.LayoutParams settingsBarLp=new LinearLayout.LayoutParams(-1,dp(48));settingsBarLp.setMargins(dp(4),dp(2),dp(4),dp(12));aiSettingsButton.setLayoutParams(settingsBarLp);
   LinearLayout.LayoutParams ringParams=new LinearLayout.LayoutParams(dp(208),dp(208));ringParams.gravity=Gravity.CENTER_HORIZONTAL;ringParams.setMargins(0,dp(4),0,dp(12));scanRing.setLayoutParams(ringParams);
   statsStrip.setPadding(0,dp(4),0,dp(8));LinearLayout.LayoutParams scanLp=new LinearLayout.LayoutParams(-1,dp(56));scanLp.setMargins(dp(4),dp(4),dp(4),dp(12));batchButton.setLayoutParams(scanLp);
   scanProgressLabel.setPadding(dp(4),dp(12),0,dp(4));collectedCount.setPadding(dp(4),0,0,dp(4));state.setPadding(dp(4),dp(4),0,dp(18));
