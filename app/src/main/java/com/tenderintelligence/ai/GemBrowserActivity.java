@@ -339,7 +339,8 @@ public class GemBrowserActivity extends Activity {
    public void afterTextChanged(android.text.Editable x){
     if(!"auto_pdf_ready".equals(extracted.getTag())||x.length()<80)return;
     extracted.setTag("ai_running");
-    String document=x.toString(),token=openRouterKey,modelId=getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free");\n    if(geminiKey.isEmpty()&&groqKey.isEmpty()&&incompatibleAiModel(modelId)){state.setText("AI model is incompatible. Choose a chat model in Settings.");apiFailedReviews.add(id);aiConnectionPaused=true;analyzingBids.remove(id);renderDashboard();finishAutoReview();return;}
+    String document=x.toString(),token=openRouterKey,modelId=getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free");
+    if(geminiKey.isEmpty()&&groqKey.isEmpty()&&incompatibleAiModel(modelId)){state.setText("AI model is incompatible. Choose a chat model in Settings.");apiFailedReviews.add(id);aiConnectionPaused=true;analyzingBids.remove(id);renderDashboard();finishAutoReview();return;}
     state.setText("Analyzing "+id+" with AI…");
     new Thread(()->{
      try{
@@ -651,7 +652,8 @@ public class GemBrowserActivity extends Activity {
      if(code>=200&&code<300){try(InputStream in=conn.getInputStream()){byte[] buf=new byte[2048];while(in.read(buf)!=-1){}}message="Connected successfully • model responded (HTTP "+code+")";}
      else if(code==401||code==403)message="Authentication failed (HTTP "+code+"). Check your API key.";
      else if(code==429)message="Rate limit reached (429). Try again later.";
-     else if(code==400||code==404||code==422)message="Model rejected (HTTP "+code+"). "+aiModelHelp();\n     else message="OpenRouter returned HTTP "+code+". Check model availability or account limits.";
+     else if(code==400||code==404||code==422)message="Model rejected (HTTP "+code+"). "+aiModelHelp();
+     else message="OpenRouter returned HTTP "+code+". Check model availability or account limits.";
     }catch(Exception e){message="Connection failed: "+e.getClass().getSimpleName()+". Check internet access.";}
     finally{if(conn!=null)conn.disconnect();}
     final String result=message;runOnUiThread(()->{test.setEnabled(true);connection.setText(result);if(result.startsWith("Connected successfully")){openRouterKey=token;getPreferences(0).edit().putString("openrouter_model",modelId).apply();aiConnectionPaused=false;apiFailedReviews.clear();state.setText("AI connected. Resuming pending tender reviews…");renderDashboard();scheduleAutoReview();}});
