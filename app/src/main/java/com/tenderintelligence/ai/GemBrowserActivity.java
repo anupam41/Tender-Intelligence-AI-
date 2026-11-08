@@ -32,6 +32,10 @@ public class GemBrowserActivity extends Activity {
  private String autoSignature="";
  private final android.os.Handler autoHandler=new android.os.Handler(android.os.Looper.getMainLooper());
  private Button autoButton;
+ private boolean batchRunning=false;
+ private int batchIndex=0;
+ private String[] batchTerms={"Heat exchanger","Tube bundle","Retubing","Condenser","Oil cooler","Sample cooler","SWAS cooler","Pressure vessel","Economizer","Air preheater","LP heater","HP heater"};
+ private Button batchButton;
  private EditText term;
  private TextView state;
  private final LinkedHashMap<String,JSONObject> collected=new LinkedHashMap<>();
@@ -94,7 +98,9 @@ public class GemBrowserActivity extends Activity {
   Button collect=button("Collect visible bids");captureRow.addView(collect,new LinearLayout.LayoutParams(0,dp(52),2));collect.setOnClickListener(v->collectVisible());
   Button review=button("Review shortlist");captureRow.addView(review,new LinearLayout.LayoutParams(0,dp(52),2));review.setOnClickListener(v->reviewCollected());
   autoButton=button("Auto collect all pages");page.addView(autoButton,new LinearLayout.LayoutParams(-1,dp(48)));
-  autoButton.setOnClickListener(v->{if(autoCollecting)stopAutoCollect("Stopped by user.");else startAutoCollect();});
+  autoButton.setOnClickListener(v->{if(autoCollecting){batchRunning=false;stopAutoCollect("Stopped by user.");}else startAutoCollect();});
+  batchButton=button("One-tap: search 12 equipment groups + collect");page.addView(batchButton,new LinearLayout.LayoutParams(-1,dp(48)));
+  batchButton.setOnClickListener(v->{if(batchRunning){batchRunning=false;stopAutoCollect("Batch stopped.");batchButton.setText("One-tap: search 12 equipment groups + collect");}else startBatch();});
   collectedCount=new TextView(this);collectedCount.setTextColor(Color.rgb(45,212,191));collectedCount.setPadding(12,2,12,2);page.addView(collectedCount);
   restoreCollected();restoreAiReviews();openRouterKey=readStoredKey();updateCollectedCount();
   Button next=button("Next");findRow.addView(next);next.setOnClickListener(v->{
@@ -182,17 +188,17 @@ public class GemBrowserActivity extends Activity {
    try{
     JSONObject data=new JSONObject(new JSONArray("["+result+"]").getString(0));
     String signature=data.optString("signature");int count=data.optInt("count");
-    if(count==0){if(++autoStalls>=8){stopAutoCollect("No GeM bid cards detected. Search first and wait for results.");return;}autoHandler.postDelayed(this::autoStep,1500);return;}
-    if(signature.equals(autoSignature)){if(++autoStalls>=8){stopAutoCollect("GeM results did not change. Pagination may be blocked.");return;}autoHandler.postDelayed(this::autoStep,1500);return;}
+    if(count==0){if(++autoStalls>=8){if(batchRunning){autoCollecting=false;autoHandler.postDelayed(this::nextBatch,600);}else stopAutoCollect("No GeM bid cards detected. Search first and wait for results.");return;}autoHandler.postDelayed(this::autoStep,1500);return;}
+    if(signature.equals(autoSignature)){if(++autoStalls>=8){if(batchRunning){autoCollecting=false;autoHandler.postDelayed(this::nextBatch,600);}else stopAutoCollect("GeM results did not change. Pagination may be blocked.");return;}autoHandler.postDelayed(this::autoStep,1500);return;}
     autoSignature=signature;autoStalls=0;autoPages++;
     state.setText("Collecting page "+autoPages+"…");
     collectVisible(()->{
      if(!autoCollecting)return;
-     if(autoPages>=100){stopAutoCollect("Reached 100-page safety limit.");return;}
+     if(autoPages>=(batchRunning?25:100)){stopAutoCollect("Reached page safety limit.");return;}
      String nextJs="(function(){var a=Array.from(document.querySelectorAll('a,button')).find(e=>{var r=e.getBoundingClientRect();return r.width>0&&r.height>0&&!e.disabled&&e.getAttribute('aria-disabled')!=='true'&&!e.classList.contains('disabled')&&/^(next|next page|›|»|>)$/i.test((e.innerText||'').trim())});if(!a)return 'END';a.click();return 'NEXT'})()";
      browser.evaluateJavascript(nextJs,out->{
       if(!autoCollecting)return;
-      if(!out.contains("NEXT")){stopAutoCollect("Reached the last available page.");return;}
+      if(!out.contains("NEXT")){if(batchRunning){autoCollecting=false;autoHandler.postDelayed(this::nextBatch,800);}else stopAutoCollect("Reached the last available page.");return;}
       state.setText("Collected "+autoPages+" pages, "+collected.size()+" unique bids. Waiting for next GeM page…");
       autoHandler.postDelayed(this::autoStep,1800);
      });
