@@ -398,14 +398,34 @@ public class GemBrowserActivity extends Activity {
   intent.putExtra(Intent.EXTRA_TITLE,"GeM_"+bid.optString("bidId").replace("/","_")+"_shortlist.docx");
   try{startActivityForResult(intent,SAVE_SHORTLIST_DOCX);}catch(Exception e){state.setText("No document provider available for Word export.");}
  }
+ private static final String[] TENDER_STAGES={"Shortlisted","Pending","Quoted","Won","Lost"};
+ private String tenderStage(JSONObject bid){
+  String value=bid.optString("trackingStage","Shortlisted");
+  for(String stage:TENDER_STAGES)if(stage.equals(value))return value;
+  return "Shortlisted";
+ }
+ private void chooseTenderStage(JSONObject bid,android.app.AlertDialog parent){
+  String current=tenderStage(bid);int selected=0;
+  for(int i=0;i<TENDER_STAGES.length;i++)if(TENDER_STAGES[i].equals(current))selected=i;
+  new android.app.AlertDialog.Builder(this).setTitle("Tender status • "+bid.optString("bidId"))
+   .setSingleChoiceItems(TENDER_STAGES,selected,(d,which)->{
+    try{bid.put("trackingStage",TENDER_STAGES[which]);}catch(Exception ignored){}
+    shortlisted.put(bid.optString("bidId"),bid);persistShortlist();
+    d.dismiss();parent.dismiss();renderDashboard();showShortlist();
+   }).setNegativeButton("Cancel",null).show();
+ }
  private void showShortlist(){
   LinearLayout list=new LinearLayout(this);list.setOrientation(1);list.setPadding(dp(14),dp(8),dp(14),dp(8));
   ScrollView scroll=new ScrollView(this);scroll.addView(list);
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Shortlisted tenders ("+shortlisted.size()+")").setView(scroll).setPositiveButton("Close",null).create();
+  int[] counts=new int[TENDER_STAGES.length];for(JSONObject item:shortlisted.values())for(int i=0;i<TENDER_STAGES.length;i++)if(TENDER_STAGES[i].equals(tenderStage(item)))counts[i]++;
+  StringBuilder overview=new StringBuilder("Pipeline: ");for(int i=0;i<TENDER_STAGES.length;i++){if(i>0)overview.append(" • ");overview.append(TENDER_STAGES[i]).append(" ").append(counts[i]);}
+  list.addView(dashText(overview.toString(),14,themeColor(0xff008b7e,0xff57d7c6)));
   if(shortlisted.isEmpty())list.addView(dashText("No shortlisted tenders yet.",15,themeColor(0xff1b2d31,0xffeff9f8)));
   for(JSONObject bid:new ArrayList<>(shortlisted.values())){
    String id=bid.optString("bidId");
-   TextView name=dashText(id+" • "+bid.optString("title"),14,themeColor(0xff1b2d31,0xffeff9f8));list.addView(name);
+   TextView name=dashText("["+tenderStage(bid)+"] "+id+" • "+bid.optString("title"),14,themeColor(0xff1b2d31,0xffeff9f8));list.addView(name);
+   Button statusButton=button("Change status • "+tenderStage(bid));list.addView(statusButton);statusButton.setOnClickListener(v->chooseTenderStage(bid,dialog));
    Button word=button("Save Word (.docx)");list.addView(word);word.setOnClickListener(v->exportShortlistedWord(bid));
    Button open=button("Open GeM document");list.addView(open);open.setOnClickListener(v->openBidPdf(bid));
    Button restore=button("Remove from shortlist / show again");list.addView(restore);
@@ -417,7 +437,7 @@ public class GemBrowserActivity extends Activity {
   if(dashboardList==null)return;
   while(dashboardList.getChildCount()>1)dashboardList.removeViewAt(1);
   int white=themeColor(0xff1b2d31,0xffeff9f8),muted=themeColor(0xff67797d,0xff9fb4b7),teal=themeColor(0xff008b7e,0xff57d7c6);
-  Button shortlistLibrary=button("Shortlist ("+shortlisted.size()+") • Saved tenders");dashboardList.addView(shortlistLibrary);shortlistLibrary.setOnClickListener(v->showShortlist());
+  Button shortlistLibrary=button("Tender management ("+shortlisted.size()+") • Pipeline");dashboardList.addView(shortlistLibrary);shortlistLibrary.setOnClickListener(v->showShortlist());
   TextView resultsHeading=dashText("Matching tenders",24,white);resultsHeading.setTypeface(null,Typeface.BOLD);dashboardList.addView(resultsHeading);
   ArrayList<JSONObject> open=new ArrayList<>();int expired=0,missing=0,analyzed=0;
   Date now=new Date();
