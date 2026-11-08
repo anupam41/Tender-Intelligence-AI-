@@ -102,7 +102,7 @@ public class GemBrowserActivity extends Activity {
   browser.setDownloadListener((url,userAgent,disposition,mime,length)->{Uri uri=Uri.parse(url);if(safe(uri))startActivity(new Intent(Intent.ACTION_VIEW,uri));else state.setText("Download blocked: external URL");});
   browser.loadUrl(GEM);
  }
- private void updateCollectedCount(){if(collectedCount!=null){int matches=0;for(JSONObject j:collected.values())if(relevantTitle(j.optString("title")))matches++;collectedCount.setText("Collected: "+collected.size()+" • Keyword candidates: "+matches+" • Dates unverified");}}
+ private void updateCollectedCount(){if(collectedCount!=null){int matches=0;for(JSONObject j:collected.values())if(relevantTitle(j.optString("title")))matches++;collectedCount.setText("Collected: "+collected.size()+" • Title matches: "+matches+" • Review closing dates");}}
  private void restoreCollected(){
   try{JSONArray a=new JSONArray(getPreferences(0).getString("gem_collected","[]"));for(int i=0;i<a.length();i++){JSONObject j=a.optJSONObject(i);if(j!=null&&!j.optString("bidId").isEmpty())collected.put(j.optString("bidId"),j);}}catch(Exception ignored){}
  }
@@ -137,20 +137,39 @@ public class GemBrowserActivity extends Activity {
    }catch(Exception e){state.setText("Could not parse bid cards. GeM page format may have changed.");}
   });
  }
- private String cleanDeadline(String value){return value.matches("(?i)\\d{2}-\\d{2}-\\d{4}(?:\\s+\\d{1,2}:\\d{2}\\s*(?:AM|PM))?")?value:"Not verified";}
- private boolean relevantTitle(String value){return value.toLowerCase(java.util.Locale.ROOT).matches(".*(heat exchanger|condenser|retub|re-tub|cooler|tube bundle|pressure vessel|evaporator|economi[sz]er|chiller|radiator|cooling coil|heater|swas|air preheater|shell and tube|shell & tube).*");}
+ private Date parsedDeadline(String value){
+  try{SimpleDateFormat format=new SimpleDateFormat("dd-MM-yyyy h:mm a",Locale.ENGLISH);format.setLenient(false);return format.parse(value.trim());}catch(Exception e){return null;}
+ }
+ private boolean relevantTitle(String value){return value.toLowerCase(Locale.ROOT).matches(".*(heat exchanger|condenser|retub|re-tub|cooler|tube bundle|pressure vessel|evaporator|economi[sz]er|chiller|radiator|cooling coil|heater|swas|air preheater|shell and tube|shell & tube).*");}
  private void reviewCollected(){
   if(collected.isEmpty()){state.setText("No bids collected. Search GeM, then tap Collect visible bids.");return;}
-  StringBuilder message=new StringBuilder();
-  int relevant=0;for(JSONObject j:collected.values())if(relevantTitle(j.optString("title")))relevant++;
-  message.append("Keyword-matched candidates: ").append(relevant).append(" / ").append(collected.size()).append("\nDocument analysis not yet performed.\n\n");
+  ArrayList<JSONObject> matches=new ArrayList<>();int expired=0,unverified=0;
+  Date now=new Date();
   for(JSONObject j:collected.values()){
    if(!relevantTitle(j.optString("title")))continue;
-   if(message.length()>15000){message.append("\n…More bids saved locally");break;}
-   message.append(j.optString("bidId")).append("\n").append(j.optString("title")).append("\nClosing: ").append(cleanDeadline(j.optString("deadlineText"))).append("\n\n");
+   Date due=parsedDeadline(j.optString("deadlineText"));
+   if(due==null){unverified++;continue;}
+   if(!due.after(now)){expired++;continue;}
+   matches.add(j);
   }
-  new android.app.AlertDialog.Builder(this).setTitle("Review matching bids ("+relevant+")").setMessage(message.toString())
-   .setPositiveButton("Close",null).setNeutralButton("Clear list",(d,w)->new android.app.AlertDialog.Builder(this).setTitle("Clear collected bids?").setNegativeButton("Cancel",null).setPositiveButton("Clear",(a,b)->{collected.clear();persistCollected();updateCollectedCount();}).show()).show();
+  LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(14),dp(8),dp(14),dp(8));
+  TextView summary=new TextView(this);summary.setText("Open-date keyword candidates: "+matches.size()+" / "+collected.size()+" collected\\nExpired candidates hidden: "+expired+" • Dates missing: "+unverified+"\\nAI document analysis not yet performed.");summary.setTextColor(Color.DKGRAY);summary.setPadding(0,0,0,dp(12));content.addView(summary);
+  for(JSONObject j:matches){
+   String id=j.optString("bidId");
+   TextView card=new TextView(this);card.setText(id+"\\n"+j.optString("title")+"\\nCloses: "+j.optString("deadlineText")+"\\nTap to open GeM bid");card.setTextColor(Color.rgb(0,86,120));card.setTextSize(15);card.setPadding(dp(10),dp(12),dp(10),dp(12));content.addView(card);
+   card.setOnClickListener(v->{
+    String url=j.optString("url");
+    Uri uri=Uri.parse(url);
+    if(safe(uri)&&!GEM.equals(url))startActivity(new Intent(Intent.ACTION_VIEW,uri));
+    else {browser.loadUrl(GEM);state.setText("Bid link unavailable. Search this bid number on GeM: "+id);}
+   });
+   View divider=new View(this);divider.setBackgroundColor(Color.LTGRAY);content.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));
+  }
+  if(matches.isEmpty()){TextView empty=new TextView(this);empty.setText("No open-date keyword matches yet. Some bids may require reading documents to determine relevance.");empty.setTextColor(Color.DKGRAY);content.addView(empty);}
+  ScrollView scroll=new ScrollView(this);scroll.addView(content);
+  new android.app.AlertDialog.Builder(this).setTitle("GeM shortlist candidates").setView(scroll)
+   .setPositiveButton("Close",null)
+   .setNeutralButton("Clear collected bids",(d,w)->new android.app.AlertDialog.Builder(this).setTitle("Clear collected bids?").setNegativeButton("Cancel",null).setPositiveButton("Clear",(x,y)->{collected.clear();persistCollected();updateCollectedCount();}).show()).show();
  }
  private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
  private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(12);b.setTextColor(Color.BLACK);b.setMinHeight(dp(44));b.setPadding(dp(4),0,dp(4),0);return b;}
