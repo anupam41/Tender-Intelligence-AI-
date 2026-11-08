@@ -405,7 +405,7 @@ public class GemBrowserActivity extends Activity {
    TextView bidId=dashText(id+"  •  "+workCategory(title),13,teal);bidId.setPadding(0,dp(7),0,dp(8));card.addView(bidId);
    card.addView(dashText("Closing  "+due+"\n"+(ai==null?(analyzingBids.contains(id)?"● Analyzing now":apiFailedReviews.contains(id)?"AI connection issue • Retry after reconnect":failedAutoReviews.contains(id)?"Document inaccessible • Manual PDF needed":"◷ Waiting in AI queue"):ai.optString("verdict","Needs review")+" • AI assessment (indicative)"),13,muted));
    LinearLayout actions=new LinearLayout(this);actions.setOrientation(0);card.addView(actions);
-   Button openBid=button("View document");openBid.setTextColor(Color.rgb(38,91,91));openBid.setBackground(glass(themeColor(0xffeaf6f4,0xff1a3036),22));LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(0,dp(48),1);openLp.setMargins(0,0,dp(6),0);actions.addView(openBid,openLp);openBid.setOnClickListener(v->openBidPdf(bid));
+   Button openBid=button("Documents");openBid.setTextColor(Color.rgb(38,91,91));openBid.setBackground(glass(themeColor(0xffeaf6f4,0xff1a3036),22));LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(0,dp(48),1);openLp.setMargins(0,0,dp(6),0);actions.addView(openBid,openLp);openBid.setOnClickListener(v->openBidPdf(bid));
    Button analyze=button(analyzingBids.contains(id)?"Analyzing…":ai==null?(apiFailedReviews.contains(id)?"Retry after reconnect":failedAutoReviews.contains(id)?"Retry AI review":"AI pending…"):ai.optInt("score",0)+"% • Summary");analyze.setTextColor(Color.WHITE);analyze.setTypeface(null,Typeface.BOLD);analyze.setBackground(rounded(Color.rgb(0,164,146),22,Color.rgb(0,164,146)));LinearLayout.LayoutParams analyzeLp=new LinearLayout.LayoutParams(0,dp(48),1);analyzeLp.setMargins(dp(6),0,0,0);actions.addView(analyze,analyzeLp);
    analyze.setEnabled(!analyzingBids.contains(id));if(analyzingBids.contains(id)){analyze.setText("◌ Analyzing");analyze.setAlpha(0.78f);}analyze.setOnClickListener(v->{if(aiReviews.containsKey(id))showSavedReview(id);else{failedAutoReviews.remove(id);apiFailedReviews.remove(id);aiConnectionPaused=false;analyzeInline(bid);}});
   }
@@ -439,14 +439,26 @@ public class GemBrowserActivity extends Activity {
  }
  private void openBidPdf(JSONObject bid){
   String id=bid.optString("bidId","");
+  JSONArray links=bid.optJSONArray("documentLinks");
+  java.util.ArrayList<String> valid=new java.util.ArrayList<>();
+  if(links!=null)for(int i=0;i<links.length();i++){
+   String link=links.optString(i,"");if(safe(Uri.parse(link))&&!valid.contains(link))valid.add(link);
+  }
+  String listing=bid.optString("url","");
   java.util.regex.Matcher match=java.util.regex.Pattern.compile("(?i)^GEM/20\\d{2}/B/(\\d+)$").matcher(id);
-  if(!match.matches()){state.setText("Cannot identify a GeM PDF for this bid.");return;}
-  String link="https://bidplus.gem.gov.in/showbidDocument/"+match.group(1);
-  try{
-   Intent view=new Intent(Intent.ACTION_VIEW,Uri.parse(link));
-   startActivity(view);
-   state.setText("Opening official GeM bid document for "+id+". Download depends on GeM access.");
-  }catch(Exception e){state.setText("No browser available to open the GeM bid document.");}
+  String guessed=match.matches()?"https://bidplus.gem.gov.in/showbidDocument/"+match.group(1):"";
+  String[] options={"Open original GeM listing","Open public bid document (if accessible)","Show document links / download guidance"};
+  new android.app.AlertDialog.Builder(this).setTitle("Documents • "+id)
+   .setMessage("GeM may require login or a browser session to download the full technical PDF. The public bid notice may not contain drawings, specifications or buyer attachments.")
+   .setItems(options,(dialog,choice)->{
+    if(choice==2){showDocumentLinks(bid);return;}
+    String url=choice==0?listing:(!valid.isEmpty()?valid.get(0):guessed);
+    if(url.isEmpty()||!safe(Uri.parse(url))){
+     new android.app.AlertDialog.Builder(this).setMessage("No verified public document link is available. Open the GeM listing and download the buyer's technical attachments there.").setPositiveButton("OK",null).show();return;
+    }
+    try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));state.setText("Opening GeM "+(choice==0?"listing":"document")+" for "+id+". Download requires GeM access.");}
+    catch(Exception e){state.setText("No browser available to open this GeM link.");}
+   }).setNegativeButton("Cancel",null).show();
  }
  private void showDocumentLinks(JSONObject bid){
   JSONArray links=bid.optJSONArray("documentLinks");
@@ -466,7 +478,7 @@ public class GemBrowserActivity extends Activity {
   int score=verdict.equals("Relevant")?80:verdict.equals("Not relevant")?10:50;
   String lowerReport=response.toLowerCase(Locale.ROOT);
   String priority=verdict.equals("Not relevant")?"Low":verdict.equals("Relevant")&&lowerReport.contains("fabrication fit:")&&!lowerReport.contains("fabrication fit: unclear")?"Review for quotation":"Needs review";
-  try{JSONObject j=new JSONObject().put("bidId",bid.optString("bidId")).put("verdict",verdict).put("score",score).put("priority",priority).put("report",response).put("model",modelId).put("reviewedAt",System.currentTimeMillis()).put("source","User-provided document text; not independently verified");aiReviews.put(bid.optString("bidId"),j);
+  try{JSONObject j=new JSONObject().put("bidId",bid.optString("bidId")).put("verdict",verdict).put("score",score).put("priority",priority).put("report",response).put("model",modelId).put("reviewedAt",System.currentTimeMillis()).put("source","GeM public bid text or user-imported document; full buyer specification not verified");aiReviews.put(bid.optString("bidId"),j);
    JSONArray a=new JSONArray();for(JSONObject item:aiReviews.values())a.put(item);getPreferences(0).edit().putString("gem_ai_reviews",a.toString()).apply();
   }catch(Exception e){state.setText("Assessment displayed but could not be saved");}
  }
@@ -479,7 +491,7 @@ public class GemBrowserActivity extends Activity {
   String report=j.optString("report").replaceAll("(?m)^#{1,6}\\\\s*","").replace("**","").replace("__","");
   TextView body=new TextView(this);body.setText(report);body.setTextSize(15);body.setTextColor(Color.DKGRAY);body.setTextIsSelectable(true);content.addView(body);
   JSONObject bid=collected.get(id);
-  if(bid!=null){Button link=button("Open original GeM bid");content.addView(link);link.setOnClickListener(v->{Uri uri=Uri.parse(bid.optString("url"));if(safe(uri)&&!GEM.equals(uri.toString()))startActivity(new Intent(Intent.ACTION_VIEW,uri));else{browser.loadUrl(GEM);state.setText("Direct bid link unavailable. Search GeM for "+id);}});}
+  if(bid!=null){Button link=button("Documents / original GeM bid");content.addView(link);link.setOnClickListener(v->openBidPdf(bid));}
   ScrollView scroll=new ScrollView(this);scroll.addView(content);
   new android.app.AlertDialog.Builder(this).setTitle("AI review • "+id).setView(scroll).setPositiveButton("Close",null).show();
  }
