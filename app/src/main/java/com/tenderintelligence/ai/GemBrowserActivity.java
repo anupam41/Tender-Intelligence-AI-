@@ -551,16 +551,17 @@ public class GemBrowserActivity extends Activity {
  }
 
 
- private String omniModel(){return getPreferences(0).getString("omni_model","liquid/lfm-3.1-7b:free");}
+ private String omniModel(){return getPreferences(0).getString("omni_model","openrouter/liquid/lfm-3.1-7b:free");}
  private String requestProviderReview(String instructions,String prompt) throws Exception{
   HttpURLConnection conn=(HttpURLConnection)new URL(OMNI_URL).openConnection();
   try{
    conn.setRequestMethod("POST");conn.setConnectTimeout(3500);conn.setReadTimeout(65000);conn.setDoOutput(true);
    conn.setRequestProperty("Content-Type","application/json");
+   String gatewayKey=OmniSecret.load(this);if(!gatewayKey.isEmpty())conn.setRequestProperty("Authorization","Bearer "+gatewayKey);
    JSONObject body=new JSONObject().put("model",omniModel()).put("max_tokens",2000).put("messages",new JSONArray().put(new JSONObject().put("role","system").put("content",instructions)).put(new JSONObject().put("role","user").put("content",prompt)));
    try(OutputStream out=conn.getOutputStream()){out.write(body.toString().getBytes(StandardCharsets.UTF_8));}
    int code=conn.getResponseCode();
-   if(code<200||code>=300)throw new IOException("OmniRoute HTTP "+code+"; check model availability and free-tier limits");
+   if(code<200||code>=300){String detail="";try(InputStream err=conn.getErrorStream()){if(err!=null){ByteArrayOutputStream eb=new ByteArrayOutputStream();byte[] tmp=new byte[1024];int n;while((n=err.read(tmp))!=-1&&eb.size()<3000)eb.write(tmp,0,n);detail=new JSONObject(eb.toString("UTF-8")).optJSONObject("error").optString("message","");}}catch(Exception ignored){}throw new IOException("OmniRoute HTTP "+code+(detail.isEmpty()?"":": "+detail));}
    ByteArrayOutputStream buffer=new ByteArrayOutputStream();
    try(InputStream in=conn.getInputStream()){byte[] chunk=new byte[4096];int n;while((n=in.read(chunk))!=-1){if(buffer.size()+n>250000)throw new IOException("AI response too large");buffer.write(chunk,0,n);}}
    String answer=new JSONObject(buffer.toString("UTF-8")).getJSONArray("choices").getJSONObject(0).getJSONObject("message").optString("content","");
@@ -570,21 +571,22 @@ public class GemBrowserActivity extends Activity {
  }
  private void showAiSettings(){
   LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(20),dp(12),dp(20),dp(12));
-  TextView info=new TextView(this);info.setText("Local OmniRoute • Termux must be running on this phone. No cloud API keys are needed in Tender Radar.");content.addView(info);
+  TextView info=new TextView(this);info.setText("Local OmniRoute • Termux must be running on this phone. Enter the local OmniRoute gateway key below. Your provider keys stay in OmniRoute.");content.addView(info);
   TextView address=new TextView(this);address.setText("Server: http://127.0.0.1:20128/v1");address.setPadding(0,dp(12),0,dp(8));content.addView(address);
   EditText model=new EditText(this);model.setSingleLine(true);model.setHint("OmniRoute model ID");model.setText(omniModel());content.addView(model);
+  EditText apiKey=new EditText(this);apiKey.setSingleLine(true);apiKey.setHint("OmniRoute gateway API key");apiKey.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);apiKey.setText(OmniSecret.load(this));content.addView(apiKey);
   TextView result=new TextView(this);result.setText("Not tested");result.setPadding(0,dp(12),0,dp(12));content.addView(result);
   Button test=button("Test local connection");content.addView(test);
   test.setOnClickListener(v->{
    String id=model.getText().toString().trim();if(id.isEmpty()){model.setError("Enter a model ID");return;}
-   getPreferences(0).edit().putString("omni_model",id).apply();test.setEnabled(false);result.setText("Testing local OmniRoute…");
+   try{OmniSecret.save(this,apiKey.getText().toString().trim());}catch(Exception e){result.setText("Cannot save encrypted key: "+e.getMessage());return;}getPreferences(0).edit().putString("omni_model",id).apply();test.setEnabled(false);result.setText("Testing local OmniRoute…");
    new Thread(()->{String message;try{String answer=requestProviderReview("Reply briefly.","Reply OK");message="Connected • "+answer.substring(0,Math.min(answer.length(),100));}
     catch(Exception e){message="Connection failed: "+e.getMessage();}
     String status=message;runOnUiThread(()->{test.setEnabled(true);result.setText(status);if(status.startsWith("Connected")){aiConnectionPaused=false;apiFailedReviews.clear();scheduleAutoReview();}});}).start();
   });
   ScrollView scroll=new ScrollView(this);scroll.addView(content);
   new android.app.AlertDialog.Builder(this).setTitle("OmniRoute AI settings").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Save",(dialog,which)->{
-   String id=model.getText().toString().trim();if(!id.isEmpty()){getPreferences(0).edit().putString("omni_model",id).apply();aiConnectionPaused=false;apiFailedReviews.clear();scheduleAutoReview();}
+   String id=model.getText().toString().trim();if(!id.isEmpty()){try{OmniSecret.save(this,apiKey.getText().toString().trim());getPreferences(0).edit().putString("omni_model",id).apply();aiConnectionPaused=false;apiFailedReviews.clear();scheduleAutoReview();}catch(Exception e){state.setText("Unable to save OmniRoute key securely");}}
   }).show();
  }
  private void showAiDialog(JSONObject bid){
