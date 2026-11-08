@@ -628,7 +628,7 @@ public class GemBrowserActivity extends Activity {
  private String aiModelHelp(){return "Select a chat/instruct model that supports OpenRouter chat completions. Embedding and reranking models cannot analyze tender text. Example: openai/gpt-4o-mini (may require credits).";}
  private void showAiSettings(){
   LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(20),dp(12),dp(20),dp(8));
-  TextView info=new TextView(this);info.setText("OpenRouter AI connection\nYour API key is stored only on this device when Remember is enabled.");info.setTextColor(Color.DKGRAY);content.addView(info);
+  TextView info=new TextView(this);info.setText("AI providers: Gemini → Groq → OpenRouter. Keys are encrypted on this device when Remember is enabled.");info.setTextColor(Color.DKGRAY);content.addView(info);
   EditText api=new EditText(this);api.setHint("OpenRouter API key");api.setSingleLine(true);api.setInputType(129);api.setText(openRouterKey);content.addView(api);
   EditText model=new EditText(this);model.setSingleLine(true);model.setHint("Model ID");model.setText(getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free"));content.addView(model);
   CheckBox remember=new CheckBox(this);remember.setText("Remember key securely (Android Keystore)");remember.setChecked(getPreferences(0).getBoolean("remember_openrouter_key",false));content.addView(remember);
@@ -657,6 +657,29 @@ public class GemBrowserActivity extends Activity {
     final String result=message;runOnUiThread(()->{test.setEnabled(true);connection.setText(result);if(result.startsWith("Connected successfully")){openRouterKey=token;getPreferences(0).edit().putString("openrouter_model",modelId).apply();aiConnectionPaused=false;apiFailedReviews.clear();state.setText("AI connected. Resuming pending tender reviews…");renderDashboard();scheduleAutoReview();}});
    }).start();
   });
+
+  TextView extraLabel=new TextView(this);extraLabel.setText("Other AI providers • Gemini first, Groq second");extraLabel.setTextColor(Color.DKGRAY);extraLabel.setPadding(0,dp(16),0,0);content.addView(extraLabel);
+  EditText gemini=new EditText(this);gemini.setHint("Google Gemini API key");gemini.setInputType(129);gemini.setSingleLine(true);gemini.setText(geminiKey);content.addView(gemini);
+  EditText groq=new EditText(this);groq.setHint("Groq API key");groq.setInputType(129);groq.setSingleLine(true);groq.setText(groqKey);content.addView(groq);
+  CheckBox rememberProviders=new CheckBox(this);rememberProviders.setText("Remember Gemini and Groq keys securely");rememberProviders.setChecked(getPreferences(0).getBoolean("remember_provider_keys",false));content.addView(rememberProviders);
+  Button testProviders=button("Test Gemini / Groq connections");content.addView(testProviders);
+  testProviders.setOnClickListener(v->{
+   String g=gemini.getText().toString().trim(),q=groq.getText().toString().trim();
+   testProviders.setEnabled(false);connection.setText("Testing AI providers…");
+   new Thread(()->{
+    StringBuilder results=new StringBuilder();
+    for(String provider:new String[]{"gemini","groq"}){
+     String token=provider.equals("gemini")?g:q;
+     if(token.isEmpty()){results.append(provider).append(": key missing; ");continue;}
+     try{callProvider(provider,token,"Reply briefly.","Reply OK");results.append(provider).append(": connected; ");}
+     catch(Exception e){results.append(e.getMessage()).append("; ");}
+    }
+    String message=results.toString();runOnUiThread(()->{
+     testProviders.setEnabled(true);connection.setText(message);
+     if(message.contains("connected")){geminiKey=g;groqKey=q;aiConnectionPaused=false;apiFailedReviews.clear();scheduleAutoReview();}
+    });
+   }).start();
+  });
   Button forget=button("Forget saved API key");content.addView(forget);forget.setOnClickListener(v->{clearStoredKey();openRouterKey="";api.setText("");remember.setChecked(false);connection.setText("Saved key removed");});
   ScrollView scroll=new ScrollView(this);scroll.addView(content);
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("AI settings").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Save",null).create();
@@ -665,6 +688,16 @@ public class GemBrowserActivity extends Activity {
    if(id.isEmpty()){model.setError("Enter model ID");return;}\n   if(incompatibleAiModel(id)){model.setError("Not a chat model");connection.setText(aiModelHelp());return;}
    try{if(remember.isChecked()&&!token.isEmpty())storeKey(token);else clearStoredKey();}
    catch(Exception e){connection.setText("Secure storage failed: "+e.getClass().getSimpleName());return;}
+
+   String g=gemini.getText().toString().trim(),q=groq.getText().toString().trim();
+   boolean providersChanged=!g.equals(geminiKey)||!q.equals(groqKey);
+   try{
+    if(rememberProviders.isChecked()){if(!g.isEmpty())saveProviderKey("gemini",g);else clearProviderKey("gemini");if(!q.isEmpty())saveProviderKey("groq",q);else clearProviderKey("groq");}
+    else{clearProviderKey("gemini");clearProviderKey("groq");}
+    getPreferences(0).edit().putBoolean("remember_provider_keys",rememberProviders.isChecked()).apply();
+   }catch(Exception e){connection.setText("Provider key storage failed");return;}
+   geminiKey=g;groqKey=q;
+   if(providersChanged){aiConnectionPaused=false;apiFailedReviews.clear();}
    boolean changed=!token.equals(openRouterKey)||!id.equals(getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free"));openRouterKey=token;if(changed){aiConnectionPaused=false;apiFailedReviews.clear();}scheduleAutoReview();getPreferences(0).edit().putString("openrouter_model",id).apply();dialog.dismiss();
   }));
   dialog.show();
