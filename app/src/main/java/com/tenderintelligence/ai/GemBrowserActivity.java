@@ -42,6 +42,8 @@ public class GemBrowserActivity extends Activity {
  private String[] batchTerms={"Heat exchanger","Tube bundle","Retubing","Condenser","Oil cooler","Sample cooler","SWAS cooler","Pressure vessel","Economizer","Air preheater","LP heater","HP heater"};
  private Button batchButton;
  private ProgressBar scanProgress;
+ private ScanRing scanRing;
+ private TextView bidTotalValue,matchTotalValue;
  private TextView scanProgressLabel;
  private boolean scanMode=true;
  private EditText term;
@@ -63,7 +65,7 @@ public class GemBrowserActivity extends Activity {
   LinearLayout page=new LinearLayout(this);page.setOrientation(1);page.setBackgroundColor(Color.rgb(244,250,247));setContentView(page);page.setOnApplyWindowInsetsListener((v,insets)->{int top=android.os.Build.VERSION.SDK_INT>=30?insets.getInsets(android.view.WindowInsets.Type.statusBars()).top:insets.getSystemWindowInsetTop();v.setPadding(0,top,0,0);return insets;});
   TextView heading=new TextView(this);heading.setText("Tender Radar");heading.setTextSize(30);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(Color.rgb(22,39,43));heading.setPadding(dp(24),dp(18),dp(24),dp(4));page.addView(heading);
   TextView note=new TextView(this);note.setText("Discover industrial tenders • GeM");note.setTextColor(Color.rgb(101,120,125));note.setPadding(dp(24),0,dp(24),dp(18));page.addView(note);
-  Button aiSettingsButton=button("⚙ AI Settings");aiSettingsButton.setTextSize(14);aiSettingsButton.setTextColor(Color.rgb(25,93,92));aiSettingsButton.setBackground(glass(0xffe8f7f5,28));aiSettingsButton.setElevation(dp(2));LinearLayout.LayoutParams settingsLp=new LinearLayout.LayoutParams(-1,dp(48));settingsLp.setMargins(dp(20),0,dp(20),dp(12));page.addView(aiSettingsButton,settingsLp);aiSettingsButton.setOnClickListener(v->showAiSettings());
+  Button aiSettingsButton=button("⚙");aiSettingsButton.setTextSize(14);aiSettingsButton.setTextColor(Color.rgb(25,93,92));aiSettingsButton.setBackground(glass(0xffe8f7f5,28));aiSettingsButton.setElevation(dp(2));LinearLayout.LayoutParams settingsLp=new LinearLayout.LayoutParams(-1,dp(48));settingsLp.setMargins(dp(20),0,dp(20),dp(12));page.addView(aiSettingsButton,settingsLp);aiSettingsButton.setOnClickListener(v->showAiSettings());
   LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.HORIZONTAL);controls.setVisibility(View.GONE);page.addView(controls);
   Button back=button("Back");controls.addView(back,new LinearLayout.LayoutParams(0,40,1));back.setOnClickListener(v->{if(browser.canGoBack())browser.goBack();else finish();});
   Button home=button("GeM home");controls.addView(home,new LinearLayout.LayoutParams(0,40,1));home.setOnClickListener(v->browser.loadUrl(GEM));
@@ -108,9 +110,11 @@ public class GemBrowserActivity extends Activity {
   Button review=button("Tender dashboard");captureRow.addView(review,new LinearLayout.LayoutParams(0,dp(52),2));review.setOnClickListener(v->toggleDashboard());
   autoButton=button("Auto collect all pages");autoButton.setVisibility(View.GONE);page.addView(autoButton,new LinearLayout.LayoutParams(-1,dp(48)));
   autoButton.setOnClickListener(v->{if(autoCollecting){batchRunning=false;stopAutoCollect("Stopped by user.");}else startAutoCollect();});
+  scanRing=new ScanRing();LinearLayout.LayoutParams ringLp=new LinearLayout.LayoutParams(dp(208),dp(208));ringLp.gravity=Gravity.CENTER_HORIZONTAL;ringLp.setMargins(0,dp(2),0,dp(12));page.addView(scanRing,ringLp);
+  LinearLayout statsStrip=new LinearLayout(this);statsStrip.setOrientation(LinearLayout.HORIZONTAL);statsStrip.setPadding(dp(20),0,dp(20),dp(12));page.addView(statsStrip);bidTotalValue=addGlassStat(statsStrip,"Bids");matchTotalValue=addGlassStat(statsStrip,"Matches");
   batchButton=button("Find tenders");batchButton.setTextSize(17);batchButton.setTypeface(null,Typeface.BOLD);batchButton.setTextColor(Color.WHITE);batchButton.setBackground(rounded(Color.rgb(0,175,152),26,Color.rgb(0,175,152)));batchButton.setElevation(dp(3));LinearLayout.LayoutParams heroLp=new LinearLayout.LayoutParams(-1,dp(60));heroLp.setMargins(dp(20),0,dp(20),dp(12));page.addView(batchButton,heroLp);
   batchButton.setOnClickListener(v->{if(batchRunning){batchRunning=false;scanProgress.setIndeterminate(false);stopAutoCollect("Batch stopped.");batchButton.setText("Find tenders");}else startBatch();});
-  scanProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);scanProgress.setMax(batchTerms.length);scanProgress.setProgress(0);scanProgress.setIndeterminate(false);scanProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.rgb(0,175,152)));LinearLayout.LayoutParams progressLp=new LinearLayout.LayoutParams(-1,dp(5));progressLp.setMargins(dp(24),0,dp(24),0);page.addView(scanProgress,progressLp);
+  scanProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);scanProgress.setMax(batchTerms.length);scanProgress.setProgress(0);scanProgress.setIndeterminate(false);scanProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.rgb(0,175,152)));scanProgress.setVisibility(View.GONE);LinearLayout.LayoutParams progressLp=new LinearLayout.LayoutParams(-1,dp(5));progressLp.setMargins(dp(24),0,dp(24),0);page.addView(scanProgress,progressLp);
   scanProgressLabel=new TextView(this);scanProgressLabel.setTextColor(Color.rgb(47,99,99));scanProgressLabel.setPadding(dp(24),dp(10),dp(24),dp(5));scanProgressLabel.setTextSize(13);scanProgressLabel.setText("Ready to scan • Results will appear below");page.addView(scanProgressLabel);
   collectedCount=new TextView(this);collectedCount.setTextColor(Color.rgb(0,129,115));collectedCount.setPadding(dp(24),dp(4),dp(24),dp(4));collectedCount.setTextSize(13);page.addView(collectedCount);
   restoreCollected();restoreAiReviews();openRouterKey=readStoredKey();updateCollectedCount();
@@ -145,7 +149,7 @@ public class GemBrowserActivity extends Activity {
   browser.setDownloadListener((url,userAgent,disposition,mime,length)->{Uri uri=Uri.parse(url);if(safe(uri))startActivity(new Intent(Intent.ACTION_VIEW,uri));else state.setText("Download blocked: external URL");});
   browser.loadUrl(GEM);renderDashboard();scheduleAutoReview();
  }
- private void updateCollectedCount(){if(collectedCount!=null){int matches=0;for(JSONObject j:collected.values())if(relevantTitle(j.optString("title")))matches++;collectedCount.setText("Collected: "+collected.size()+" • Title matches: "+matches+" • Review closing dates");}}
+ private void updateCollectedCount(){int matches=0;for(JSONObject j:collected.values())if(relevantTitle(j.optString("title")))matches++;if(bidTotalValue!=null)bidTotalValue.setText(String.valueOf(collected.size()));if(matchTotalValue!=null)matchTotalValue.setText(String.valueOf(matches));if(collectedCount!=null)collectedCount.setText("Collected: "+collected.size()+" • Title matches: "+matches+" • Review closing dates");}
  private void restoreCollected(){
   try{JSONArray a=new JSONArray(getPreferences(0).getString("gem_collected","[]"));for(int i=0;i<a.length();i++){JSONObject j=a.optJSONObject(i);if(j!=null&&!j.optString("bidId").isEmpty())collected.put(j.optString("bidId"),j);}}catch(Exception ignored){}
  }
@@ -186,17 +190,17 @@ public class GemBrowserActivity extends Activity {
  }
  private void startBatch(){
   if(autoCollecting){state.setText("Stop the current collection first.");return;}
-  batchRunning=true;batchIndex=0;searchRetries=0;scanProgress.setIndeterminate(true);scanProgress.setProgress(0);scanProgressLabel.setText("Starting scan • 0 / "+batchTerms.length+" equipment groups");batchButton.setText("Stop scanning");nextBatch();
+  batchRunning=true;batchIndex=0;searchRetries=0;scanProgress.setIndeterminate(true);scanProgress.setProgress(0);if(scanRing!=null)scanRing.setValue(0);scanProgressLabel.setText("Starting scan • 0 / "+batchTerms.length+" equipment groups");batchButton.setText("Stop scanning");nextBatch();
  }
  private void nextBatch(){
   if(!batchRunning)return;
   if(batchIndex>=batchTerms.length){
    batchRunning=false;autoCollecting=false;scanProgress.setIndeterminate(false);autoButton.setText("Auto collect all pages");
    batchButton.setText("Find tenders • Scan equipment categories");
-   updateCollectedCount();if(scanProgress!=null){scanProgress.setProgress(batchTerms.length);scanProgressLabel.setText("Scan complete • "+collected.size()+" unique bids collected");}if(showingDashboard)renderDashboard();state.setText("Scan complete. Review matching tenders below.");return;
+   updateCollectedCount();if(scanProgress!=null){scanProgress.setProgress(batchTerms.length);if(scanRing!=null)scanRing.setValue(batchTerms.length);scanProgressLabel.setText("Scan complete • "+collected.size()+" unique bids collected");}if(showingDashboard)renderDashboard();state.setText("Scan complete. Review matching tenders below.");return;
   }
   if(!gemPageReady){state.setText("Waiting for GeM listing page to load…");autoHandler.postDelayed(this::nextBatch,1200);return;}
-  String keyword=batchTerms[batchIndex++];term.setText(keyword);if(scanProgress!=null){scanProgress.setProgress(batchIndex-1);scanProgressLabel.setText("Scanning "+batchIndex+" / "+batchTerms.length+" • "+keyword+" • "+collected.size()+" bids collected");}
+  String keyword=batchTerms[batchIndex++];term.setText(keyword);if(scanProgress!=null){scanProgress.setProgress(batchIndex-1);if(scanRing!=null)scanRing.setValue(batchIndex-1);scanProgressLabel.setText("Scanning "+batchIndex+" / "+batchTerms.length+" • "+keyword+" • "+collected.size()+" bids collected");}
   state.setText("Searching "+batchIndex+"/"+batchTerms.length+": "+keyword);
   String js="(function(){try{var inputs=Array.from(document.querySelectorAll('input')).filter(e=>{var r=e.getBoundingClientRect();return r.width>100&&r.height>0&&!e.disabled});"+
    "var el=inputs.find(e=>/searchBid|search_bid|bid_search/i.test((e.id||'')+' '+(e.name||'')))||inputs.find(e=>{var p=e.parentElement;return p&&/contains/i.test((p.parentElement&&p.parentElement.innerText||'').slice(0,90))})||inputs.filter(e=>/text|search/i.test(e.type||'text')).slice(-1)[0];"+
@@ -702,6 +706,8 @@ public class GemBrowserActivity extends Activity {
    catch(Exception e){runOnUiThread(()->{target.setText("");new android.app.AlertDialog.Builder(this).setTitle("PDF import failed").setMessage(e.getMessage()).setPositiveButton("OK",null).show();});}
   }).start();
  }
+ private TextView addGlassStat(LinearLayout parent,String label){LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);tile.setGravity(Gravity.CENTER);tile.setBackground(glass(0xffe7f7f3,24));tile.setElevation(dp(3));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(80),1);lp.setMargins(dp(4),0,dp(4),0);parent.addView(tile,lp);TextView value=new TextView(this);value.setText("0");value.setTextSize(27);value.setTypeface(null,Typeface.BOLD);value.setTextColor(0xff183e3b);tile.addView(value);TextView caption=new TextView(this);caption.setText(label);caption.setTextSize(12);caption.setTextColor(0xff6b8080);tile.addView(caption);return value;}
+ private class ScanRing extends View {private int value=0;private final android.graphics.Paint paint=new android.graphics.Paint(3);ScanRing(){super(GemBrowserActivity.this);setLayerType(View.LAYER_TYPE_SOFTWARE,null);}void setValue(int v){value=Math.max(0,Math.min(batchTerms.length,v));invalidate();}@Override protected void onDraw(android.graphics.Canvas c){super.onDraw(c);float w=getWidth(),h=getHeight(),cx=w/2,cy=h/2,r=Math.min(w,h)*.40f;paint.setStyle(android.graphics.Paint.Style.STROKE);paint.setStrokeWidth(dp(15));paint.setStrokeCap(android.graphics.Paint.Cap.ROUND);paint.setColor(0xffc9eae4);c.drawCircle(cx,cy,r,paint);paint.setShader(new android.graphics.LinearGradient(0,0,w,h,0xff0d998e,0xff49d3bf,android.graphics.Shader.TileMode.CLAMP));c.drawArc(cx-r,cy-r,cx+r,cy+r,-90,360f*value/batchTerms.length,false,paint);paint.setShader(null);paint.setStyle(android.graphics.Paint.Style.FILL);paint.setColor(0xff1c3034);paint.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));paint.setTextAlign(android.graphics.Paint.Align.CENTER);paint.setTextSize(dp(44));c.drawText(value+"/"+batchTerms.length,cx,cy+dp(4),paint);paint.setTypeface(Typeface.create("sans-serif",Typeface.NORMAL));paint.setTextSize(dp(12));c.drawText("Equipment groups",cx,cy+dp(28),paint);c.drawText("scanned",cx,cy+dp(44),paint);}}
  private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
  private android.graphics.drawable.GradientDrawable glass(int color,int radius){android.graphics.drawable.GradientDrawable g=new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,new int[]{0xfffcffff,color,0xffe2f3f0});g.setCornerRadius(dp(radius));g.setStroke(dp(1),0xffd5e9e6);return g;}
  private android.graphics.drawable.GradientDrawable rounded(int color,int radius,int border){android.graphics.drawable.GradientDrawable d=new android.graphics.drawable.GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));d.setStroke(dp(1),border);return d;}
