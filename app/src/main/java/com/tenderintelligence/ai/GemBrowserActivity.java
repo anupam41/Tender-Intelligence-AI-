@@ -371,12 +371,89 @@ public class GemBrowserActivity extends Activity {
  }
  private void saveAiReview(JSONObject bid,String response,String modelId){
   String verdict="Needs review";
-  java.util.regex.Matcher matcher=java.util.regex.Pattern.compile("(?i)(?:https?://|/)[^\\\"\u0027\\s<>]+[.]pdf(?:[?][^\\\"\u0027\\s<>]*)?").matcher(html);
+  java.util.regex.Matcher matcher=java.util.regex.Pattern.compile("(?i)verdict[^\\\\n]{0,50}?(not relevant|irrelevant|unclear|needs review|relevant)").matcher(response);
+  if(matcher.find()){String v=matcher.group(1).toLowerCase(Locale.ROOT);verdict=v.equals("relevant")?"Relevant":v.equals("not relevant")||v.equals("irrelevant")?"Not relevant":"Needs review";}
+  int score=verdict.equals("Relevant")?80:verdict.equals("Not relevant")?10:50;
+  String lowerReport=response.toLowerCase(Locale.ROOT);
+  String priority=verdict.equals("Not relevant")?"Low":verdict.equals("Relevant")&&lowerReport.contains("fabrication fit:")&&!lowerReport.contains("fabrication fit: unclear")?"Review for quotation":"Needs review";
+  try{JSONObject j=new JSONObject().put("bidId",bid.optString("bidId")).put("verdict",verdict).put("score",score).put("priority",priority).put("report",response).put("model",modelId).put("reviewedAt",System.currentTimeMillis()).put("source","User-provided document text; not independently verified");aiReviews.put(bid.optString("bidId"),j);
+   JSONArray a=new JSONArray();for(JSONObject item:aiReviews.values())a.put(item);getPreferences(0).edit().putString("gem_ai_reviews",a.toString()).apply();
+  }catch(Exception e){state.setText("Assessment displayed but could not be saved");}
+ }
+ private void showSavedReview(String id){
+  JSONObject j=aiReviews.get(id);if(j==null){new android.app.AlertDialog.Builder(this).setMessage("No AI assessment saved for this bid yet.").setPositiveButton("OK",null).show();return;}
+  LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(18),dp(12),dp(18),dp(12));
+  TextView verdict=new TextView(this);verdict.setText(j.optString("verdict")+" • "+j.optInt("score")+"/100 (indicative)");verdict.setTextSize(20);verdict.setTypeface(null,Typeface.BOLD);verdict.setTextColor(j.optString("verdict").equals("Relevant")?Color.rgb(0,110,88):Color.rgb(120,82,20));content.addView(verdict);
+  TextView priority=new TextView(this);priority.setText("Tender priority: "+j.optString("priority","Needs review")+" • Fabrication suitability requires technical verification");priority.setTextSize(14);priority.setPadding(0,dp(6),0,dp(4));content.addView(priority);
+  TextView caution=new TextView(this);caution.setText("AI-generated assessment • Not independently verified • Score derived from verdict, not calibrated probability");caution.setTextSize(12);caution.setPadding(0,dp(8),0,dp(12));content.addView(caution);
+  String report=j.optString("report").replaceAll("(?m)^#{1,6}\\\\s*","").replace("**","").replace("__","");
+  TextView body=new TextView(this);body.setText(report);body.setTextSize(15);body.setTextColor(Color.DKGRAY);body.setTextIsSelectable(true);content.addView(body);
+  JSONObject bid=collected.get(id);
+  if(bid!=null){Button link=button("Open original GeM bid");content.addView(link);link.setOnClickListener(v->{Uri uri=Uri.parse(bid.optString("url"));if(safe(uri)&&!GEM.equals(uri.toString()))startActivity(new Intent(Intent.ACTION_VIEW,uri));else{browser.loadUrl(GEM);state.setText("Direct bid link unavailable. Search GeM for "+id);}});}
+  ScrollView scroll=new ScrollView(this);scroll.addView(content);
+  new android.app.AlertDialog.Builder(this).setTitle("AI review • "+id).setView(scroll).setPositiveButton("Close",null).show();
+ }
+ private SecretKey deviceSecret() throws Exception{
+  KeyStore store=KeyStore.getInstance("AndroidKeyStore");store.load(null);
+  if(store.containsAlias(KEY_ALIAS))return ((KeyStore.SecretKeyEntry)store.getEntry(KEY_ALIAS,null)).getSecretKey();
+  KeyGenerator generator=KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES,"AndroidKeyStore");
+  generator.init(new KeyGenParameterSpec.Builder(KEY_ALIAS,KeyProperties.PURPOSE_ENCRYPT|KeyProperties.PURPOSE_DECRYPT).setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).setKeySize(256).build());
+  return generator.generateKey();
+ }
+ private void storeKey(String value) throws Exception{
+  Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");cipher.init(Cipher.ENCRYPT_MODE,deviceSecret());
+  byte[] encrypted=cipher.doFinal(value.getBytes(StandardCharsets.UTF_8));
+  getPreferences(0).edit().putString("openrouter_key_iv",Base64.encodeToString(cipher.getIV(),Base64.NO_WRAP)).putString("openrouter_key_cipher",Base64.encodeToString(encrypted,Base64.NO_WRAP)).putBoolean("remember_openrouter_key",true).commit();
+ }
+ private String readStoredKey(){
+  String iv=getPreferences(0).getString("openrouter_key_iv",""),ciphertext=getPreferences(0).getString("openrouter_key_cipher","");
+  if(iv.isEmpty()||ciphertext.isEmpty())return "";
+  try{
+   Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");cipher.init(Cipher.DECRYPT_MODE,deviceSecret(),new GCMParameterSpec(128,Base64.decode(iv,Base64.NO_WRAP)));
+   return new String(cipher.doFinal(Base64.decode(ciphertext,Base64.NO_WRAP)),StandardCharsets.UTF_8);
+  }catch(Exception e){clearStoredKey();return "";}
+ }
+ private void clearStoredKey(){
+  getPreferences(0).edit().remove("openrouter_key_iv").remove("openrouter_key_cipher").putBoolean("remember_openrouter_key",false).commit();
+  try{KeyStore store=KeyStore.getInstance("AndroidKeyStore");store.load(null);if(store.containsAlias(KEY_ALIAS))store.deleteEntry(KEY_ALIAS);}catch(Exception ignored){}
+ }
+ private boolean safeGemDocument(Uri uri){
+  String host=uri==null?null:uri.getHost();
+  return uri!=null&&"https".equalsIgnoreCase(uri.getScheme())&&host!=null&&(host.equals("gem.gov.in")||host.endsWith(".gem.gov.in"));
+ }
+ private void discoverBidPdf(JSONObject bid,EditText target,Button trigger){
+  String url=bid.optString("url","");
+  Uri uri=Uri.parse(url);
+  if(!safeGemDocument(uri)||url.equals(GEM)||url.contains("/all-bids")){
+   new android.app.AlertDialog.Builder(this).setTitle("No public bid document link").setMessage("This listing does not provide a usable bid detail URL. Open the bid in GeM to find its documents.").setPositiveButton("OK",null).show();return;
+  }
+  trigger.setEnabled(false);
+  state.setText("Checking public bid page for PDF documents…");
+  new Thread(()->{
+   HttpURLConnection conn=null;
+   try{
+    conn=(HttpURLConnection)new URL(url).openConnection();
+    conn.setConnectTimeout(12000);conn.setReadTimeout(16000);conn.setInstanceFollowRedirects(false);
+    if(conn.getResponseCode()!=200)throw new IOException("GeM bid page HTTP "+conn.getResponseCode());
+    String mime=conn.getContentType();
+    if(mime==null||!mime.toLowerCase(Locale.ROOT).contains("text/html"))throw new IOException("Bid page is not public HTML");
+    ByteArrayOutputStream output=new ByteArrayOutputStream();
+    try(InputStream in=conn.getInputStream()){byte[] buffer=new byte[4096];int n;while((n=in.read(buffer))!=-1){if(output.size()+n>1024*1024)break;output.write(buffer,0,n);}}
+    String html=output.toString("UTF-8").replace("&amp;","&");
+    java.util.regex.Matcher matcher=java.util.regex.Pattern.compile("(?i)(?:https?://|/)[^\\\"'\\s<>]+[.]pdf(?:[?][^\\\"'\\s<>]*)?").matcher(html);
     String found="";
-    while(matcher.find()){String raw=matcher.group();URL resolved=new URL(new URL(bidUrl),raw);if(safeGemDocument(Uri.parse(resolved.toString()))){found=resolved.toString();break;}}
+    while(matcher.find()){
+     String candidate=new URL(new URL(url),matcher.group()).toString();
+     if(safeGemDocument(Uri.parse(candidate))){found=candidate;break;}
+    }
     final String pdf=found;
-    runOnUiThread(()->{trigger.setEnabled(true);if(pdf.isEmpty()){new android.app.AlertDialog.Builder(this).setTitle("No public PDF on bid page").setMessage("The public bid page did not expose a direct PDF link. GeM may load documents dynamically or require a session. Use Import tender PDF for this bid.").setPositiveButton("OK",null).show();}else{try{JSONArray arr=bid.optJSONArray("documentLinks");if(arr==null){arr=new JSONArray();bid.put("documentLinks",arr);}arr.put(pdf);}catch(Exception ignored){}loadPublicPdfInto(bid,target,trigger);}});
-   }catch(Exception e){String error=e.getMessage();runOnUiThread(()->{trigger.setEnabled(true);new android.app.AlertDialog.Builder(this).setTitle("Bid document lookup unavailable").setMessage(error+"\\nYou can still import the tender PDF manually.").setPositiveButton("OK",null).show();});}
+    runOnUiThread(()->{
+     trigger.setEnabled(true);
+     if(pdf.isEmpty()){new android.app.AlertDialog.Builder(this).setTitle("No public PDF found").setMessage("The GeM bid page did not expose a direct public PDF. Use Import tender PDF if the document is available through GeM.").setPositiveButton("OK",null).show();return;}
+     try{JSONArray links=bid.optJSONArray("documentLinks");if(links==null){links=new JSONArray();bid.put("documentLinks",links);}links.put(pdf);}catch(Exception ignored){}
+     loadPublicPdfInto(bid,target,trigger);
+    });
+   }catch(Exception e){String error=e.getMessage();runOnUiThread(()->{trigger.setEnabled(true);new android.app.AlertDialog.Builder(this).setTitle("Document lookup unavailable").setMessage(error).setPositiveButton("OK",null).show();});}
    finally{if(conn!=null)conn.disconnect();}
   }).start();
  }
@@ -385,7 +462,7 @@ public class GemBrowserActivity extends Activity {
   String link="";
   if(links!=null)for(int i=0;i<links.length();i++){String candidate=links.optString(i);if(safeGemDocument(Uri.parse(candidate))){link=candidate;break;}}
   if(link.isEmpty()){discoverBidPdf(bid,target,trigger);return;}
-   final String pdfLink=link;trigger.setEnabled(false);target.setText("Reading GeM PDF…");
+  final String pdfLink=link;trigger.setEnabled(false);target.setText("Reading GeM PDF…");
   new Thread(()->{
    File file=null;HttpURLConnection conn=null;
    try{
