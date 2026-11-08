@@ -70,8 +70,8 @@ public class GemBrowserActivity extends Activity {
    });
   });
   LinearLayout captureRow=new LinearLayout(this);captureRow.setOrientation(LinearLayout.HORIZONTAL);page.addView(captureRow);
-  Button collect=button("Collect visible bids");captureRow.addView(collect,new LinearLayout.LayoutParams(0,44,2));collect.setOnClickListener(v->collectVisible());
-  Button review=button("Review shortlist");captureRow.addView(review,new LinearLayout.LayoutParams(0,44,2));review.setOnClickListener(v->reviewCollected());
+  Button collect=button("Collect visible bids");captureRow.addView(collect,new LinearLayout.LayoutParams(0,dp(52),2));collect.setOnClickListener(v->collectVisible());
+  Button review=button("Review shortlist");captureRow.addView(review,new LinearLayout.LayoutParams(0,dp(52),2));review.setOnClickListener(v->reviewCollected());
   collectedCount=new TextView(this);collectedCount.setTextColor(Color.rgb(45,212,191));collectedCount.setPadding(12,2,12,2);page.addView(collectedCount);
   restoreCollected();updateCollectedCount();
   Button next=button("Next");findRow.addView(next);next.setOnClickListener(v->{
@@ -113,8 +113,8 @@ public class GemBrowserActivity extends Activity {
  private void collectVisible(){
   state.setText("Reading visible GeM listing cards…");
   String js="(function(){try{var found=[];var seen={};"+
-   "var nodes=Array.from(document.querySelectorAll('div,article,li')).filter(e=>e.children.length>0&&e.innerText&&/BID\\s*NO\\s*:/i.test(e.innerText));"+
-   "for(var el of nodes){var text=el.innerText||'';if(text.length>1400||text.length<40)continue;"+
+   "var nodes=Array.from(document.querySelectorAll('div,article,li')).filter(e=>e.children.length>0&&e.innerText&&/BID\\s*NO\\.?\\s*:/i.test(e.innerText));"+
+   "for(var el of nodes){var text=el.innerText||'';if(text.length>2500||text.length<30)continue;"+
    "var match=text.match(/GEM\\/20\\d{2}\\/B\\/\\d+/i);if(!match||seen[match[0]])continue;seen[match[0]]=true;"+
    "var link=Array.from(el.querySelectorAll('a[href]')).find(a=>(a.textContent||'').includes(match[0]));"+
    "var item=text.match(/Items?\\s*:\\s*([^\\n]+)/i);var end=text.match(/End Date\\s*:\\s*([^\\n]+)/i);"+
@@ -146,7 +146,8 @@ public class GemBrowserActivity extends Activity {
   new android.app.AlertDialog.Builder(this).setTitle("Collected GeM bids ("+collected.size()+")").setMessage(message.toString())
    .setPositiveButton("Close",null).setNeutralButton("Clear list",(d,w)->new android.app.AlertDialog.Builder(this).setTitle("Clear collected bids?").setNegativeButton("Cancel",null).setPositiveButton("Clear",(a,b)->{collected.clear();persistCollected();updateCollectedCount();}).show()).show();
  }
- private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(12);b.setTextColor(Color.BLACK);return b;}
+ private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
+ private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(12);b.setTextColor(Color.BLACK);b.setMinHeight(dp(44));b.setPadding(dp(4),0,dp(4),0);return b;}
  @Override public void onBackPressed(){if(browser!=null&&browser.canGoBack())browser.goBack();else super.onBackPressed();}
  @Override protected void onDestroy(){if(browser!=null){browser.destroy();browser=null;}super.onDestroy();}
 }
