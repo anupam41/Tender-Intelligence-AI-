@@ -102,7 +102,7 @@ public class GemBrowserActivity extends Activity {
   browser.setDownloadListener((url,userAgent,disposition,mime,length)->{Uri uri=Uri.parse(url);if(safe(uri))startActivity(new Intent(Intent.ACTION_VIEW,uri));else state.setText("Download blocked: external URL");});
   browser.loadUrl(GEM);
  }
- private void updateCollectedCount(){if(collectedCount!=null)collectedCount.setText("Collected: "+collected.size()+" unique bids • Review dates on GeM");}
+ private void updateCollectedCount(){if(collectedCount!=null){int matches=0;for(JSONObject j:collected.values())if(relevantTitle(j.optString("title")))matches++;collectedCount.setText("Collected: "+collected.size()+" • Keyword candidates: "+matches+" • Dates unverified");}}
  private void restoreCollected(){
   try{JSONArray a=new JSONArray(getPreferences(0).getString("gem_collected","[]"));for(int i=0;i<a.length();i++){JSONObject j=a.optJSONObject(i);if(j!=null&&!j.optString("bidId").isEmpty())collected.put(j.optString("bidId"),j);}}catch(Exception ignored){}
  }
@@ -117,7 +117,7 @@ public class GemBrowserActivity extends Activity {
    "for(var node of ids){var match=(node.textContent||'').match(/GEM\\/20\\d{2}\\/B\\/\\d+/i);if(!match||seen[match[0]])continue;"+
    "var card=node;for(var n=0;n<7&&card.parentElement;n++){var t=card.innerText||'';if(/End Date\\s*:/i.test(t)&&/Items?\\s*:/i.test(t)&&t.length<3500)break;card=card.parentElement;}"+
    "var text=card.innerText||'';if(text.length>6000)continue;"+
-   "var item=text.match(/Items?\\s*:\\s*([^\\n]+)/i),end=text.match(/End Date\\s*:\\s*([^\\n]+)/i);"+
+   "var item=text.match(/Items?\\s*:\\s*([^\\n]+)/i),end=text.match(/End Date\\s*:\\s*(\\d{2}-\\d{2}-\\d{4}(?:\\s+\\d{1,2}:\\d{2}\\s*(?:AM|PM))?)/i);"+
    "var anchor=node.closest('a[href]')||Array.from(card.querySelectorAll('a[href]')).find(a=>(a.textContent||'').includes(match[0]));"+
    "seen[match[0]]=true;found.push({bidId:match[0],title:item?item[1].trim():'GeM bid',deadlineText:end?end[1].trim():'',url:anchor?anchor.href:'',source:'GeM visible listing'});if(found.length>=100)break;}"+
    "return JSON.stringify({items:found,matchedNodes:ids.length});}catch(e){return JSON.stringify({error:e.message})}})()";
@@ -137,14 +137,19 @@ public class GemBrowserActivity extends Activity {
    }catch(Exception e){state.setText("Could not parse bid cards. GeM page format may have changed.");}
   });
  }
+ private String cleanDeadline(String value){return value.matches("(?i)\\\\d{2}-\\\\d{2}-\\\\d{4}(?:\\\\s+\\\\d{1,2}:\\\\d{2}\\\\s*(?:AM|PM))?")?value:"Not verified";}
+ private boolean relevantTitle(String value){return value.toLowerCase(java.util.Locale.ROOT).matches(".*(heat exchanger|condenser|retub|re-tub|cooler|tube bundle|pressure vessel|evaporator|economi[sz]er|chiller|radiator|cooling coil|heater|swas|air preheater|shell and tube|shell & tube).*");}
  private void reviewCollected(){
   if(collected.isEmpty()){state.setText("No bids collected. Search GeM, then tap Collect visible bids.");return;}
   StringBuilder message=new StringBuilder();
+  int relevant=0;for(JSONObject j:collected.values())if(relevantTitle(j.optString("title")))relevant++;
+  message.append("Keyword-matched candidates: ").append(relevant).append(" / ").append(collected.size()).append("\nDocument analysis not yet performed.\n\n");
   for(JSONObject j:collected.values()){
-   if(message.length()>15000){message.append("\\n…More bids saved locally");break;}
-   message.append(j.optString("bidId")).append("\\n").append(j.optString("title")).append("\\nClosing: ").append(j.optString("deadlineText","Not found")).append("\\n\\n");
+   if(!relevantTitle(j.optString("title")))continue;
+   if(message.length()>15000){message.append("\n…More bids saved locally");break;}
+   message.append(j.optString("bidId")).append("\n").append(j.optString("title")).append("\nClosing: ").append(cleanDeadline(j.optString("deadlineText"))).append("\n\n");
   }
-  new android.app.AlertDialog.Builder(this).setTitle("Collected GeM bids ("+collected.size()+")").setMessage(message.toString())
+  new android.app.AlertDialog.Builder(this).setTitle("Review matching bids ("+relevant+")").setMessage(message.toString())
    .setPositiveButton("Close",null).setNeutralButton("Clear list",(d,w)->new android.app.AlertDialog.Builder(this).setTitle("Clear collected bids?").setNegativeButton("Cancel",null).setPositiveButton("Clear",(a,b)->{collected.clear();persistCollected();updateCollectedCount();}).show()).show();
  }
  private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
