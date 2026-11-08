@@ -12,6 +12,9 @@ import android.widget.*;
 import org.json.*;
 import java.text.*;
 import java.util.*;
+import java.net.*;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 
 /** User-driven browser for public GeM bid listings. Does not scrape or bypass access controls. */
 public class GemBrowserActivity extends Activity {
@@ -20,6 +23,7 @@ public class GemBrowserActivity extends Activity {
  private TextView state;
  private final LinkedHashMap<String,JSONObject> collected=new LinkedHashMap<>();
  private TextView collectedCount;
+ private String openRouterKey="";
  private static final String GEM="https://bidplus.gem.gov.in/all-bids";
  private boolean safe(Uri uri){
   return uri!=null&&"https".equalsIgnoreCase(uri.getScheme())&&"bidplus.gem.gov.in".equalsIgnoreCase(uri.getHost());
@@ -140,7 +144,12 @@ public class GemBrowserActivity extends Activity {
  private Date parsedDeadline(String value){
   try{SimpleDateFormat format=new SimpleDateFormat("dd-MM-yyyy h:mm a",Locale.ENGLISH);format.setLenient(false);return format.parse(value.trim());}catch(Exception e){return null;}
  }
- private boolean relevantTitle(String value){return value.toLowerCase(Locale.ROOT).matches(".*(heat exchanger|condenser|retub|re-tub|cooler|tube bundle|pressure vessel|evaporator|economi[sz]er|chiller|radiator|cooling coil|heater|swas|air preheater|shell and tube|shell & tube).*");}
+ private boolean relevantTitle(String value){
+  String t=value.toLowerCase(Locale.ROOT);
+  if(t.matches(".*(foot massager|room heater|gas stove|hot plate|hair dryer|water heater|space heater|fan heater|electric heater|hand heater|heat shrink|heat gun|laboratory heater).*"))return false;
+  return t.matches(".*(heat exchanger|condenser|retub|re-tub|industrial cooler|oil cooler|sample cooler|swas cooler|tube bundle|pressure vessel|evaporator|economi[sz]er|industrial chiller|radiator|cooling coil|air preheater|shell and tube|shell & tube|tubesheet|tube sheet|reboiler|industrial heater).*");
+ }
+
  private void reviewCollected(){
   if(collected.isEmpty()){state.setText("No bids collected. Search GeM, then tap Collect visible bids.");return;}
   ArrayList<JSONObject> matches=new ArrayList<>();int expired=0,unverified=0;
@@ -157,12 +166,15 @@ public class GemBrowserActivity extends Activity {
   for(JSONObject j:matches){
    String id=j.optString("bidId");
    TextView card=new TextView(this);card.setText(id+"\n"+j.optString("title")+"\nCloses: "+j.optString("deadlineText")+"\nTap to open GeM bid");card.setTextColor(Color.rgb(0,86,120));card.setTextSize(15);card.setPadding(dp(10),dp(12),dp(10),dp(12));content.addView(card);
+   card.setOnClickListener(v->showBidActions(j));
+   /* Old direct-link handler disabled; use bid actions dialog instead.
    card.setOnClickListener(v->{
     String url=j.optString("url");
     Uri uri=Uri.parse(url);
     if(safe(uri)&&!GEM.equals(url))startActivity(new Intent(Intent.ACTION_VIEW,uri));
     else {browser.loadUrl(GEM);state.setText("Bid link unavailable. Search this bid number on GeM: "+id);}
    });
+   */
    View divider=new View(this);divider.setBackgroundColor(Color.LTGRAY);content.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));
   }
   if(matches.isEmpty()){TextView empty=new TextView(this);empty.setText("No open-date keyword matches yet. Some bids may require reading documents to determine relevance.");empty.setTextColor(Color.DKGRAY);content.addView(empty);}
@@ -170,6 +182,45 @@ public class GemBrowserActivity extends Activity {
   new android.app.AlertDialog.Builder(this).setTitle("GeM shortlist candidates").setView(scroll)
    .setPositiveButton("Close",null)
    .setNeutralButton("Clear collected bids",(d,w)->new android.app.AlertDialog.Builder(this).setTitle("Clear collected bids?").setNegativeButton("Cancel",null).setPositiveButton("Clear",(x,y)->{collected.clear();persistCollected();updateCollectedCount();}).show()).show();
+ }
+ private void showBidActions(JSONObject bid){
+  String id=bid.optString("bidId");
+  new android.app.AlertDialog.Builder(this).setTitle(id).setItems(new String[]{"Open GeM bid","Analyze tender text with OpenRouter AI"},(d,which)->{
+   if(which==0){String url=bid.optString("url");Uri uri=Uri.parse(url);if(safe(uri)&&!GEM.equals(url))startActivity(new Intent(Intent.ACTION_VIEW,uri));else{browser.loadUrl(GEM);state.setText("GeM direct link unavailable. Search bid ID: "+id);}}
+   else showAiDialog(bid);
+  }).setNegativeButton("Cancel",null).show();
+ }
+ private void showAiDialog(JSONObject bid){
+  LinearLayout layout=new LinearLayout(this);layout.setOrientation(1);layout.setPadding(dp(16),dp(8),dp(16),dp(8));
+  TextView explanation=new TextView(this);explanation.setText("Paste the tender scope or extracted document text. AI cannot verify a bid from its truncated title alone. OpenRouter key stays in memory.");layout.addView(explanation);
+  EditText api=new EditText(this);api.setHint("OpenRouter API key");api.setSingleLine(true);api.setInputType(129);api.setText(openRouterKey);layout.addView(api);
+  EditText model=new EditText(this);model.setHint("OpenRouter model");model.setSingleLine(true);model.setText("openai/gpt-4o-mini");layout.addView(model);
+  EditText scope=new EditText(this);scope.setHint("Paste tender document / technical scope");scope.setMinLines(5);scope.setMaxLines(12);layout.addView(scope);
+  ScrollView scroll=new ScrollView(this);scroll.addView(layout);
+  new android.app.AlertDialog.Builder(this).setTitle("AI technical review: "+bid.optString("bidId")).setView(scroll)
+   .setNegativeButton("Cancel",null).setPositiveButton("Analyze",(d,w)->{
+    String token=api.getText().toString().trim(),modelId=model.getText().toString().trim(),document=scope.getText().toString().trim();
+    openRouterKey=token;
+    if(token.isEmpty()||modelId.isEmpty()||document.length()<80){state.setText("AI analysis requires an OpenRouter key, model and at least 80 characters of tender scope.");return;}
+    state.setText("Analyzing tender scope with OpenRouter…");
+    new Thread(()->{
+     try{
+      JSONObject payload=new JSONObject().put("model",modelId);
+      JSONArray messages=new JSONArray();
+      messages.put(new JSONObject().put("role","system").put("content","You review Indian industrial fabrication tenders for heat exchangers, condensers, tube bundles, retubing and pressure vessels. Return concise sections: Verdict (Relevant/Unclear/Not relevant), Equipment, Scope, Fabrication fit, Risks, Missing information. Never invent specifications or claim the tender is verified. Distinguish industrial equipment from household appliances."));
+      messages.put(new JSONObject().put("role","user").put("content","GeM bid: "+bid.optString("bidId")+"\\nListing title: "+bid.optString("title")+"\\nClosing date from listing: "+bid.optString("deadlineText")+"\\nDocument excerpt:\\n"+document.substring(0,Math.min(document.length(),18000))));
+      payload.put("messages",messages);
+      HttpURLConnection conn=(HttpURLConnection)new URL("https://openrouter.ai/api/v1/chat/completions").openConnection();
+      conn.setRequestMethod("POST");conn.setConnectTimeout(20000);conn.setReadTimeout(60000);conn.setDoOutput(true);conn.setRequestProperty("Authorization","Bearer "+token);conn.setRequestProperty("Content-Type","application/json");
+      try(OutputStream out=conn.getOutputStream()){out.write(payload.toString().getBytes(StandardCharsets.UTF_8));}
+      int code=conn.getResponseCode();if(code>=400){conn.disconnect();throw new IOException("OpenRouter HTTP "+code);}
+      ByteArrayOutputStream output=new ByteArrayOutputStream();try(InputStream in=conn.getInputStream()){byte[] buf=new byte[4096];int n;while((n=in.read(buf))!=-1){if(output.size()+n>200000)throw new IOException("Response too large");output.write(buf,0,n);}}
+      conn.disconnect();
+      String response=new JSONObject(output.toString("UTF-8")).getJSONArray("choices").getJSONObject(0).getJSONObject("message").optString("content","No analysis returned");
+      runOnUiThread(()->{state.setText("AI review completed for "+bid.optString("bidId"));new android.app.AlertDialog.Builder(this).setTitle("AI assessment (not verified)").setMessage(response).setPositiveButton("Close",null).show();});
+     }catch(Exception e){runOnUiThread(()->state.setText("AI review failed: "+e.getMessage()));}
+    }).start();
+   }).show();
  }
  private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
  private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(12);b.setTextColor(Color.BLACK);b.setMinHeight(dp(44));b.setPadding(dp(4),0,dp(4),0);return b;}
