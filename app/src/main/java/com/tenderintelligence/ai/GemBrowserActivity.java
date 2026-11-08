@@ -287,7 +287,7 @@ public class GemBrowserActivity extends Activity {
   showingDashboard=!showingDashboard;
   dashboard.setVisibility(showingDashboard?View.VISIBLE:View.GONE);
   browser.setVisibility(View.VISIBLE);
-  if(showingDashboard)renderDashboard();
+  if(showingDashboard){renderDashboard();scheduleAutoReview();}
   state.setText(showingDashboard?"Dashboard: open tenders with title matches. Technical eligibility requires document review.":"GeM browser ready.");
  }
  private TextView dashText(String value,int size,int color){
@@ -350,7 +350,7 @@ public class GemBrowserActivity extends Activity {
   loadPublicPdfInto(bid,extracted,trigger);
   autoHandler.postDelayed(()->{
    if(analyzingBids.contains(id)&&!"ai_running".equals(extracted.getTag())&&extracted.length()<80){
-    analyzingBids.remove(id);renderDashboard();
+    analyzingBids.remove(id);failedAutoReviews.add(id);renderDashboard();finishAutoReview();
     state.setText("Public PDF not available for "+id+". Manual import may be needed.");
    }
   },45000);
@@ -598,7 +598,7 @@ public class GemBrowserActivity extends Activity {
    if(id.isEmpty()){model.setError("Enter model ID");return;}
    try{if(remember.isChecked()&&!token.isEmpty())storeKey(token);else clearStoredKey();}
    catch(Exception e){connection.setText("Secure storage failed: "+e.getClass().getSimpleName());return;}
-   openRouterKey=token;getPreferences(0).edit().putString("openrouter_model",id).apply();dialog.dismiss();
+   openRouterKey=token;scheduleAutoReview();getPreferences(0).edit().putString("openrouter_model",id).apply();dialog.dismiss();
   }));
   dialog.show();
  }
