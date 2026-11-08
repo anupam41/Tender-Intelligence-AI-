@@ -293,6 +293,54 @@ public class GemBrowserActivity extends Activity {
  private TextView dashText(String value,int size,int color){
   TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);t.setPadding(dp(10),dp(8),dp(10),dp(8));return t;
  }
+
+ private final java.util.HashSet<String> analyzingBids=new java.util.HashSet<>();
+ private void analyzeInline(JSONObject bid){
+  String id=bid.optString("bidId");
+  if(analyzingBids.contains(id))return;
+  if(aiReviews.containsKey(id)){showSavedReview(id);return;}
+  if(openRouterKey.trim().isEmpty()){new android.app.AlertDialog.Builder(this).setTitle("AI setup required").setMessage("Add your OpenRouter key in AI Settings, then tap Analyze tender again.").setPositiveButton("AI Settings",(d,w)->showAiSettings()).setNegativeButton("Cancel",null).show();return;}
+  analyzingBids.add(id);renderDashboard();
+  EditText extracted=new EditText(this);
+  extracted.addTextChangedListener(new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence x,int a,int c,int z){}
+   public void onTextChanged(CharSequence x,int a,int b,int c){}
+   public void afterTextChanged(android.text.Editable x){
+    if(!"auto_pdf_ready".equals(extracted.getTag())||x.length()<80)return;
+    extracted.setTag(null);
+    String document=x.toString(),token=openRouterKey,modelId=getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free");
+    state.setText("Analyzing "+id+" with AI…");
+    new Thread(()->{
+     try{
+      JSONObject payload=new JSONObject().put("model",modelId);
+      JSONArray messages=new JSONArray();
+      messages.put(new JSONObject().put("role","system").put("content","You review Indian industrial fabrication tenders for ADITYA UDYOG HEATXCHANGER PVT. LTD. Its user-supplied catalogue describes manufacturing, refurbishment and services for shell-and-tube, fin-tube and plate heat exchangers, condensers, turbine/generator/stator/oil/air coolers, LP/HP heaters, air preheaters, U-tube and copper/brass tube bundles, radiators, vaporizers, pressure vessels, storage tanks, reactors, blenders, expansion bellows, FRP cooling towers, and customized retubing, hydrojet cleaning and rubber/FRP lining. The facility catalogue lists plate rolling, tube flaring, MIG/TIG/ARC welding, machining, hydraulic press, NDT and third-party inspection arrangements. Treat these as claimed general capabilities, NOT proof of qualification for a specific tender. Prioritize manufacturing, refurbishment, retubing, tube bundles, heat transfer equipment and plant service work; reject unrelated household appliances, generic spare parts and standalone material supply unless document evidence establishes fabrication scope. Return these clearly labeled concise sections in order: Verdict (Relevant/Unclear/Not relevant); Buyer; Equipment; Quantity; Closing date; Scope; Fabrication fit (Suitable/Possible/Unclear/Not suitable, with reason); Missing specifications (drawings, material grades, dimensions, design pressure, tests and inspection only where not provided); Risks; Recommendation (Quote candidate/Manual review/Reject). Distinguish supply of spare tubes from fabrication of a complete exchanger, tube bundle or retubing. Only use supplied document evidence; mark unknown fields Not provided. Never invent specifications or claim the tender is verified. Distinguish industrial equipment from household appliances."));
+      messages.put(new JSONObject().put("role","user").put("content","GeM bid: "+bid.optString("bidId")+"\\nListing title: "+bid.optString("title")+"\\nClosing date from listing: "+bid.optString("deadlineText")+"\\nDocument excerpt:\\n"+document.substring(0,Math.min(document.length(),18000))));
+      payload.put("messages",messages);
+      HttpURLConnection conn=(HttpURLConnection)new URL("https://openrouter.ai/api/v1/chat/completions").openConnection();
+      conn.setRequestMethod("POST");conn.setConnectTimeout(20000);conn.setReadTimeout(60000);conn.setDoOutput(true);conn.setRequestProperty("Authorization","Bearer "+token);conn.setRequestProperty("Content-Type","application/json");
+      try(OutputStream out=conn.getOutputStream()){out.write(payload.toString().getBytes(StandardCharsets.UTF_8));}
+      int code=conn.getResponseCode();if(code>=400){conn.disconnect();throw new IOException("OpenRouter HTTP "+code);}
+      ByteArrayOutputStream output=new ByteArrayOutputStream();try(InputStream in=conn.getInputStream()){byte[] buf=new byte[4096];int n;while((n=in.read(buf))!=-1){if(output.size()+n>200000)throw new IOException("Response too large");output.write(buf,0,n);}}
+      conn.disconnect();
+      String response=new JSONObject(output.toString("UTF-8")).getJSONArray("choices").getJSONObject(0).getJSONObject("message").optString("content","No analysis returned");
+      runOnUiThread(()->{saveAiReview(bid,response,modelId);state.setText("AI review saved for "+bid.optString("bidId"));renderDashboard();});
+
+     }catch(Exception e){runOnUiThread(()->{state.setText("AI review failed for "+id+": "+e.getMessage());new android.app.AlertDialog.Builder(GemBrowserActivity.this).setTitle("AI analysis unavailable").setMessage("Could not analyze this bid. Check your connection and AI settings.").setPositiveButton("OK",null).show();});}
+     finally{runOnUiThread(()->{analyzingBids.remove(id);renderDashboard();});}
+    }).start();
+   }
+  });
+  Button trigger=button("Loading");
+  state.setText("Reading GeM document for "+id+"…");
+  loadPublicPdfInto(bid,extracted,trigger);
+  autoHandler.postDelayed(()->{
+   if(analyzingBids.contains(id)&&!"auto_pdf_ready".equals(extracted.getTag())&&extracted.length()<80){
+    analyzingBids.remove(id);renderDashboard();
+    state.setText("Public PDF not available for "+id+". Manual import may be needed.");
+   }
+  },45000);
+ }
  private void renderDashboard(){
   if(dashboardList==null)return;
   dashboardList.removeAllViews();
@@ -329,8 +377,8 @@ public class GemBrowserActivity extends Activity {
    card.addView(dashText("Buyer: not captured from listing\nClosing: "+due+"\nPriority: "+qualificationLabel(bid)+" (title-based)\nAI: "+(ai==null?"Not reviewed":ai.optString("verdict","Needs review")+" • "+ai.optInt("score",0)+"/100 indicative"),13,muted));
    LinearLayout actions=new LinearLayout(this);actions.setOrientation(0);card.addView(actions);
    Button openBid=button("Bid details");openBid.setTextColor(Color.rgb(201,222,232));openBid.setBackground(rounded(Color.rgb(32,48,70),12,Color.rgb(58,79,103)));LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(0,dp(48),1);openLp.setMargins(0,0,dp(6),0);actions.addView(openBid,openLp);openBid.setOnClickListener(v->showBidActions(bid));
-   Button analyze=button(ai==null?"Analyze tender":"View assessment");analyze.setTextColor(Color.rgb(6,28,35));analyze.setTypeface(null,Typeface.BOLD);analyze.setBackground(rounded(Color.rgb(47,211,196),12,Color.rgb(47,211,196)));LinearLayout.LayoutParams analyzeLp=new LinearLayout.LayoutParams(0,dp(48),1);analyzeLp.setMargins(dp(6),0,0,0);actions.addView(analyze,analyzeLp);
-   analyze.setOnClickListener(v->{if(ai==null)showAiDialog(bid);else showSavedReview(id);});
+   Button analyze=button(analyzingBids.contains(id)?"Analyzing…":ai==null?"Analyze tender":ai.optInt("score",0)+"% • Summary");analyze.setTextColor(Color.rgb(6,28,35));analyze.setTypeface(null,Typeface.BOLD);analyze.setBackground(rounded(Color.rgb(47,211,196),12,Color.rgb(47,211,196)));LinearLayout.LayoutParams analyzeLp=new LinearLayout.LayoutParams(0,dp(48),1);analyzeLp.setMargins(dp(6),0,0,0);actions.addView(analyze,analyzeLp);
+   analyze.setEnabled(!analyzingBids.contains(id));analyze.setOnClickListener(v->analyzeInline(bid));
   }
  }
  private void reviewCollected(){
