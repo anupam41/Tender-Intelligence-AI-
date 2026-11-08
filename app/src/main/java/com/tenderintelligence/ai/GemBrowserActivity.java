@@ -53,7 +53,7 @@ public class GemBrowserActivity extends Activity {
  private TextView state;
  private final LinkedHashMap<String,JSONObject> collected=new LinkedHashMap<>();
  private TextView collectedCount;
- private String openRouterKey="";
+ private String openRouterKey="",geminiKey="",groqKey="";
  private static final String KEY_ALIAS="TenderIntelligenceOpenRouterKey";
  private EditText pendingPdfScope;
  private final LinkedHashMap<String,JSONObject> aiReviews=new LinkedHashMap<>();
@@ -120,7 +120,7 @@ public class GemBrowserActivity extends Activity {
   scanProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);scanProgress.setMax(batchTerms.length);scanProgress.setProgress(0);scanProgress.setIndeterminate(false);scanProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.rgb(0,175,152)));scanProgress.setVisibility(View.GONE);LinearLayout.LayoutParams progressLp=new LinearLayout.LayoutParams(-1,dp(5));progressLp.setMargins(dp(24),0,dp(24),0);page.addView(scanProgress,progressLp);
   scanProgressLabel=new TextView(this);scanProgressLabel.setTextColor(Color.rgb(47,99,99));scanProgressLabel.setPadding(dp(24),dp(10),dp(24),dp(5));scanProgressLabel.setTextSize(13);scanProgressLabel.setText("Ready to scan • Results will appear below");page.addView(scanProgressLabel);
   collectedCount=new TextView(this);collectedCount.setTextColor(Color.rgb(0,129,115));collectedCount.setPadding(dp(24),dp(4),dp(24),dp(4));collectedCount.setTextSize(13);page.addView(collectedCount);
-  restoreCollected();restoreAiReviews();openRouterKey=readStoredKey();updateCollectedCount();
+  restoreCollected();restoreAiReviews();openRouterKey=readStoredKey();geminiKey=readProviderKey("gemini");groqKey=readProviderKey("groq");updateCollectedCount();
   Button next=button("Next");findRow.addView(next);next.setOnClickListener(v->{
    state.setText("Looking for GeM next results page…");
    String js="(function(){"+
@@ -592,6 +592,45 @@ public class GemBrowserActivity extends Activity {
    }catch(Exception e){String message=e.getMessage();runOnUiThread(()->{target.setText("");trigger.setEnabled(true);if("auto_review".equals(trigger.getTag()))onAutoDocumentFailure(bid,"Public PDF download failed");else new android.app.AlertDialog.Builder(this).setTitle("Automatic PDF retrieval unavailable").setMessage(message+"\\nThis GeM document may require a browser session. You can still import it manually.").setPositiveButton("OK",null).show();});}
    finally{if(conn!=null)conn.disconnect();if(file!=null)file.delete();}
   }).start();
+ }
+
+ private void saveProviderKey(String provider,String key) throws Exception{
+  Cipher c=Cipher.getInstance("AES/GCM/NoPadding");c.init(Cipher.ENCRYPT_MODE,deviceSecret());
+  getPreferences(0).edit().putString(provider+"_iv",Base64.encodeToString(c.getIV(),Base64.NO_WRAP)).putString(provider+"_encrypted",Base64.encodeToString(c.doFinal(key.getBytes(StandardCharsets.UTF_8)),Base64.NO_WRAP)).apply();
+ }
+ private String readProviderKey(String provider){
+  String iv=getPreferences(0).getString(provider+"_iv",""),data=getPreferences(0).getString(provider+"_encrypted","");
+  if(iv.isEmpty()||data.isEmpty())return "";
+  try{Cipher c=Cipher.getInstance("AES/GCM/NoPadding");c.init(Cipher.DECRYPT_MODE,deviceSecret(),new GCMParameterSpec(128,Base64.decode(iv,Base64.NO_WRAP)));return new String(c.doFinal(Base64.decode(data,Base64.NO_WRAP)),StandardCharsets.UTF_8);}catch(Exception e){return "";}
+ }
+ private void clearProviderKey(String provider){getPreferences(0).edit().remove(provider+"_iv").remove(provider+"_encrypted").apply();}
+ private String callProvider(String provider,String token,String instructions,String prompt) throws Exception{
+  String model=provider.equals("gemini")?"gemini-2.5-flash":provider.equals("groq")?"llama-3.3-70b-versatile":getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free");
+  String endpoint=provider.equals("gemini")?"https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent":provider.equals("groq")?"https://api.groq.com/openai/v1/chat/completions":"https://openrouter.ai/api/v1/chat/completions";
+  HttpURLConnection conn=(HttpURLConnection)new URL(endpoint).openConnection();
+  try{
+   conn.setRequestMethod("POST");conn.setConnectTimeout(18000);conn.setReadTimeout(65000);conn.setDoOutput(true);conn.setRequestProperty("Content-Type","application/json");
+   if(provider.equals("gemini"))conn.setRequestProperty("x-goog-api-key",token);else conn.setRequestProperty("Authorization","Bearer "+token);
+   JSONObject payload;
+   if(provider.equals("gemini"))payload=new JSONObject().put("contents",new JSONArray().put(new JSONObject().put("parts",new JSONArray().put(new JSONObject().put("text",instructions+"\n\n"+prompt))))).put("generationConfig",new JSONObject().put("maxOutputTokens",2200));
+   else payload=new JSONObject().put("model",model).put("max_tokens",2200).put("messages",new JSONArray().put(new JSONObject().put("role","system").put("content",instructions)).put(new JSONObject().put("role","user").put("content",prompt)));
+   try(OutputStream out=conn.getOutputStream()){out.write(payload.toString().getBytes(StandardCharsets.UTF_8));}
+   int code=conn.getResponseCode();if(code<200||code>=300)throw new IOException(provider+" HTTP "+code);
+   ByteArrayOutputStream buffer=new ByteArrayOutputStream();
+   try(InputStream in=conn.getInputStream()){byte[] bytes=new byte[4096];int n;while((n=in.read(bytes))!=-1){if(buffer.size()+n>250000)throw new IOException("AI response too large");buffer.write(bytes,0,n);}}
+   JSONObject response=new JSONObject(buffer.toString("UTF-8"));
+   String answer=provider.equals("gemini")?response.getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text"):response.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
+   if(answer.trim().isEmpty())throw new IOException("Empty AI response");return answer;
+  }finally{conn.disconnect();}
+ }
+ private String requestProviderReview(String instructions,String prompt) throws Exception{
+  String errors="";
+  for(String provider:new String[]{"gemini","groq","openrouter"}){
+   String token=provider.equals("gemini")?geminiKey:provider.equals("groq")?groqKey:openRouterKey;
+   if(token.isEmpty())continue;
+   try{return callProvider(provider,token,instructions,prompt);}catch(Exception e){errors+=e.getMessage()+"; ";}
+  }
+  throw new IOException(errors.isEmpty()?"No AI provider configured":errors);
  }
  private boolean incompatibleAiModel(String id){
   String m=id==null?"":id.toLowerCase(java.util.Locale.ROOT);
