@@ -40,7 +40,6 @@ public class GemBrowserActivity extends Activity {
   term=new EditText(this);term.setSingleLine(true);term.setTextColor(Color.WHITE);term.setHintTextColor(Color.LTGRAY);term.setHint("Or type equipment keyword");term.setTextSize(14);findRow.addView(term,new LinearLayout.LayoutParams(0,44,1));
   Button find=button("Search");findRow.addView(find);find.setOnClickListener(v->{
    String q=term.getText().toString().trim();
-   if(q.isEmpty()){state.setText("Select or type an equipment keyword first.");return;}
    state.setText("Submitting GeM bid search…");
    ((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(term.getWindowToken(),0);
    term.clearFocus();
@@ -48,7 +47,8 @@ public class GemBrowserActivity extends Activity {
     "var inputs=Array.from(document.querySelectorAll('input')).filter(e=>{var r=e.getBoundingClientRect();return r.width>100&&r.height>0&&!e.disabled});"+
     "var el=inputs.find(e=>/searchBid|search_bid|bid_search/i.test((e.id||'')+' '+(e.name||'')))||inputs.find(e=>/heat exchanger|head exchanger|oil cooler/i.test(e.value||''))||inputs.find(e=>{var p=e.parentElement;return p&&/contains/i.test((p.parentElement&&p.parentElement.innerText||'').slice(0,90))})||inputs.filter(e=>/text|search/i.test(e.type||'text')).slice(-1)[0];"+
     "if(!el)return 'NO_BID_INPUT';"+
-    "var setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(el,"+org.json.JSONObject.quote(q)+");"+
+    "var keyword="+org.json.JSONObject.quote(q)+";if(!keyword.trim())keyword=(el.value||'').trim();if(!keyword)return 'NO_KEYWORD';"+
+    "var setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(el,keyword);"+
     "el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));"+
     "var r=el.getBoundingClientRect();"+
     "var bidSection=Array.from(document.querySelectorAll('h1,h2,h3,h4,div,span')).find(e=>e.children.length===0&&/^(Bid Listing)$/i.test((e.textContent||'').trim()));"+
@@ -58,7 +58,8 @@ public class GemBrowserActivity extends Activity {
     "el.blur();btn.click();return 'SEARCH_CLICKED';"+
     "}catch(e){return 'ERROR:'+e.message}})()";
    browser.evaluateJavascript(js,result->{
-    if(result.contains("SEARCH_CLICKED"))state.setText("GeM bid-search button clicked for "+q+". Check the results below.");
+    if(result.contains("SEARCH_CLICKED"))state.setText("GeM search submitted. Check results below.");
+    else if(result.contains("NO_KEYWORD"))state.setText("Type a keyword in GeM Bid Listing or choose one above.");
     else if(result.contains("NO_BID_INPUT"))state.setText("GeM bid search field not found. Use the search box inside the webpage.");
     else state.setText("Keyword entered, but GeM's search button was not detected. Tap the blue magnifying glass beside GeM's bid search field.");
    });
@@ -85,7 +86,7 @@ public class GemBrowserActivity extends Activity {
     if("https".equalsIgnoreCase(url.getScheme())){startActivity(new Intent(Intent.ACTION_VIEW,url));return true;}
     return true;
    }
-   @Override public void onPageFinished(WebView view,String url){state.setText("GeM loaded. Choose a keyword, then tap Search.");}
+   @Override public void onPageFinished(WebView view,String url){state.setText("Enter a keyword in GeM or select one above, then tap Search.");}
    @Override public void onReceivedError(WebView view,WebResourceRequest req,WebResourceError error){if(req.isForMainFrame())state.setText("Unable to load GeM in WebView. Try opening in your browser.");}
   });
   browser.setDownloadListener((url,userAgent,disposition,mime,length)->{Uri uri=Uri.parse(url);if(safe(uri))startActivity(new Intent(Intent.ACTION_VIEW,uri));else state.setText("Download blocked: external URL");});
