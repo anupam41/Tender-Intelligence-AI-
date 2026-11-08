@@ -210,6 +210,29 @@ public class GemBrowserActivity extends Activity {
   return t.matches(".*(heat exchanger|condenser|retub|re-tub|hydrojet|industrial cooler|oil cooler|sample cooler|sampling cooler|swas cooler|tube bundle|pressure vessel|evaporator|economi[sz]er|industrial chiller|industrial radiator|generator radiator|cooling coil|air preheater|air pre heater|shell and tube|shell & tube|tubesheet|tube sheet|reboiler|industrial heater|lp heater|hp heater|fin tube|finned tube|stator water cooler|generator air cooler|seal oil cooler|intercooler|inter cooler|aftercooler|after cooler|air fin fan|vaporizer|expansion bellow|frp cooling tower|air receiver|storage tank|process tank|industrial blender|industrial reactor|flue gas cooler|heat recovery).*");
  }
 
+ private String workCategory(String title){
+  String t=title.toLowerCase(Locale.ROOT);
+  if(t.matches(".*(retub|re-tub|refurbish|overhaul|hydrojet|cleaning of heat exchanger|repair of heat exchanger|maintenance of heat exchanger).*"))return "Refurbishment / service";
+  if(t.matches(".*(tube bundle|u tube bundle|u-tube bundle|tubesheet|tube sheet).*"))return "Tube bundle / components";
+  if(t.matches(".*(heat exchanger|condenser|industrial cooler|oil cooler|sample cooler|sampling cooler|swas cooler|pressure vessel|reboiler|economi[sz]er|evaporator|air preheater|air pre heater|lp heater|hp heater|fin tube|finned tube|stator water cooler|generator air cooler|seal oil cooler|intercooler|inter cooler|aftercooler|after cooler|air fin fan|vaporizer|expansion bellow|frp cooling tower|air receiver|storage tank|process tank|industrial blender|industrial reactor|flue gas cooler|heat recovery).*"))return "Equipment manufacturing";
+  return "Other equipment / manual review";
+ }
+ private int qualificationScore(JSONObject bid){
+  String title=bid.optString("title").toLowerCase(Locale.ROOT);
+  int points=workCategory(title).equals("Refurbishment / service")?75:workCategory(title).equals("Tube bundle / components")?70:workCategory(title).equals("Equipment manufacturing")?65:35;
+  if(title.matches(".*(supply of spare|spare part|consumable|gasket only|seal only|repair kit).*"))points-=25;
+  JSONObject ai=aiReviews.get(bid.optString("bidId"));
+  if(ai!=null){
+   String verdict=ai.optString("verdict");
+   if("Not relevant".equals(verdict))points=5;
+   else if("Relevant".equals(verdict))points=Math.min(90,points+10);
+  }
+  return Math.max(0,points);
+ }
+ private String qualificationLabel(JSONObject bid){
+  int score=qualificationScore(bid);
+  return score>=70?"High-priority review":score>=50?"Review scope":"Low-priority review";
+ }
  private void reviewCollected(){
   if(collected.isEmpty()){state.setText("No bids collected. Search GeM, then tap Collect visible bids.");return;}
   ArrayList<JSONObject> matches=new ArrayList<>();int expired=0,unverified=0;
@@ -221,17 +244,19 @@ public class GemBrowserActivity extends Activity {
    if(!due.after(now)){expired++;continue;}
    matches.add(j);
   }
+  Collections.sort(matches,(a,b)->Integer.compare(qualificationScore(b),qualificationScore(a)));
+  int high=0,medium=0,low=0;for(JSONObject item:matches){int score=qualificationScore(item);if(score>=70)high++;else if(score>=50)medium++;else low++;}
   LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(14),dp(8),dp(14),dp(8));
-  TextView summary=new TextView(this);summary.setText("Open-date keyword candidates: "+matches.size()+" / "+collected.size()+" collected\nExpired candidates hidden: "+expired+" • Dates missing: "+unverified+"\nSaved AI assessments: "+aiReviews.size()+" (document-based, not independently verified).");summary.setTextColor(Color.DKGRAY);summary.setPadding(0,0,0,dp(12));content.addView(summary);
+  TextView summary=new TextView(this);summary.setText( " + "Title-based qualification: "+high+" high • "+medium+" review • "+low+" low\\nOpen-date candidates: "+matches.size()+" / "+collected.size()+" collected\\nExpired candidates hidden: "+expired+" • Dates missing: "+unverified+"\nSaved AI assessments: "+aiReviews.size()+" (document-based, not independently verified).");summary.setTextColor(Color.DKGRAY);summary.setPadding(0,0,0,dp(12));content.addView(summary);
   for(JSONObject j:matches){
    String id=j.optString("bidId");
-   TextView card=new TextView(this);JSONObject review=aiReviews.get(id);card.setText(id+"\n"+j.optString("title")+"\nCloses: "+j.optString("deadlineText")+(review==null?"\nAI: Not analyzed":"\nAI: "+review.optString("verdict","Needs review")+" • "+review.optInt("score",0)+"/100")+"\nTap for bid options");card.setTextColor(Color.rgb(0,86,120));card.setTextSize(15);card.setPadding(dp(10),dp(12),dp(10),dp(12));content.addView(card);
+   TextView card=new TextView(this);JSONObject review=aiReviews.get(id);card.setText(qualificationLabel(j)+" • "+workCategory(j.optString("title"))+"\n"+id+"\n"+j.optString("title")+"\nCloses: "+j.optString("deadlineText")+(review==null?"\nAI: Not analyzed":"\nAI: "+review.optString("verdict","Needs review")+" • "+review.optInt("score",0)+"/100")+"\nTap for bid options");card.setTextColor(Color.rgb(0,86,120));card.setTextSize(15);card.setPadding(dp(10),dp(12),dp(10),dp(12));content.addView(card);
    card.setOnClickListener(v->showBidActions(j));
    View divider=new View(this);divider.setBackgroundColor(Color.LTGRAY);content.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));
   }
   if(matches.isEmpty()){TextView empty=new TextView(this);empty.setText("No open-date keyword matches yet. Some bids may require reading documents to determine relevance.");empty.setTextColor(Color.DKGRAY);content.addView(empty);}
   ScrollView scroll=new ScrollView(this);scroll.addView(content);
-  new android.app.AlertDialog.Builder(this).setTitle("GeM shortlist candidates").setView(scroll)
+  new android.app.AlertDialog.Builder(this).setTitle("Qualified GeM candidates").setView(scroll)
    .setPositiveButton("Close",null)
    .setNeutralButton("Clear collected bids",(d,w)->new android.app.AlertDialog.Builder(this).setTitle("Clear collected bids?").setNegativeButton("Cancel",null).setPositiveButton("Clear",(x,y)->{collected.clear();persistCollected();updateCollectedCount();}).show()).show();
  }
