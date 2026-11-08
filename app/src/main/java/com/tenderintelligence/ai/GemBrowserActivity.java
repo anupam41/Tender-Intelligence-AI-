@@ -153,10 +153,10 @@ public class GemBrowserActivity extends Activity {
    matches.add(j);
   }
   LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(14),dp(8),dp(14),dp(8));
-  TextView summary=new TextView(this);summary.setText("Open-date keyword candidates: "+matches.size()+" / "+collected.size()+" collected\\nExpired candidates hidden: "+expired+" • Dates missing: "+unverified+"\\nAI document analysis not yet performed.");summary.setTextColor(Color.DKGRAY);summary.setPadding(0,0,0,dp(12));content.addView(summary);
+  TextView summary=new TextView(this);summary.setText("Open-date keyword candidates: "+matches.size()+" / "+collected.size()+" collected\nExpired candidates hidden: "+expired+" • Dates missing: "+unverified+"\nAI document analysis not yet performed.");summary.setTextColor(Color.DKGRAY);summary.setPadding(0,0,0,dp(12));content.addView(summary);
   for(JSONObject j:matches){
    String id=j.optString("bidId");
-   TextView card=new TextView(this);card.setText(id+"\\n"+j.optString("title")+"\\nCloses: "+j.optString("deadlineText")+"\\nTap to open GeM bid");card.setTextColor(Color.rgb(0,86,120));card.setTextSize(15);card.setPadding(dp(10),dp(12),dp(10),dp(12));content.addView(card);
+   TextView card=new TextView(this);card.setText(id+"\n"+j.optString("title")+"\nCloses: "+j.optString("deadlineText")+"\nTap to open GeM bid");card.setTextColor(Color.rgb(0,86,120));card.setTextSize(15);card.setPadding(dp(10),dp(12),dp(10),dp(12));content.addView(card);
    card.setOnClickListener(v->{
     String url=j.optString("url");
     Uri uri=Uri.parse(url);
