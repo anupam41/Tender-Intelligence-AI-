@@ -113,11 +113,11 @@ public class GemBrowserActivity extends Activity {
  private void collectVisible(){
   state.setText("Reading visible GeM listing cards…");
   String js="(function(){try{var found=[];var seen={};"+
-   "var nodes=Array.from(document.querySelectorAll('div,article,li')).filter(e=>e.children.length>0&&e.innerText&&/BID\\\\s*NO\\\\s*:/i.test(e.innerText));"+
+   "var nodes=Array.from(document.querySelectorAll('div,article,li')).filter(e=>e.children.length>0&&e.innerText&&/BID\\s*NO\\s*:/i.test(e.innerText));"+
    "for(var el of nodes){var text=el.innerText||'';if(text.length>1400||text.length<40)continue;"+
-   "var match=text.match(/GEM\\\\/20\\\\d{2}\\\\/B\\\\/\\\\d+/i);if(!match||seen[match[0]])continue;seen[match[0]]=true;"+
+   "var match=text.match(/GEM\\/20\\d{2}\\/B\\/\\d+/i);if(!match||seen[match[0]])continue;seen[match[0]]=true;"+
    "var link=Array.from(el.querySelectorAll('a[href]')).find(a=>(a.textContent||'').includes(match[0]));"+
-   "var item=text.match(/Items?\\\\s*:\\\\s*([^\\\\n]+)/i);var end=text.match(/End Date\\\\s*:\\\\s*([^\\\\n]+)/i);"+
+   "var item=text.match(/Items?\\s*:\\s*([^\\n]+)/i);var end=text.match(/End Date\\s*:\\s*([^\\n]+)/i);"+
    "found.push({bidId:match[0],title:item?item[1].trim():'GeM bid',deadlineText:end?end[1].trim():'',url:link?link.href:'',source:'GeM visible listing'});"+
    "if(found.length>=50)break;}return JSON.stringify(found);}catch(e){return JSON.stringify({error:e.message})}})()";
   browser.evaluateJavascript(js,result->{
