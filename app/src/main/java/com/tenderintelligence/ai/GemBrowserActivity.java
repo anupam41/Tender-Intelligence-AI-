@@ -48,7 +48,9 @@ public class GemBrowserActivity extends Activity {
  private static final String OMNI_URL="http://127.0.0.1:20128/v1/chat/completions";
  private EditText pendingPdfScope;
  private final LinkedHashMap<String,JSONObject> aiReviews=new LinkedHashMap<>();
- private static final int PICK_TENDER_PDF=4207;
+ private static final int PICK_TENDER_PDF=4207, SAVE_SHORTLIST_DOCX=4208;
+ private final LinkedHashMap<String,JSONObject> shortlisted=new LinkedHashMap<>();
+ private JSONObject pendingWordBid;
  private static final String GEM="https://bidplus.gem.gov.in/all-bids";
  private boolean safe(Uri uri){
   return uri!=null&&"https".equalsIgnoreCase(uri.getScheme())&&"bidplus.gem.gov.in".equalsIgnoreCase(uri.getHost());
@@ -111,7 +113,7 @@ public class GemBrowserActivity extends Activity {
   scanProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);scanProgress.setMax(batchTerms.length);scanProgress.setProgress(0);scanProgress.setIndeterminate(false);scanProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.rgb(0,175,152)));scanProgress.setVisibility(View.GONE);LinearLayout.LayoutParams progressLp=new LinearLayout.LayoutParams(-1,dp(5));progressLp.setMargins(dp(24),0,dp(24),0);page.addView(scanProgress,progressLp);
   scanProgressLabel=new TextView(this);scanProgressLabel.setTextColor(Color.rgb(47,99,99));scanProgressLabel.setPadding(dp(24),dp(10),dp(24),dp(5));scanProgressLabel.setTextSize(13);scanProgressLabel.setText("Ready to scan • Results will appear below");page.addView(scanProgressLabel);
   collectedCount=new TextView(this);collectedCount.setTextColor(Color.rgb(0,129,115));collectedCount.setPadding(dp(24),dp(4),dp(24),dp(4));collectedCount.setTextSize(13);page.addView(collectedCount);
-  restoreCollected();restoreAiReviews();getPreferences(0).edit().remove("openrouter_key_iv").remove("openrouter_key_cipher").remove("gemini_iv").remove("gemini_encrypted").remove("groq_iv").remove("groq_encrypted").remove("remember_openrouter_key").remove("remember_provider_keys").apply();updateCollectedCount();
+  restoreCollected();restoreAiReviews();restoreShortlist();getPreferences(0).edit().remove("openrouter_key_iv").remove("openrouter_key_cipher").remove("gemini_iv").remove("gemini_encrypted").remove("groq_iv").remove("groq_encrypted").remove("remember_openrouter_key").remove("remember_provider_keys").apply();updateCollectedCount();
   Button next=button("Next");findRow.addView(next);next.setOnClickListener(v->{
    state.setText("Looking for GeM next results page…");
    String js="(function(){"+
@@ -309,7 +311,7 @@ public class GemBrowserActivity extends Activity {
   if(autoReviewActive||aiConnectionPaused||!showingDashboard)return;
   for(JSONObject bid:collected.values()){
    String id=bid.optString("bidId");
-   if(!relevantTitle(bid.optString("title"))||aiReviews.containsKey(id)||analyzingBids.contains(id)||failedAutoReviews.contains(id)||apiFailedReviews.contains(id))continue;
+   if(shortlisted.containsKey(id)||!relevantTitle(bid.optString("title"))||aiReviews.containsKey(id)||analyzingBids.contains(id)||failedAutoReviews.contains(id)||apiFailedReviews.contains(id))continue;
    Date due=parsedDeadline(bid.optString("deadlineText"));
    if(due==null||!due.after(new Date()))continue;
    autoReviewActive=true;currentReviewId=id;analyzeInline(bid);return;
@@ -370,15 +372,58 @@ public class GemBrowserActivity extends Activity {
   TextView count=new TextView(this);count.setText(value);count.setTextSize(21);count.setTypeface(null,Typeface.BOLD);count.setTextColor(darkMode()?0xff7de4d7:color);count.setGravity(Gravity.CENTER);tile.addView(count,new LinearLayout.LayoutParams(-1,-2));
   TextView caption=new TextView(this);caption.setText(label);caption.setTextSize(11);caption.setTextColor(themeColor(0xff71858a,0xffa3bdc1));caption.setGravity(Gravity.CENTER);tile.addView(caption,new LinearLayout.LayoutParams(-1,-2));
  }
+ private void restoreShortlist(){
+  try{JSONArray a=new JSONArray(getPreferences(0).getString("shortlisted_tenders","[]"));for(int i=0;i<a.length();i++){JSONObject j=a.optJSONObject(i);if(j!=null&&!j.optString("bidId").isEmpty())shortlisted.put(j.optString("bidId"),j);}}catch(Exception ignored){}
+ }
+ private void persistShortlist(){
+  JSONArray a=new JSONArray();for(JSONObject j:shortlisted.values())a.put(j);
+  getPreferences(0).edit().putString("shortlisted_tenders",a.toString()).apply();
+ }
+ private void shortlistTender(JSONObject bid){
+  String id=bid.optString("bidId");
+  new android.app.AlertDialog.Builder(this).setTitle("Shortlist "+id)
+   .setMessage("Save this tender to your shortlist and hide it from future search results on this device? You can export its GeM link and saved AI summary to Word.")
+   .setNegativeButton("Cancel",null).setPositiveButton("Shortlist", (d,w)->{
+    shortlisted.put(id,bid);persistShortlist();renderDashboard();updateCollectedCount();scheduleAutoReview();
+    new android.app.AlertDialog.Builder(this).setTitle("Tender shortlisted")
+     .setMessage("Saved locally and excluded from future matching results. Export its details and AI summary to Word now?")
+     .setNegativeButton("Later",null).setPositiveButton("Export Word", (d2,w2)->exportShortlistedWord(bid)).show();
+   }).show();
+ }
+ private void exportShortlistedWord(JSONObject bid){
+  pendingWordBid=bid;
+  Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+  intent.addCategory(Intent.CATEGORY_OPENABLE);
+  intent.setType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+  intent.putExtra(Intent.EXTRA_TITLE,"GeM_"+bid.optString("bidId").replace("/","_")+"_shortlist.docx");
+  try{startActivityForResult(intent,SAVE_SHORTLIST_DOCX);}catch(Exception e){state.setText("No document provider available for Word export.");}
+ }
+ private void showShortlist(){
+  LinearLayout list=new LinearLayout(this);list.setOrientation(1);list.setPadding(dp(14),dp(8),dp(14),dp(8));
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Shortlisted tenders ("+shortlisted.size()+")").setView(list).setPositiveButton("Close",null).create();
+  if(shortlisted.isEmpty())list.addView(dashText("No shortlisted tenders yet.",15,themeColor(0xff1b2d31,0xffeff9f8)));
+  for(JSONObject bid:new ArrayList<>(shortlisted.values())){
+   String id=bid.optString("bidId");
+   TextView name=dashText(id+" • "+bid.optString("title"),14,themeColor(0xff1b2d31,0xffeff9f8));list.addView(name);
+   Button word=button("Save Word (.docx)");list.addView(word);word.setOnClickListener(v->exportShortlistedWord(bid));
+   Button open=button("Open GeM document");list.addView(open);open.setOnClickListener(v->openBidPdf(bid));
+   Button restore=button("Remove from shortlist / show again");list.addView(restore);
+   restore.setOnClickListener(v->{shortlisted.remove(id);persistShortlist();dialog.dismiss();renderDashboard();updateCollectedCount();});
+  }
+  ScrollView scroll=new ScrollView(this);list.setPadding(dp(14),dp(8),dp(14),dp(8));
+  dialog.setOnShowListener(d->{});
+  dialog.show();
+ }
  private void renderDashboard(){
   if(dashboardList==null)return;
   while(dashboardList.getChildCount()>1)dashboardList.removeViewAt(1);
   int white=themeColor(0xff1b2d31,0xffeff9f8),muted=themeColor(0xff67797d,0xff9fb4b7),teal=themeColor(0xff008b7e,0xff57d7c6);
+  Button shortlistLibrary=button("Shortlist ("+shortlisted.size()+") • Saved tenders");dashboardList.addView(shortlistLibrary);shortlistLibrary.setOnClickListener(v->showShortlist());
   TextView resultsHeading=dashText("Matching tenders",24,white);resultsHeading.setTypeface(null,Typeface.BOLD);dashboardList.addView(resultsHeading);
   ArrayList<JSONObject> open=new ArrayList<>();int expired=0,missing=0,analyzed=0;
   Date now=new Date();
   for(JSONObject j:collected.values()){
-   if(!relevantTitle(j.optString("title")))continue;
+   if(shortlisted.containsKey(j.optString("bidId"))||!relevantTitle(j.optString("title")))continue;
    Date due=parsedDeadline(j.optString("deadlineText"));
    if(due==null){missing++;continue;}
    if(!due.after(now)){expired++;continue;}
@@ -406,6 +451,7 @@ public class GemBrowserActivity extends Activity {
    TextView bidId=dashText(id+"  •  "+workCategory(title),13,teal);bidId.setPadding(0,dp(7),0,dp(8));card.addView(bidId);
    card.addView(dashText("Closing  "+due+"\n"+(ai==null?(analyzingBids.contains(id)?"● Analyzing now":apiFailedReviews.contains(id)?"AI connection issue • Retry after reconnect":failedAutoReviews.contains(id)?"Document inaccessible • Manual PDF needed":"◷ Waiting in AI queue"):ai.optString("verdict","Needs review")+" • Provisional AI assessment"),13,muted));
    LinearLayout actions=new LinearLayout(this);actions.setOrientation(0);card.addView(actions);
+   Button shortlist=button("Shortlist");shortlist.setTextColor(teal);card.addView(shortlist,new LinearLayout.LayoutParams(-1,dp(42)));shortlist.setOnClickListener(v->shortlistTender(bid));
    Button openBid=button("View document");openBid.setTextColor(Color.rgb(38,91,91));openBid.setBackground(glass(themeColor(0xffeaf6f4,0xff1a3036),22));LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(0,dp(48),1);openLp.setMargins(0,0,dp(6),0);actions.addView(openBid,openLp);openBid.setOnClickListener(v->openBidPdf(bid));
    Button analyze=button(analyzingBids.contains(id)?"Analyzing…":ai==null?(apiFailedReviews.contains(id)?"Retry after reconnect":failedAutoReviews.contains(id)?"Retry AI review":"AI pending…"):ai.optInt("score",0)+"% • Review");analyze.setTextColor(Color.WHITE);analyze.setTypeface(null,Typeface.BOLD);analyze.setBackground(rounded(Color.rgb(0,164,146),22,Color.rgb(0,164,146)));LinearLayout.LayoutParams analyzeLp=new LinearLayout.LayoutParams(0,dp(48),1);analyzeLp.setMargins(dp(6),0,0,0);actions.addView(analyze,analyzeLp);
    analyze.setEnabled(!analyzingBids.contains(id));if(analyzingBids.contains(id)){analyze.setText("◌ Analyzing");analyze.setAlpha(0.78f);}analyze.setOnClickListener(v->{if(aiReviews.containsKey(id))showSavedReview(id);else{failedAutoReviews.remove(id);apiFailedReviews.remove(id);aiConnectionPaused=false;analyzeInline(bid);}});
@@ -659,6 +705,7 @@ public class GemBrowserActivity extends Activity {
  }
  @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
   super.onActivityResult(requestCode,resultCode,data);
+  if(requestCode==SAVE_SHORTLIST_DOCX){if(resultCode==RESULT_OK&&data!=null&&data.getData()!=null&&pendingWordBid!=null){try{TenderWordExport.write(this,data.getData(),pendingWordBid,aiReviews.get(pendingWordBid.optString("bidId")));state.setText("Shortlisted tender exported to Word.");}catch(Exception e){state.setText("Word export failed: "+e.getMessage());}}pendingWordBid=null;return;}
   if(requestCode!=PICK_TENDER_PDF||resultCode!=RESULT_OK||data==null||data.getData()==null||pendingPdfScope==null)return;
   EditText target=pendingPdfScope;Uri uri=data.getData();target.setText("Extracting selected PDF…");
   new Thread(()->{
