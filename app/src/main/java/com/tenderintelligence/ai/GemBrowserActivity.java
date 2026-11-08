@@ -510,7 +510,7 @@ public class GemBrowserActivity extends Activity {
   String url=bid.optString("url","");
   Uri uri=Uri.parse(url);
   if(!safeGemDocument(uri)||url.equals(GEM)||url.contains("/all-bids")){
-   trigger.setEnabled(true);target.setHint("No public document URL detected for this bid. Import the PDF if needed.");return;
+   trigger.setEnabled(true);target.setHint("No public document URL detected for this bid. Import the PDF if needed.");if("auto_review".equals(trigger.getTag()))onAutoDocumentFailure(bid,"No direct document URL");return;
   }
   trigger.setEnabled(false);
   state.setText("Checking public bid page for PDF documents…");
@@ -564,7 +564,7 @@ public class GemBrowserActivity extends Activity {
     }
     PdfTenderReader.Result result=PdfTenderReader.read(this,Uri.fromFile(file));
     runOnUiThread(()->{target.setTag("auto_pdf_ready");target.setText(result.text);trigger.setEnabled(true);state.setText("GeM PDF extracted ("+result.pages+" pages). Review scope and tap Analyze.");});
-   }catch(Exception e){String message=e.getMessage();runOnUiThread(()->{target.setText("");trigger.setEnabled(true);new android.app.AlertDialog.Builder(this).setTitle("Automatic PDF retrieval unavailable").setMessage(message+"\\nThis GeM document may require a browser session. You can still import it manually.").setPositiveButton("OK",null).show();});}
+   }catch(Exception e){String message=e.getMessage();runOnUiThread(()->{target.setText("");trigger.setEnabled(true);if("auto_review".equals(trigger.getTag()))onAutoDocumentFailure(bid,"Public PDF download failed");else new android.app.AlertDialog.Builder(this).setTitle("Automatic PDF retrieval unavailable").setMessage(message+"\\nThis GeM document may require a browser session. You can still import it manually.").setPositiveButton("OK",null).show();});}
    finally{if(conn!=null)conn.disconnect();if(file!=null)file.delete();}
   }).start();
  }
