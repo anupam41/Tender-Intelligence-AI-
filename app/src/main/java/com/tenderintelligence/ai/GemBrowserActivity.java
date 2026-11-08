@@ -60,7 +60,7 @@ public class GemBrowserActivity extends Activity {
  @Override public void onCreate(Bundle bundle){
   super.onCreate(bundle);
   getWindow().setStatusBarColor(Color.rgb(6,10,18));
-  LinearLayout page=new LinearLayout(this);page.setOrientation(1);page.setBackgroundColor(Color.rgb(250,247,244));setContentView(page);page.setOnApplyWindowInsetsListener((v,insets)->{int top=android.os.Build.VERSION.SDK_INT>=30?insets.getInsets(android.view.WindowInsets.Type.statusBars()).top:insets.getSystemWindowInsetTop();v.setPadding(0,top,0,0);return insets;});
+  LinearLayout page=new LinearLayout(this);page.setOrientation(1);page.setBackgroundColor(Color.rgb(246,248,251));setContentView(page);page.setOnApplyWindowInsetsListener((v,insets)->{int top=android.os.Build.VERSION.SDK_INT>=30?insets.getInsets(android.view.WindowInsets.Type.statusBars()).top:insets.getSystemWindowInsetTop();v.setPadding(0,top,0,0);return insets;});
   TextView heading=new TextView(this);heading.setText("Tender Radar");heading.setTextSize(26);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(Color.rgb(35,38,43));heading.setPadding(dp(20),dp(18),dp(20),dp(6));page.addView(heading);
   TextView note=new TextView(this);note.setText("Discover industrial tenders • GeM");note.setTextColor(Color.rgb(108,110,116));note.setPadding(dp(20),0,dp(20),dp(16));page.addView(note);
   LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.HORIZONTAL);controls.setVisibility(View.GONE);page.addView(controls);
@@ -107,11 +107,11 @@ public class GemBrowserActivity extends Activity {
   Button review=button("Tender dashboard");captureRow.addView(review,new LinearLayout.LayoutParams(0,dp(52),2));review.setOnClickListener(v->toggleDashboard());
   autoButton=button("Auto collect all pages");autoButton.setVisibility(View.GONE);page.addView(autoButton,new LinearLayout.LayoutParams(-1,dp(48)));
   autoButton.setOnClickListener(v->{if(autoCollecting){batchRunning=false;stopAutoCollect("Stopped by user.");}else startAutoCollect();});
-  batchButton=button("Find tenders");batchButton.setTextSize(17);batchButton.setTypeface(null,Typeface.BOLD);batchButton.setTextColor(Color.rgb(30,37,41));batchButton.setBackground(rounded(Color.rgb(255,132,17),22,Color.rgb(255,132,17)));page.addView(batchButton,new LinearLayout.LayoutParams(-1,dp(54)));
-  batchButton.setOnClickListener(v->{if(batchRunning){batchRunning=false;stopAutoCollect("Batch stopped.");batchButton.setText("Find tenders");}else startBatch();});
-  scanProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);scanProgress.setMax(batchTerms.length);scanProgress.setProgress(0);scanProgress.setIndeterminate(false);page.addView(scanProgress,new LinearLayout.LayoutParams(-1,dp(5)));
-  scanProgressLabel=new TextView(this);scanProgressLabel.setTextColor(Color.rgb(100,88,74));scanProgressLabel.setPadding(dp(12),dp(7),dp(12),dp(7));scanProgressLabel.setText("Ready to scan • Results will appear below");page.addView(scanProgressLabel);
-  collectedCount=new TextView(this);collectedCount.setTextColor(Color.rgb(166,88,24));collectedCount.setPadding(12,2,12,2);page.addView(collectedCount);
+  batchButton=button("Find tenders");batchButton.setTextSize(17);batchButton.setTypeface(null,Typeface.BOLD);batchButton.setTextColor(Color.WHITE);batchButton.setBackground(rounded(Color.rgb(30,43,65),18,Color.rgb(30,43,65)));page.addView(batchButton,new LinearLayout.LayoutParams(-1,dp(54)));
+  batchButton.setOnClickListener(v->{if(batchRunning){batchRunning=false;scanProgress.setIndeterminate(false);stopAutoCollect("Batch stopped.");batchButton.setText("Find tenders");}else startBatch();});
+  scanProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);scanProgress.setMax(batchTerms.length);scanProgress.setProgress(0);scanProgress.setIndeterminate(false);scanProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.rgb(0,164,171)));page.addView(scanProgress,new LinearLayout.LayoutParams(-1,dp(5)));
+  scanProgressLabel=new TextView(this);scanProgressLabel.setTextColor(Color.rgb(79,91,106));scanProgressLabel.setPadding(dp(12),dp(7),dp(12),dp(7));scanProgressLabel.setText("Ready to scan • Results will appear below");page.addView(scanProgressLabel);
+  collectedCount=new TextView(this);collectedCount.setTextColor(Color.rgb(0,127,137));collectedCount.setPadding(12,2,12,2);page.addView(collectedCount);
   restoreCollected();restoreAiReviews();openRouterKey=readStoredKey();updateCollectedCount();
   Button next=button("Next");findRow.addView(next);next.setOnClickListener(v->{
    state.setText("Looking for GeM next results page…");
@@ -126,11 +126,11 @@ public class GemBrowserActivity extends Activity {
     else state.setText("Next-page control not found. Use GeM pagination inside the webpage.");
    });
   });
-  state=new TextView(this);state.setTextColor(Color.rgb(124,104,86));state.setText("Opening GeM…");state.setPadding(16,5,16,5);page.addView(state);
+  state=new TextView(this);state.setTextColor(Color.rgb(79,91,106));state.setText("Opening GeM…");state.setPadding(16,5,16,5);page.addView(state);
   FrameLayout contentLayer=new FrameLayout(this);page.addView(contentLayer,new LinearLayout.LayoutParams(-1,0,1));
   browser=new WebView(this);contentLayer.addView(browser,new FrameLayout.LayoutParams(-1,-1));
-  dashboard=new ScrollView(this);dashboard.setFillViewport(true);dashboard.setVisibility(View.VISIBLE);showingDashboard=true;dashboard.setBackgroundColor(Color.rgb(250,247,244));contentLayer.addView(dashboard,new FrameLayout.LayoutParams(-1,-1));
-  dashboardList=new LinearLayout(this);dashboardList.setOrientation(1);dashboardList.setPadding(dp(12),dp(12),dp(12),dp(20));dashboardList.setBackgroundColor(Color.rgb(250,247,244));dashboard.addView(dashboardList);
+  dashboard=new ScrollView(this);dashboard.setFillViewport(true);dashboard.setVisibility(View.VISIBLE);showingDashboard=true;dashboard.setBackgroundColor(Color.rgb(246,248,251));contentLayer.addView(dashboard,new FrameLayout.LayoutParams(-1,-1));
+  dashboardList=new LinearLayout(this);dashboardList.setOrientation(1);dashboardList.setPadding(dp(12),dp(12),dp(12),dp(20));dashboardList.setBackgroundColor(Color.rgb(246,248,251));dashboard.addView(dashboardList);
   WebSettings settings=browser.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);settings.setSupportZoom(true);settings.setBuiltInZoomControls(true);settings.setDisplayZoomControls(false);
   browser.setWebViewClient(new WebViewClient(){
    @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){
@@ -185,12 +185,12 @@ public class GemBrowserActivity extends Activity {
  }
  private void startBatch(){
   if(autoCollecting){state.setText("Stop the current collection first.");return;}
-  batchRunning=true;batchIndex=0;searchRetries=0;scanProgress.setProgress(0);scanProgressLabel.setText("Starting scan • 0 / "+batchTerms.length+" equipment groups");batchButton.setText("Stop scanning");nextBatch();
+  batchRunning=true;batchIndex=0;searchRetries=0;scanProgress.setIndeterminate(true);scanProgress.setProgress(0);scanProgressLabel.setText("Starting scan • 0 / "+batchTerms.length+" equipment groups");batchButton.setText("Stop scanning");nextBatch();
  }
  private void nextBatch(){
   if(!batchRunning)return;
   if(batchIndex>=batchTerms.length){
-   batchRunning=false;autoCollecting=false;autoButton.setText("Auto collect all pages");
+   batchRunning=false;autoCollecting=false;scanProgress.setIndeterminate(false);autoButton.setText("Auto collect all pages");
    batchButton.setText("Find tenders • Scan equipment categories");
    updateCollectedCount();if(scanProgress!=null){scanProgress.setProgress(batchTerms.length);scanProgressLabel.setText("Scan complete • "+collected.size()+" unique bids collected");}if(showingDashboard)renderDashboard();state.setText("Scan complete. Review matching tenders below.");return;
   }
@@ -295,7 +295,7 @@ public class GemBrowserActivity extends Activity {
  private void renderDashboard(){
   if(dashboardList==null)return;
   dashboardList.removeAllViews();
-  int white=Color.rgb(34,39,46),muted=Color.rgb(110,117,126),teal=Color.rgb(193,96,17);
+  int white=Color.rgb(34,39,46),muted=Color.rgb(110,117,126),teal=Color.rgb(0,127,137);
   dashboardList.addView(dashText("Matching tenders",23,white));
   ArrayList<JSONObject> open=new ArrayList<>();int expired=0,missing=0,analyzed=0;
   Date now=new Date();
@@ -321,14 +321,14 @@ public class GemBrowserActivity extends Activity {
    JSONObject ai=aiReviews.get(id);
    LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(10),dp(10),dp(10),dp(12));
    android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();
-   bg.setColor(Color.WHITE);bg.setCornerRadius(dp(22));bg.setStroke(dp(1),Color.rgb(236,229,221));card.setBackground(bg);
+   bg.setColor(Color.WHITE);bg.setCornerRadius(dp(22));bg.setStroke(dp(1),Color.rgb(223,231,238));card.setBackground(bg);
    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,dp(7),0,dp(7));dashboardList.addView(card,cp);
    card.addView(dashText(title,17,white));
    card.addView(dashText(id+"\n"+workCategory(title),13,teal));
    card.addView(dashText("Buyer: not captured from listing\nClosing: "+due+"\nPriority: "+qualificationLabel(bid)+" (title-based)\nAI: "+(ai==null?"Not reviewed":ai.optString("verdict","Needs review")+" • "+ai.optInt("score",0)+"/100 indicative"),13,muted));
    LinearLayout actions=new LinearLayout(this);actions.setOrientation(0);card.addView(actions);
    Button openBid=button("Open bid");actions.addView(openBid,new LinearLayout.LayoutParams(0,dp(48),1));openBid.setOnClickListener(v->showBidActions(bid));
-   Button analyze=button(ai==null?"AI review":"View AI");actions.addView(analyze,new LinearLayout.LayoutParams(0,dp(48),1));
+   Button analyze=button(ai==null?"Analyze tender":"View assessment");actions.addView(analyze,new LinearLayout.LayoutParams(0,dp(48),1));
    analyze.setOnClickListener(v->{if(ai==null)showAiDialog(bid);else showSavedReview(id);});
   }
  }
@@ -435,7 +435,7 @@ public class GemBrowserActivity extends Activity {
   String url=bid.optString("url","");
   Uri uri=Uri.parse(url);
   if(!safeGemDocument(uri)||url.equals(GEM)||url.contains("/all-bids")){
-   new android.app.AlertDialog.Builder(this).setTitle("No public bid document link").setMessage("This listing does not provide a usable bid detail URL. Open the bid in GeM to find its documents.").setPositiveButton("OK",null).show();return;
+   trigger.setEnabled(true);target.setHint("No public document URL detected for this bid. Import the PDF if needed.");return;
   }
   trigger.setEnabled(false);
   state.setText("Checking public bid page for PDF documents…");
@@ -459,11 +459,11 @@ public class GemBrowserActivity extends Activity {
     final String pdf=found;
     runOnUiThread(()->{
      trigger.setEnabled(true);
-     if(pdf.isEmpty()){new android.app.AlertDialog.Builder(this).setTitle("No public PDF found").setMessage("The GeM bid page did not expose a direct public PDF. Use Import tender PDF if the document is available through GeM.").setPositiveButton("OK",null).show();return;}
+     if(pdf.isEmpty()){target.setHint("GeM did not expose a public PDF. Import a document if available.");return;}
      try{JSONArray links=bid.optJSONArray("documentLinks");if(links==null){links=new JSONArray();bid.put("documentLinks",links);}links.put(pdf);}catch(Exception ignored){}
      loadPublicPdfInto(bid,target,trigger);
     });
-   }catch(Exception e){String error=e.getMessage();runOnUiThread(()->{trigger.setEnabled(true);new android.app.AlertDialog.Builder(this).setTitle("Document lookup unavailable").setMessage(error).setPositiveButton("OK",null).show();});}
+   }catch(Exception e){String error=e.getMessage();runOnUiThread(()->{trigger.setEnabled(true);target.setHint("Automatic document lookup unavailable: "+error+". Import a PDF if needed.");});}
    finally{if(conn!=null)conn.disconnect();}
   }).start();
  }
@@ -495,12 +495,12 @@ public class GemBrowserActivity extends Activity {
  }
  private void showAiDialog(JSONObject bid){
   LinearLayout layout=new LinearLayout(this);layout.setOrientation(1);layout.setPadding(dp(16),dp(8),dp(16),dp(8));
-  TextView explanation=new TextView(this);explanation.setText("Paste the tender scope or extracted document text. AI cannot verify a bid from its truncated title alone. OpenRouter key can be encrypted with Android Keystore and remembered on this device.");layout.addView(explanation);
+  TextView explanation=new TextView(this);explanation.setText("The app will try to retrieve the public GeM bid document automatically. Your OpenRouter key can be stored securely on this device. If GeM does not expose the document, manual import remains available.");layout.addView(explanation);
   EditText api=new EditText(this);api.setHint("OpenRouter API key");api.setSingleLine(true);api.setInputType(129);api.setText(openRouterKey);layout.addView(api);
   EditText model=new EditText(this);model.setHint("OpenRouter model");model.setSingleLine(true);model.setText(getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free"));layout.addView(model);
    CheckBox remember=new CheckBox(this);remember.setText("Remember API key securely on this device");remember.setChecked(getPreferences(0).getBoolean("remember_openrouter_key",false));layout.addView(remember);
    Button forget=button("Forget saved API key");layout.addView(forget);forget.setOnClickListener(v->{clearStoredKey();openRouterKey="";api.setText("");remember.setChecked(false);state.setText("Saved OpenRouter key removed.");});
-  EditText scope=new EditText(this);scope.setHint("Paste tender document / technical scope");scope.setMinLines(5);scope.setMaxLines(12);layout.addView(scope);
+  EditText scope=new EditText(this);scope.setHint("Tender text loads automatically when a public document is available");scope.setMinLines(5);scope.setMaxLines(12);layout.addView(scope);
   Button automatic=button("Auto-read available GeM tender PDF");layout.addView(automatic);automatic.setOnClickListener(v->loadPublicPdfInto(bid,scope,automatic));
   Button importPdf=button("Import tender PDF (no copying)");layout.addView(importPdf);
   importPdf.setOnClickListener(v->{pendingPdfScope=scope;Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT);pick.setType("application/pdf");pick.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(pick,PICK_TENDER_PDF);});
@@ -524,7 +524,7 @@ public class GemBrowserActivity extends Activity {
    }).start();
   });
   ScrollView scroll=new ScrollView(this);scroll.addView(layout);
-  JSONArray discovered=bid.optJSONArray("documentLinks");if(discovered!=null&&discovered.length()>0)loadPublicPdfInto(bid,scope,automatic);
+  loadPublicPdfInto(bid,scope,automatic);
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("AI technical review: "+bid.optString("bidId")).setView(scroll)
    .setNegativeButton("Cancel",null).setPositiveButton("Analyze",null).create();
   dialog.setOnShowListener(ignored->dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
