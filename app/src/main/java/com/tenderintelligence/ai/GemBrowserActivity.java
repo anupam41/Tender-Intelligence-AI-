@@ -36,6 +36,8 @@ public class GemBrowserActivity extends Activity {
  private final android.os.Handler autoHandler=new android.os.Handler(android.os.Looper.getMainLooper());
  private Button autoButton;
  private boolean batchRunning=false;
+ private boolean gemPageReady=false;
+ private int searchRetries=0;
  private int batchIndex=0;
  private String[] batchTerms={"Heat exchanger","Tube bundle","Retubing","Condenser","Oil cooler","Sample cooler","SWAS cooler","Pressure vessel","Economizer","Air preheater","LP heater","HP heater"};
  private Button batchButton;
@@ -125,9 +127,10 @@ public class GemBrowserActivity extends Activity {
    });
   });
   state=new TextView(this);state.setTextColor(Color.rgb(45,212,191));state.setText("Opening GeM…");state.setPadding(16,5,16,5);page.addView(state);
-  dashboard=new ScrollView(this);dashboard.setFillViewport(true);dashboard.setVisibility(View.GONE);page.addView(dashboard,new LinearLayout.LayoutParams(-1,0,1));
+  FrameLayout contentLayer=new FrameLayout(this);page.addView(contentLayer,new LinearLayout.LayoutParams(-1,0,1));
+  browser=new WebView(this);contentLayer.addView(browser,new FrameLayout.LayoutParams(-1,-1));
+  dashboard=new ScrollView(this);dashboard.setFillViewport(true);dashboard.setVisibility(View.VISIBLE);showingDashboard=true;dashboard.setBackgroundColor(Color.rgb(9,17,32));contentLayer.addView(dashboard,new FrameLayout.LayoutParams(-1,-1));
   dashboardList=new LinearLayout(this);dashboardList.setOrientation(1);dashboardList.setPadding(dp(12),dp(12),dp(12),dp(20));dashboardList.setBackgroundColor(Color.rgb(9,17,32));dashboard.addView(dashboardList);
-  browser=new WebView(this);browser.setVisibility(View.GONE);page.addView(browser,new LinearLayout.LayoutParams(-1,0,1));
   WebSettings settings=browser.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);settings.setSupportZoom(true);settings.setBuiltInZoomControls(true);settings.setDisplayZoomControls(false);
   browser.setWebViewClient(new WebViewClient(){
    @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){
@@ -135,7 +138,7 @@ public class GemBrowserActivity extends Activity {
     if("https".equalsIgnoreCase(url.getScheme())){startActivity(new Intent(Intent.ACTION_VIEW,url));return true;}
     return true;
    }
-   @Override public void onPageFinished(WebView view,String url){state.setText("Enter a keyword in GeM or select one above, then tap Search.");}
+   @Override public void onPageFinished(WebView view,String url){gemPageReady=true;if(!batchRunning)state.setText("GeM loaded. Tap Find tenders to scan.");}
    @Override public void onReceivedError(WebView view,WebResourceRequest req,WebResourceError error){if(req.isForMainFrame())state.setText("Unable to load GeM in WebView. Try opening in your browser.");}
   });
   browser.setDownloadListener((url,userAgent,disposition,mime,length)->{Uri uri=Uri.parse(url);if(safe(uri))startActivity(new Intent(Intent.ACTION_VIEW,uri));else state.setText("Download blocked: external URL");});
@@ -182,15 +185,16 @@ public class GemBrowserActivity extends Activity {
  }
  private void startBatch(){
   if(autoCollecting){state.setText("Stop the current collection first.");return;}
-  batchRunning=true;batchIndex=0;scanProgress.setProgress(0);scanProgressLabel.setText("Starting scan • 0 / "+batchTerms.length+" equipment groups");batchButton.setText("Stop scanning");nextBatch();
+  batchRunning=true;batchIndex=0;searchRetries=0;scanProgress.setProgress(0);scanProgressLabel.setText("Starting scan • 0 / "+batchTerms.length+" equipment groups");batchButton.setText("Stop scanning");nextBatch();
  }
  private void nextBatch(){
   if(!batchRunning)return;
   if(batchIndex>=batchTerms.length){
    batchRunning=false;autoCollecting=false;autoButton.setText("Auto collect all pages");
-   batchButton.setText("One-tap: search 12 equipment groups + collect");
+   batchButton.setText("Find tenders • Scan equipment categories");
    updateCollectedCount();if(scanProgress!=null){scanProgress.setProgress(batchTerms.length);scanProgressLabel.setText("Scan complete • "+collected.size()+" unique bids collected");}if(showingDashboard)renderDashboard();state.setText("Scan complete. Review matching tenders below.");return;
   }
+  if(!gemPageReady){state.setText("Waiting for GeM listing page to load…");autoHandler.postDelayed(this::nextBatch,1200);return;}
   String keyword=batchTerms[batchIndex++];term.setText(keyword);if(scanProgress!=null){scanProgress.setProgress(batchIndex-1);scanProgressLabel.setText("Scanning "+batchIndex+" / "+batchTerms.length+" • "+keyword+" • "+collected.size()+" bids collected");}
   state.setText("Searching "+batchIndex+"/"+batchTerms.length+": "+keyword);
   String js="(function(){try{var inputs=Array.from(document.querySelectorAll('input')).filter(e=>{var r=e.getBoundingClientRect();return r.width>100&&r.height>0&&!e.disabled});"+
@@ -200,7 +204,8 @@ public class GemBrowserActivity extends Activity {
    "buttons.sort((a,b)=>Math.abs(a.getBoundingClientRect().left-r.right)-Math.abs(b.getBoundingClientRect().left-r.right));if(!buttons.length)return 'NO_BUTTON';el.blur();buttons[0].click();return 'OK';}catch(e){return 'ERROR'}})()";
   browser.evaluateJavascript(js,result->{
    if(!batchRunning)return;
-   if(!result.contains("OK")){state.setText("Could not submit GeM search for "+keyword+". Check webpage; batch stopped.");batchRunning=false;batchButton.setText("One-tap: search 12 equipment groups + collect");return;}
+   if(!result.contains("OK")){if(searchRetries++<4){batchIndex--;state.setText("Waiting for GeM search controls… retry "+searchRetries+"/4");autoHandler.postDelayed(this::nextBatch,1800);return;}state.setText("GeM search controls unavailable for "+keyword+". Portal may have changed or blocked loading.");batchRunning=false;batchButton.setText("Find tenders • Scan equipment categories");return;}
+   searchRetries=0;
    autoCollecting=true;autoPages=0;autoStalls=0;autoSignature="";
    autoButton.setText("Stop auto collection");
    autoHandler.postDelayed(this::autoStep,2600);
@@ -280,7 +285,7 @@ public class GemBrowserActivity extends Activity {
  private void toggleDashboard(){
   showingDashboard=!showingDashboard;
   dashboard.setVisibility(showingDashboard?View.VISIBLE:View.GONE);
-  browser.setVisibility(showingDashboard?View.GONE:View.VISIBLE);
+  browser.setVisibility(View.VISIBLE);
   if(showingDashboard)renderDashboard();
   state.setText(showingDashboard?"Dashboard: open tenders with title matches. Technical eligibility requires document review.":"GeM browser ready.");
  }
