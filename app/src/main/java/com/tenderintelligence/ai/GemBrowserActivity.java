@@ -421,6 +421,34 @@ public class GemBrowserActivity extends Activity {
   String host=uri==null?null:uri.getHost();
   return uri!=null&&"https".equalsIgnoreCase(uri.getScheme())&&host!=null&&(host.equals("gem.gov.in")||host.endsWith(".gem.gov.in"));
  }
+ private void discoverBidPdf(JSONObject bid,EditText target,Button trigger){
+  String bidUrl=bid.optString("url","");
+  Uri page=Uri.parse(bidUrl);
+  if(!safeGemDocument(page)||bidUrl.equals(GEM)||bidUrl.contains("/all-bids")){
+   new android.app.AlertDialog.Builder(this).setTitle("No public document URL").setMessage("GeM did not provide a public bid-detail URL in this listing. Open the bid in GeM and import its document if available.").setPositiveButton("OK",null).show();return;
+  }
+  trigger.setEnabled(false);state.setText("Checking public GeM bid details for documents…");
+  new Thread(()->{
+   HttpURLConnection conn=null;
+   try{
+    conn=(HttpURLConnection)new URL(bidUrl).openConnection();
+    conn.setConnectTimeout(12000);conn.setReadTimeout(16000);conn.setInstanceFollowRedirects(false);
+    conn.setRequestProperty("Accept","text/html");
+    if(conn.getResponseCode()!=200)throw new IOException("Bid detail returned HTTP "+conn.getResponseCode());
+    String type=conn.getContentType();
+    if(type==null||!type.toLowerCase(Locale.ROOT).contains("text/html"))throw new IOException("Bid details are not public HTML");
+    ByteArrayOutputStream data=new ByteArrayOutputStream();
+    try(InputStream in=conn.getInputStream()){byte[] buffer=new byte[4096];int n;while((n=in.read(buffer))!=-1){if(data.size()+n>1024*1024)break;data.write(buffer,0,n);}}
+    String html=data.toString("UTF-8").replace("&amp;","&");
+    java.util.regex.Matcher matcher=java.util.regex.Pattern.compile("(?:href|src)\\\\s*=\\\\s*['\\\"]([^'\\\"]+\\\\.pdf(?:\\\\?[^'\\\"]*)?)['\\\"]",java.util.regex.Pattern.CASE_INSENSITIVE).matcher(html);
+    String found="";
+    while(matcher.find()){Uri candidate=Uri.parse(bidUrl).buildUpon().build();String raw=matcher.group(1);URL resolved=new URL(new URL(bidUrl),raw);if(safeGemDocument(Uri.parse(resolved.toString()))){found=resolved.toString();break;}}
+    final String pdf=found;
+    runOnUiThread(()->{trigger.setEnabled(true);if(pdf.isEmpty()){new android.app.AlertDialog.Builder(this).setTitle("No public PDF on bid page").setMessage("The public bid page did not expose a direct PDF link. GeM may load documents dynamically or require a session. Use Import tender PDF for this bid.").setPositiveButton("OK",null).show();}else{try{JSONArray arr=bid.optJSONArray("documentLinks");if(arr==null){arr=new JSONArray();bid.put("documentLinks",arr);}arr.put(pdf);}catch(Exception ignored){}loadPublicPdfInto(bid,target,trigger);}});
+   }catch(Exception e){String error=e.getMessage();runOnUiThread(()->{trigger.setEnabled(true);new android.app.AlertDialog.Builder(this).setTitle("Bid document lookup unavailable").setMessage(error+"\\nYou can still import the tender PDF manually.").setPositiveButton("OK",null).show();});}
+   finally{if(conn!=null)conn.disconnect();}
+  }).start();
+ }
  private void loadPublicPdfInto(JSONObject bid,EditText target,Button trigger){
   JSONArray links=bid.optJSONArray("documentLinks");
   String link="";
