@@ -595,7 +595,7 @@ public class GemBrowserActivity extends Activity {
  }
  private void clearProviderKey(String provider){getPreferences(0).edit().remove(provider+"_iv").remove(provider+"_encrypted").apply();}
  private String callProvider(String provider,String token,String instructions,String prompt) throws Exception{
-  String model=provider.equals("gemini")?getPreferences(0).getString("gemini_model","gemini-2.5-flash"):provider.equals("groq")?getPreferences(0).getString("groq_model","llama-3.3-70b-versatile"):getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free");
+  String model=provider.equals("gemini")?getPreferences(0).getString("gemini_model","gemini-3.8-flash"):provider.equals("groq")?getPreferences(0).getString("groq_model","llama-3.3-70b-versatile"):getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free");
   String endpoint=provider.equals("gemini")?"https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent":provider.equals("groq")?"https://api.groq.com/openai/v1/chat/completions":"https://openrouter.ai/api/v1/chat/completions";
   HttpURLConnection conn=(HttpURLConnection)new URL(endpoint).openConnection();
   try{
@@ -665,9 +665,32 @@ public class GemBrowserActivity extends Activity {
   EditText gemini=new EditText(this);gemini.setHint("Google Gemini API key");gemini.setInputType(129);gemini.setSingleLine(true);gemini.setText(geminiKey);content.addView(gemini);
   EditText groq=new EditText(this);groq.setHint("Groq API key");groq.setInputType(129);groq.setSingleLine(true);groq.setText(groqKey);content.addView(groq);
 
-  EditText geminiModel=new EditText(this);geminiModel.setSingleLine(true);geminiModel.setHint("Gemini model");geminiModel.setText(getPreferences(0).getString("gemini_model","gemini-2.5-flash"));content.addView(geminiModel);
+  EditText geminiModel=new EditText(this);geminiModel.setSingleLine(true);geminiModel.setHint("Gemini model");geminiModel.setText(getPreferences(0).getString("gemini_model","gemini-3.8-flash"));content.addView(geminiModel);
   EditText groqModel=new EditText(this);groqModel.setSingleLine(true);groqModel.setHint("Groq model");groqModel.setText(getPreferences(0).getString("groq_model","llama-3.3-70b-versatile"));content.addView(groqModel);
   CheckBox rememberProviders=new CheckBox(this);rememberProviders.setText("Remember Gemini and Groq keys securely");rememberProviders.setChecked(getPreferences(0).getBoolean("remember_provider_keys",false));content.addView(rememberProviders);
+
+  Button listGroq=button("Find Groq models available to my key");content.addView(listGroq);
+  listGroq.setOnClickListener(v->{
+   String key=groq.getText().toString().trim();if(key.isEmpty()){groq.setError("Enter Groq key first");return;}
+   listGroq.setEnabled(false);connection.setText("Checking available Groq models…");
+   new Thread(()->{
+    String message;
+    HttpURLConnection c=null;
+    try{
+     c=(HttpURLConnection)new URL("https://api.groq.com/openai/v1/models").openConnection();
+     c.setConnectTimeout(15000);c.setReadTimeout(20000);c.setRequestProperty("Authorization","Bearer "+key);
+     int code=c.getResponseCode();if(code!=200)throw new IOException("Groq model list HTTP "+code);
+     ByteArrayOutputStream out=new ByteArrayOutputStream();
+     try(InputStream in=c.getInputStream()){byte[] buf=new byte[4096];int n;while((n=in.read(buf))!=-1){if(out.size()+n>100000)break;out.write(buf,0,n);}}
+     JSONArray data=new JSONObject(out.toString("UTF-8")).getJSONArray("data");
+     ArrayList<String> models=new ArrayList<>();
+     for(int i=0;i<data.length();i++){String id=data.getJSONObject(i).optString("id");if(!id.isEmpty()&&!id.contains("whisper")&&!id.contains("tts")&&!id.contains("guard"))models.add(id);}
+     Collections.sort(models);message=models.isEmpty()?"No chat models listed":android.text.TextUtils.join("\n",models);
+    }catch(Exception e){message="Could not list Groq models: "+e.getMessage();}
+    finally{if(c!=null)c.disconnect();}
+    String result=message;runOnUiThread(()->{listGroq.setEnabled(true);new android.app.AlertDialog.Builder(this).setTitle("Available Groq models").setMessage(result).setPositiveButton("OK",null).show();});
+   }).start();
+  });
   Button testProviders=button("Test Gemini / Groq connections");content.addView(testProviders);
   testProviders.setOnClickListener(v->{
    String g=gemini.getText().toString().trim(),q=groq.getText().toString().trim();
