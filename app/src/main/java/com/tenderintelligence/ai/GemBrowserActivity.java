@@ -15,6 +15,14 @@ import java.util.*;
 import java.net.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
+import java.security.KeyStore;
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+import android.util.Base64;
 
 /** User-driven browser for public GeM bid listings. Does not scrape or bypass access controls. */
 public class GemBrowserActivity extends Activity {
@@ -29,6 +37,7 @@ public class GemBrowserActivity extends Activity {
  private final LinkedHashMap<String,JSONObject> collected=new LinkedHashMap<>();
  private TextView collectedCount;
  private String openRouterKey="";
+ private static final String KEY_ALIAS="TenderIntelligenceOpenRouterKey";
  private EditText pendingPdfScope;
  private final LinkedHashMap<String,JSONObject> aiReviews=new LinkedHashMap<>();
  private static final int PICK_TENDER_PDF=4207;
@@ -87,7 +96,7 @@ public class GemBrowserActivity extends Activity {
   autoButton=button("Auto collect all pages");page.addView(autoButton,new LinearLayout.LayoutParams(-1,dp(48)));
   autoButton.setOnClickListener(v->{if(autoCollecting)stopAutoCollect("Stopped by user.");else startAutoCollect();});
   collectedCount=new TextView(this);collectedCount.setTextColor(Color.rgb(45,212,191));collectedCount.setPadding(12,2,12,2);page.addView(collectedCount);
-  restoreCollected();restoreAiReviews();updateCollectedCount();
+  restoreCollected();restoreAiReviews();openRouterKey=readStoredKey();updateCollectedCount();
   Button next=button("Next");findRow.addView(next);next.setOnClickListener(v->{
    state.setText("Looking for GeM next results page…");
    String js="(function(){"+
@@ -256,9 +265,33 @@ public class GemBrowserActivity extends Activity {
   ScrollView scroll=new ScrollView(this);scroll.addView(content);
   new android.app.AlertDialog.Builder(this).setTitle("AI review • "+id).setView(scroll).setPositiveButton("Close",null).show();
  }
+ private SecretKey deviceSecret() throws Exception{
+  KeyStore store=KeyStore.getInstance("AndroidKeyStore");store.load(null);
+  if(store.containsAlias(KEY_ALIAS))return ((KeyStore.SecretKeyEntry)store.getEntry(KEY_ALIAS,null)).getSecretKey();
+  KeyGenerator generator=KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES,"AndroidKeyStore");
+  generator.init(new KeyGenParameterSpec.Builder(KEY_ALIAS,KeyProperties.PURPOSE_ENCRYPT|KeyProperties.PURPOSE_DECRYPT).setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).setKeySize(256).build());
+  return generator.generateKey();
+ }
+ private void storeKey(String value) throws Exception{
+  Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");cipher.init(Cipher.ENCRYPT_MODE,deviceSecret());
+  byte[] encrypted=cipher.doFinal(value.getBytes(StandardCharsets.UTF_8));
+  getPreferences(0).edit().putString("openrouter_key_iv",Base64.encodeToString(cipher.getIV(),Base64.NO_WRAP)).putString("openrouter_key_cipher",Base64.encodeToString(encrypted,Base64.NO_WRAP)).putBoolean("remember_openrouter_key",true).commit();
+ }
+ private String readStoredKey(){
+  String iv=getPreferences(0).getString("openrouter_key_iv",""),ciphertext=getPreferences(0).getString("openrouter_key_cipher","");
+  if(iv.isEmpty()||ciphertext.isEmpty())return "";
+  try{
+   Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");cipher.init(Cipher.DECRYPT_MODE,deviceSecret(),new GCMParameterSpec(128,Base64.decode(iv,Base64.NO_WRAP)));
+   return new String(cipher.doFinal(Base64.decode(ciphertext,Base64.NO_WRAP)),StandardCharsets.UTF_8);
+  }catch(Exception e){clearStoredKey();return "";}
+ }
+ private void clearStoredKey(){
+  getPreferences(0).edit().remove("openrouter_key_iv").remove("openrouter_key_cipher").putBoolean("remember_openrouter_key",false).commit();
+  try{KeyStore store=KeyStore.getInstance("AndroidKeyStore");store.load(null);if(store.containsAlias(KEY_ALIAS))store.deleteEntry(KEY_ALIAS);}catch(Exception ignored){}
+ }
  private void showAiDialog(JSONObject bid){
   LinearLayout layout=new LinearLayout(this);layout.setOrientation(1);layout.setPadding(dp(16),dp(8),dp(16),dp(8));
-  TextView explanation=new TextView(this);explanation.setText("Paste the tender scope or extracted document text. AI cannot verify a bid from its truncated title alone. OpenRouter key stays in memory.");layout.addView(explanation);
+  TextView explanation=new TextView(this);explanation.setText("Paste the tender scope or extracted document text. AI cannot verify a bid from its truncated title alone. OpenRouter key can be encrypted with Android Keystore and remembered on this device.");layout.addView(explanation);
   EditText api=new EditText(this);api.setHint("OpenRouter API key");api.setSingleLine(true);api.setInputType(129);api.setText(openRouterKey);layout.addView(api);
   EditText model=new EditText(this);model.setHint("OpenRouter model");model.setSingleLine(true);model.setText("openai/gpt-4o-mini");layout.addView(model);
   EditText scope=new EditText(this);scope.setHint("Paste tender document / technical scope");scope.setMinLines(5);scope.setMaxLines(12);layout.addView(scope);
@@ -292,6 +325,8 @@ public class GemBrowserActivity extends Activity {
     if(token.isEmpty()){api.setError("Enter OpenRouter API key");api.requestFocus();return;}
     if(modelId.isEmpty()){model.setError("Enter model ID");model.requestFocus();return;}
     if(document.length()<80){scope.setError("Paste at least 80 characters of actual tender scope");scope.requestFocus();return;}
+    try{if(remember.isChecked())storeKey(token);else clearStoredKey();}catch(Exception e){new android.app.AlertDialog.Builder(this).setTitle("Could not securely save key").setMessage("Android Keystore failed. The key has not been saved. "+e.getClass().getSimpleName()).setPositiveButton("OK",null).show();return;}
+    getPreferences(0).edit().putString("openrouter_model",modelId).apply();
     dialog.dismiss();
     state.setText("Analyzing tender scope with OpenRouter…");
     android.app.AlertDialog progress=new android.app.AlertDialog.Builder(this).setTitle("Analyzing tender").setMessage("Contacting OpenRouter. This can take up to a minute.").setCancelable(false).create();progress.show();
