@@ -514,7 +514,7 @@ public class GemBrowserActivity extends Activity {
  }
  private void clearStoredKey(){
   getPreferences(0).edit().remove("openrouter_key_iv").remove("openrouter_key_cipher").putBoolean("remember_openrouter_key",false).commit();
-  try{KeyStore store=KeyStore.getInstance("AndroidKeyStore");store.load(null);if(store.containsAlias(KEY_ALIAS))store.deleteEntry(KEY_ALIAS);}catch(Exception ignored){}
+  // Keep shared Android Keystore alias while Gemini or Groq keys may still use it.
  }
  private boolean safeGemDocument(Uri uri){
   String host=uri==null?null:uri.getHost();
