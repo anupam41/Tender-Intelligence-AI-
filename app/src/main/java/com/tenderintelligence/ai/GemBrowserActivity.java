@@ -25,6 +25,7 @@ public class GemBrowserActivity extends Activity {
  private TextView collectedCount;
  private String openRouterKey="";
  private EditText pendingPdfScope;
+ private final LinkedHashMap<String,JSONObject> aiReviews=new LinkedHashMap<>();
  private static final int PICK_TENDER_PDF=4207;
  private static final String GEM="https://bidplus.gem.gov.in/all-bids";
  private boolean safe(Uri uri){
@@ -79,7 +80,7 @@ public class GemBrowserActivity extends Activity {
   Button collect=button("Collect visible bids");captureRow.addView(collect,new LinearLayout.LayoutParams(0,dp(52),2));collect.setOnClickListener(v->collectVisible());
   Button review=button("Review shortlist");captureRow.addView(review,new LinearLayout.LayoutParams(0,dp(52),2));review.setOnClickListener(v->reviewCollected());
   collectedCount=new TextView(this);collectedCount.setTextColor(Color.rgb(45,212,191));collectedCount.setPadding(12,2,12,2);page.addView(collectedCount);
-  restoreCollected();updateCollectedCount();
+  restoreCollected();restoreAiReviews();updateCollectedCount();
   Button next=button("Next");findRow.addView(next);next.setOnClickListener(v->{
    state.setText("Looking for GeM next results page…");
    String js="(function(){"+
@@ -164,10 +165,10 @@ public class GemBrowserActivity extends Activity {
    matches.add(j);
   }
   LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(14),dp(8),dp(14),dp(8));
-  TextView summary=new TextView(this);summary.setText("Open-date keyword candidates: "+matches.size()+" / "+collected.size()+" collected\nExpired candidates hidden: "+expired+" • Dates missing: "+unverified+"\nAI document analysis not yet performed.");summary.setTextColor(Color.DKGRAY);summary.setPadding(0,0,0,dp(12));content.addView(summary);
+  TextView summary=new TextView(this);summary.setText("Open-date keyword candidates: "+matches.size()+" / "+collected.size()+" collected\nExpired candidates hidden: "+expired+" • Dates missing: "+unverified+"\nSaved AI assessments: "+aiReviews.size()+" (document-based, not independently verified).");summary.setTextColor(Color.DKGRAY);summary.setPadding(0,0,0,dp(12));content.addView(summary);
   for(JSONObject j:matches){
    String id=j.optString("bidId");
-   TextView card=new TextView(this);card.setText(id+"\n"+j.optString("title")+"\nCloses: "+j.optString("deadlineText")+"\nTap to open GeM bid");card.setTextColor(Color.rgb(0,86,120));card.setTextSize(15);card.setPadding(dp(10),dp(12),dp(10),dp(12));content.addView(card);
+   TextView card=new TextView(this);JSONObject review=aiReviews.get(id);card.setText(id+"\n"+j.optString("title")+"\nCloses: "+j.optString("deadlineText")+(review==null?"\nAI: Not analyzed":"\nAI: "+review.optString("verdict","Needs review")+" • "+review.optInt("score",0)+"/100")+"\nTap for bid options");card.setTextColor(Color.rgb(0,86,120));card.setTextSize(15);card.setPadding(dp(10),dp(12),dp(10),dp(12));content.addView(card);
    card.setOnClickListener(v->showBidActions(j));
    View divider=new View(this);divider.setBackgroundColor(Color.LTGRAY);content.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));
   }
@@ -179,10 +180,34 @@ public class GemBrowserActivity extends Activity {
  }
  private void showBidActions(JSONObject bid){
   String id=bid.optString("bidId");
-  new android.app.AlertDialog.Builder(this).setTitle(id).setItems(new String[]{"Open GeM bid","Analyze tender text with OpenRouter AI"},(d,which)->{
+  new android.app.AlertDialog.Builder(this).setTitle(id).setItems(new String[]{"Open GeM bid","Analyze tender text with OpenRouter AI","View saved AI assessment"},(d,which)->{
    if(which==0){String url=bid.optString("url");Uri uri=Uri.parse(url);if(safe(uri)&&!GEM.equals(url))startActivity(new Intent(Intent.ACTION_VIEW,uri));else{browser.loadUrl(GEM);state.setText("GeM direct link unavailable. Search bid ID: "+id);}}
-   else showAiDialog(bid);
+   else if(which==1)showAiDialog(bid);
+   else showSavedReview(id);
   }).setNegativeButton("Cancel",null).show();
+ }
+ private void restoreAiReviews(){
+  try{JSONArray a=new JSONArray(getPreferences(0).getString("gem_ai_reviews","[]"));for(int i=0;i<a.length();i++){JSONObject j=a.optJSONObject(i);if(j!=null&&!j.optString("bidId").isEmpty())aiReviews.put(j.optString("bidId"),j);}}catch(Exception ignored){}
+ }
+ private void saveAiReview(JSONObject bid,String response,String modelId){
+  String lower=response.toLowerCase(Locale.ROOT);
+  String verdict="Needs review";
+  java.util.regex.Matcher matcher=java.util.regex.Pattern.compile("(?i)verdict[^\\\\n]{0,50}?(not relevant|irrelevant|unclear|needs review|relevant)").matcher(response);
+  if(matcher.find()){String v=matcher.group(1).toLowerCase(Locale.ROOT);verdict=v.equals("relevant")?"Relevant":v.equals("not relevant")||v.equals("irrelevant")?"Not relevant":"Needs review";}
+  int score=verdict.equals("Relevant")?80:verdict.equals("Not relevant")?10:50;
+  try{JSONObject j=new JSONObject().put("bidId",bid.optString("bidId")).put("verdict",verdict).put("score",score).put("report",response).put("model",modelId).put("reviewedAt",System.currentTimeMillis()).put("source","User-provided document text; not independently verified");aiReviews.put(bid.optString("bidId"),j);
+   JSONArray a=new JSONArray();for(JSONObject item:aiReviews.values())a.put(item);getPreferences(0).edit().putString("gem_ai_reviews",a.toString()).apply();
+  }catch(Exception e){state.setText("Assessment displayed but could not be saved");}
+ }
+ private void showSavedReview(String id){
+  JSONObject j=aiReviews.get(id);if(j==null){new android.app.AlertDialog.Builder(this).setMessage("No AI assessment saved for this bid yet.").setPositiveButton("OK",null).show();return;}
+  LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(18),dp(12),dp(18),dp(12));
+  TextView verdict=new TextView(this);verdict.setText(j.optString("verdict")+" • "+j.optInt("score")+"/100 (indicative)");verdict.setTextSize(20);verdict.setTypeface(null,Typeface.BOLD);verdict.setTextColor(j.optString("verdict").equals("Relevant")?Color.rgb(0,110,88):Color.rgb(120,82,20));content.addView(verdict);
+  TextView caution=new TextView(this);caution.setText("AI-generated assessment • Not independently verified • Score derived from verdict, not calibrated probability");caution.setTextSize(12);caution.setPadding(0,dp(8),0,dp(12));content.addView(caution);
+  String report=j.optString("report").replaceAll("(?m)^#{1,6}\\\\s*","").replace("**","").replace("__","");
+  TextView body=new TextView(this);body.setText(report);body.setTextSize(15);body.setTextColor(Color.DKGRAY);body.setTextIsSelectable(true);content.addView(body);
+  ScrollView scroll=new ScrollView(this);scroll.addView(content);
+  new android.app.AlertDialog.Builder(this).setTitle("AI review • "+id).setView(scroll).setPositiveButton("Close",null).show();
  }
  private void showAiDialog(JSONObject bid){
   LinearLayout layout=new LinearLayout(this);layout.setOrientation(1);layout.setPadding(dp(16),dp(8),dp(16),dp(8));
@@ -237,7 +262,7 @@ public class GemBrowserActivity extends Activity {
       ByteArrayOutputStream output=new ByteArrayOutputStream();try(InputStream in=conn.getInputStream()){byte[] buf=new byte[4096];int n;while((n=in.read(buf))!=-1){if(output.size()+n>200000)throw new IOException("Response too large");output.write(buf,0,n);}}
       conn.disconnect();
       String response=new JSONObject(output.toString("UTF-8")).getJSONArray("choices").getJSONObject(0).getJSONObject("message").optString("content","No analysis returned");
-      runOnUiThread(()->{progress.dismiss();state.setText("AI review completed for "+bid.optString("bidId"));new android.app.AlertDialog.Builder(this).setTitle("AI assessment (not verified)").setMessage(response).setPositiveButton("Close",null).show();});
+      runOnUiThread(()->{progress.dismiss();saveAiReview(bid,response,modelId);state.setText("AI review saved for "+bid.optString("bidId"));showSavedReview(bid.optString("bidId"));});
      }catch(Exception e){runOnUiThread(()->{progress.dismiss();state.setText("AI review failed: "+e.getMessage());new android.app.AlertDialog.Builder(this).setTitle("OpenRouter analysis failed").setMessage(e.getMessage()+"\nCheck model availability, API key and internet connection.").setPositiveButton("OK",null).show();});}
     }).start();
    }));
