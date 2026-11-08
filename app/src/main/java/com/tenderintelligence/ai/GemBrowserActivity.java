@@ -297,6 +297,7 @@ public class GemBrowserActivity extends Activity {
  private final java.util.HashSet<String> analyzingBids=new java.util.HashSet<>();
  private final java.util.HashSet<String> failedAutoReviews=new java.util.HashSet<>();
  private boolean autoReviewActive=false;
+ private String currentReviewId="";
  private final Runnable autoReviewTask=()->{
   if(autoReviewActive||openRouterKey==null||openRouterKey.trim().isEmpty()||!showingDashboard)return;
   for(JSONObject bid:collected.values()){
@@ -304,11 +305,11 @@ public class GemBrowserActivity extends Activity {
    if(!relevantTitle(bid.optString("title"))||aiReviews.containsKey(id)||analyzingBids.contains(id)||failedAutoReviews.contains(id))continue;
    Date due=parsedDeadline(bid.optString("deadlineText"));
    if(due==null||!due.after(new Date()))continue;
-   autoReviewActive=true;analyzeInline(bid);return;
+   autoReviewActive=true;currentReviewId=id;analyzeInline(bid);return;
   }
  };
  private void scheduleAutoReview(){autoHandler.removeCallbacks(autoReviewTask);autoHandler.postDelayed(autoReviewTask,900);}
- private void finishAutoReview(){autoReviewActive=false;scheduleAutoReview();}
+ private void finishAutoReview(){autoReviewActive=false;currentReviewId="";scheduleAutoReview();}
  private void analyzeInline(JSONObject bid){
   String id=bid.optString("bidId");
   if(analyzingBids.contains(id))return;
@@ -345,7 +346,7 @@ public class GemBrowserActivity extends Activity {
     }).start();
    }
   });
-  Button trigger=button("Loading");
+  Button trigger=button("Loading");trigger.setTag("auto_review");
   state.setText("Reading GeM document for "+id+"…");
   loadPublicPdfInto(bid,extracted,trigger);
   autoHandler.postDelayed(()->{
@@ -354,6 +355,14 @@ public class GemBrowserActivity extends Activity {
     state.setText("Public PDF not available for "+id+". Manual import may be needed.");
    }
   },45000);
+ }
+ private void onAutoDocumentFailure(JSONObject bid,String reason){
+  String id=bid.optString("bidId");
+  if(!analyzingBids.remove(id))return;
+  failedAutoReviews.add(id);
+  state.setText(reason+" • "+id+" skipped; continuing queue.");
+  renderDashboard();
+  finishAutoReview();
  }
  private void renderDashboard(){
   if(dashboardList==null)return;
@@ -375,7 +384,7 @@ public class GemBrowserActivity extends Activity {
    Date ad=parsedDeadline(a.optString("deadlineText")),bd=parsedDeadline(b.optString("deadlineText"));
    return ad==null||bd==null?0:ad.compareTo(bd);
   });
-  dashboardList.addView(dashText(open.size()+" matches   •   "+analyzed+" reviewed   •   "+Math.max(0,open.size()-analyzed)+" pending",15,teal));
+  dashboardList.addView(dashText(open.size()+" matches   •   "+analyzed+" reviewed   •   "+analyzingBids.size()+" analyzing   •   "+Math.max(0,open.size()-analyzed-analyzingBids.size()-failedAutoReviews.size())+" waiting",15,teal));
   dashboardList.addView(dashText(expired+" expired hidden • "+missing+" missing dates hidden\nTitle matching is preliminary; verify bid documents and GeM dates.",12,muted));
 
   if(open.isEmpty())dashboardList.addView(dashText("No open matching tenders found. Run a GeM search and collect results.",15,white));
@@ -389,7 +398,7 @@ public class GemBrowserActivity extends Activity {
    card.addView(dashText(title,18,white));
    if(analyzingBids.contains(id)){ProgressBar spinner=new ProgressBar(this);spinner.setIndeterminate(true);spinner.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(teal));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(28),dp(28));sp.setMargins(0,dp(4),0,dp(4));card.addView(spinner,sp);card.addView(dashText("Reading document / AI processing…",12,teal));}
    card.addView(dashText(id+"\n"+workCategory(title),13,teal));
-   card.addView(dashText("Closing  "+due+"\n"+(ai==null?(analyzingBids.contains(id)?"AI reviewing…":failedAutoReviews.contains(id)?"Document unavailable • Manual review needed":"Queued for automatic AI review"):ai.optString("verdict","Needs review")+" • AI assessment (indicative)"),13,muted));
+   card.addView(dashText("Closing  "+due+"\n"+(ai==null?(analyzingBids.contains(id)?"● Analyzing now":failedAutoReviews.contains(id)?"Document inaccessible • Manual PDF needed":openRouterKey.trim().isEmpty()?"AI not configured • Set up in Settings":"◷ Waiting in AI queue"):ai.optString("verdict","Needs review")+" • AI assessment (indicative)"),13,muted));
    LinearLayout actions=new LinearLayout(this);actions.setOrientation(0);card.addView(actions);
    Button openBid=button("View PDF");openBid.setTextColor(Color.rgb(38,91,91));openBid.setBackground(glass(0xffeaf6f4,18));LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(0,dp(48),1);openLp.setMargins(0,0,dp(6),0);actions.addView(openBid,openLp);openBid.setOnClickListener(v->openBidPdf(bid));
    Button analyze=button(analyzingBids.contains(id)?"Analyzing…":ai==null?(failedAutoReviews.contains(id)?"Retry AI review":"AI pending…"):ai.optInt("score",0)+"% • Summary");analyze.setTextColor(Color.WHITE);analyze.setTypeface(null,Typeface.BOLD);analyze.setBackground(rounded(Color.rgb(0,164,146),18,Color.rgb(0,164,146)));LinearLayout.LayoutParams analyzeLp=new LinearLayout.LayoutParams(0,dp(48),1);analyzeLp.setMargins(dp(6),0,0,0);actions.addView(analyze,analyzeLp);
@@ -525,11 +534,11 @@ public class GemBrowserActivity extends Activity {
     final String pdf=found;
     runOnUiThread(()->{
      trigger.setEnabled(true);
-     if(pdf.isEmpty()){target.setHint("GeM did not expose a public PDF. Import a document if available.");return;}
+     if(pdf.isEmpty()){target.setHint("GeM did not expose a public PDF. Import a document if available.");if("auto_review".equals(trigger.getTag()))onAutoDocumentFailure(bid,"No public PDF found");return;}
      try{JSONArray links=bid.optJSONArray("documentLinks");if(links==null){links=new JSONArray();bid.put("documentLinks",links);}links.put(pdf);}catch(Exception ignored){}
      loadPublicPdfInto(bid,target,trigger);
     });
-   }catch(Exception e){String error=e.getMessage();runOnUiThread(()->{trigger.setEnabled(true);target.setHint("Automatic document lookup unavailable: "+error+". Import a PDF if needed.");});}
+   }catch(Exception e){String error=e.getMessage();runOnUiThread(()->{trigger.setEnabled(true);target.setHint("Automatic document lookup unavailable: "+error+". Import a PDF if needed.");if("auto_review".equals(trigger.getTag()))onAutoDocumentFailure(bid,"GeM document lookup blocked");});}
    finally{if(conn!=null)conn.disconnect();}
   }).start();
  }
