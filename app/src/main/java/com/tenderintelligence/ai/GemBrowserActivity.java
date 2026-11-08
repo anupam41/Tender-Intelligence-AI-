@@ -112,19 +112,20 @@ public class GemBrowserActivity extends Activity {
  }
  private void collectVisible(){
   state.setText("Reading visible GeM listing cards…");
-  String js="(function(){try{var found=[];var seen={};"+
-   "var nodes=Array.from(document.querySelectorAll('div,article,li')).filter(e=>e.children.length>0&&e.innerText&&/BID\\s*NO\\.?\\s*:/i.test(e.innerText));"+
-   "for(var el of nodes){var text=el.innerText||'';if(text.length>2500||text.length<30)continue;"+
-   "var match=text.match(/GEM\\/20\\d{2}\\/B\\/\\d+/i);if(!match||seen[match[0]])continue;seen[match[0]]=true;"+
-   "var link=Array.from(el.querySelectorAll('a[href]')).find(a=>(a.textContent||'').includes(match[0]));"+
-   "var item=text.match(/Items?\\s*:\\s*([^\\n]+)/i);var end=text.match(/End Date\\s*:\\s*([^\\n]+)/i);"+
-   "found.push({bidId:match[0],title:item?item[1].trim():'GeM bid',deadlineText:end?end[1].trim():'',url:link?link.href:'',source:'GeM visible listing'});"+
-   "if(found.length>=50)break;}return JSON.stringify(found);}catch(e){return JSON.stringify({error:e.message})}})()";
+  String js="(function(){try{var found=[],seen={};"+
+   "var ids=Array.from(document.querySelectorAll('a,span,strong,b,div')).filter(e=>e.children.length<3&&/GEM\\\\/20\\\\d{2}\\\\/B\\\\/\\\\d+/i.test(e.textContent||''));"+
+   "for(var node of ids){var match=(node.textContent||'').match(/GEM\\\\/20\\\\d{2}\\\\/B\\\\/\\\\d+/i);if(!match||seen[match[0]])continue;"+
+   "var card=node;for(var n=0;n<7&&card.parentElement;n++){var t=card.innerText||'';if(/End Date\\\\s*:/i.test(t)&&/Items?\\\\s*:/i.test(t)&&t.length<3500)break;card=card.parentElement;}"+
+   "var text=card.innerText||'';if(text.length>6000)continue;"+
+   "var item=text.match(/Items?\\\\s*:\\\\s*([^\\\\n]+)/i),end=text.match(/End Date\\\\s*:\\\\s*([^\\\\n]+)/i);"+
+   "var anchor=node.closest('a[href]')||Array.from(card.querySelectorAll('a[href]')).find(a=>(a.textContent||'').includes(match[0]));"+
+   "seen[match[0]]=true;found.push({bidId:match[0],title:item?item[1].trim():'GeM bid',deadlineText:end?end[1].trim():'',url:anchor?anchor.href:'',source:'GeM visible listing'});if(found.length>=100)break;}"+
+   "return JSON.stringify({items:found,matchedNodes:ids.length});}catch(e){return JSON.stringify({error:e.message})}})()";
   browser.evaluateJavascript(js,result->{
    try{
     String decoded=new JSONArray("["+result+"]").getString(0);
-    if(decoded.startsWith("{")){state.setText("Could not read GeM cards: "+decoded);return;}
-    JSONArray items=new JSONArray(decoded);int added=0;
+    JSONObject payload=new JSONObject(decoded);if(payload.has("error")){state.setText("GeM collection error: "+payload.optString("error"));return;}
+    JSONArray items=payload.optJSONArray("items");if(items==null)throw new Exception("Missing items");int added=0;
     for(int i=0;i<items.length();i++){
      JSONObject j=items.optJSONObject(i);if(j==null)continue;String id=j.optString("bidId");
      if(!id.matches("GEM/20\\d{2}/B/\\d+"))continue;
@@ -132,7 +133,7 @@ public class GemBrowserActivity extends Activity {
      if(!collected.containsKey(id)){collected.put(id,j);added++;}
     }
     persistCollected();updateCollectedCount();
-    state.setText("Collected "+added+" new bids from this page ("+items.length()+" detected). Tap Next, then Collect again.");
+    state.setText("Detected "+items.length()+" GeM bid IDs; saved "+added+" new bids. "+(items.length()==0?"No bid IDs detected in page DOM. Scroll to results and retry.":"Tap Next and collect again."));
    }catch(Exception e){state.setText("Could not parse bid cards. GeM page format may have changed.");}
   });
  }
