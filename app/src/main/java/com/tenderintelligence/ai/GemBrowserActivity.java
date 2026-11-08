@@ -61,9 +61,9 @@ public class GemBrowserActivity extends Activity {
   super.onCreate(bundle);
   getWindow().setStatusBarColor(Color.rgb(244,250,247));getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
   LinearLayout page=new LinearLayout(this);page.setOrientation(1);page.setBackgroundColor(Color.rgb(244,250,247));setContentView(page);page.setOnApplyWindowInsetsListener((v,insets)->{int top=android.os.Build.VERSION.SDK_INT>=30?insets.getInsets(android.view.WindowInsets.Type.statusBars()).top:insets.getSystemWindowInsetTop();v.setPadding(0,top,0,0);return insets;});
-  TextView heading=new TextView(this);heading.setText("Tender Radar");heading.setTextSize(26);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(Color.rgb(22,39,43));heading.setPadding(dp(20),dp(18),dp(20),dp(6));page.addView(heading);
-  TextView note=new TextView(this);note.setText("Discover industrial tenders • GeM");note.setTextColor(Color.rgb(101,120,125));note.setPadding(dp(20),0,dp(20),dp(16));page.addView(note);
-  Button aiSettingsButton=button("⚙ AI Settings");aiSettingsButton.setTextSize(14);aiSettingsButton.setTextColor(Color.rgb(25,93,92));aiSettingsButton.setBackground(glass(0xffe8f7f5,22));LinearLayout.LayoutParams settingsLp=new LinearLayout.LayoutParams(-1,dp(48));settingsLp.setMargins(dp(20),0,dp(20),dp(12));page.addView(aiSettingsButton,settingsLp);aiSettingsButton.setOnClickListener(v->showAiSettings());
+  TextView heading=new TextView(this);heading.setText("Tender Radar");heading.setTextSize(30);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(Color.rgb(22,39,43));heading.setPadding(dp(24),dp(18),dp(24),dp(4));page.addView(heading);
+  TextView note=new TextView(this);note.setText("Discover industrial tenders • GeM");note.setTextColor(Color.rgb(101,120,125));note.setPadding(dp(24),0,dp(24),dp(18));page.addView(note);
+  Button aiSettingsButton=button("⚙ AI Settings");aiSettingsButton.setTextSize(14);aiSettingsButton.setTextColor(Color.rgb(25,93,92));aiSettingsButton.setBackground(glass(0xffe8f7f5,28));aiSettingsButton.setElevation(dp(2));LinearLayout.LayoutParams settingsLp=new LinearLayout.LayoutParams(-1,dp(48));settingsLp.setMargins(dp(20),0,dp(20),dp(12));page.addView(aiSettingsButton,settingsLp);aiSettingsButton.setOnClickListener(v->showAiSettings());
   LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.HORIZONTAL);controls.setVisibility(View.GONE);page.addView(controls);
   Button back=button("Back");controls.addView(back,new LinearLayout.LayoutParams(0,40,1));back.setOnClickListener(v->{if(browser.canGoBack())browser.goBack();else finish();});
   Button home=button("GeM home");controls.addView(home,new LinearLayout.LayoutParams(0,40,1));home.setOnClickListener(v->browser.loadUrl(GEM));
@@ -108,11 +108,11 @@ public class GemBrowserActivity extends Activity {
   Button review=button("Tender dashboard");captureRow.addView(review,new LinearLayout.LayoutParams(0,dp(52),2));review.setOnClickListener(v->toggleDashboard());
   autoButton=button("Auto collect all pages");autoButton.setVisibility(View.GONE);page.addView(autoButton,new LinearLayout.LayoutParams(-1,dp(48)));
   autoButton.setOnClickListener(v->{if(autoCollecting){batchRunning=false;stopAutoCollect("Stopped by user.");}else startAutoCollect();});
-  batchButton=button("Find tenders");batchButton.setTextSize(17);batchButton.setTypeface(null,Typeface.BOLD);batchButton.setTextColor(Color.WHITE);batchButton.setBackground(rounded(Color.rgb(0,175,152),26,Color.rgb(0,175,152)));page.addView(batchButton,new LinearLayout.LayoutParams(-1,dp(54)));
+  batchButton=button("Find tenders");batchButton.setTextSize(17);batchButton.setTypeface(null,Typeface.BOLD);batchButton.setTextColor(Color.WHITE);batchButton.setBackground(rounded(Color.rgb(0,175,152),26,Color.rgb(0,175,152)));batchButton.setElevation(dp(3));LinearLayout.LayoutParams heroLp=new LinearLayout.LayoutParams(-1,dp(60));heroLp.setMargins(dp(20),0,dp(20),dp(12));page.addView(batchButton,heroLp);
   batchButton.setOnClickListener(v->{if(batchRunning){batchRunning=false;scanProgress.setIndeterminate(false);stopAutoCollect("Batch stopped.");batchButton.setText("Find tenders");}else startBatch();});
-  scanProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);scanProgress.setMax(batchTerms.length);scanProgress.setProgress(0);scanProgress.setIndeterminate(false);scanProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.rgb(0,175,152)));page.addView(scanProgress,new LinearLayout.LayoutParams(-1,dp(5)));
-  scanProgressLabel=new TextView(this);scanProgressLabel.setTextColor(Color.rgb(47,99,99));scanProgressLabel.setPadding(dp(12),dp(7),dp(12),dp(7));scanProgressLabel.setText("Ready to scan • Results will appear below");page.addView(scanProgressLabel);
-  collectedCount=new TextView(this);collectedCount.setTextColor(Color.rgb(0,129,115));collectedCount.setPadding(12,2,12,2);page.addView(collectedCount);
+  scanProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);scanProgress.setMax(batchTerms.length);scanProgress.setProgress(0);scanProgress.setIndeterminate(false);scanProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.rgb(0,175,152)));LinearLayout.LayoutParams progressLp=new LinearLayout.LayoutParams(-1,dp(5));progressLp.setMargins(dp(24),0,dp(24),0);page.addView(scanProgress,progressLp);
+  scanProgressLabel=new TextView(this);scanProgressLabel.setTextColor(Color.rgb(47,99,99));scanProgressLabel.setPadding(dp(24),dp(10),dp(24),dp(5));scanProgressLabel.setTextSize(13);scanProgressLabel.setText("Ready to scan • Results will appear below");page.addView(scanProgressLabel);
+  collectedCount=new TextView(this);collectedCount.setTextColor(Color.rgb(0,129,115));collectedCount.setPadding(dp(24),dp(4),dp(24),dp(4));collectedCount.setTextSize(13);page.addView(collectedCount);
   restoreCollected();restoreAiReviews();openRouterKey=readStoredKey();updateCollectedCount();
   Button next=button("Next");findRow.addView(next);next.setOnClickListener(v->{
    state.setText("Looking for GeM next results page…");
@@ -127,11 +127,11 @@ public class GemBrowserActivity extends Activity {
     else state.setText("Next-page control not found. Use GeM pagination inside the webpage.");
    });
   });
-  state=new TextView(this);state.setTextColor(Color.rgb(102,119,121));state.setText("Opening GeM…");state.setPadding(16,5,16,5);page.addView(state);
+  state=new TextView(this);state.setTextColor(Color.rgb(102,119,121));state.setText("Opening GeM…");state.setPadding(dp(24),dp(4),dp(24),dp(10));state.setTextSize(12);page.addView(state);
   FrameLayout contentLayer=new FrameLayout(this);page.addView(contentLayer,new LinearLayout.LayoutParams(-1,0,1));
   browser=new WebView(this);contentLayer.addView(browser,new FrameLayout.LayoutParams(-1,-1));
   dashboard=new ScrollView(this);dashboard.setFillViewport(true);dashboard.setVisibility(View.VISIBLE);showingDashboard=true;dashboard.setBackgroundColor(Color.rgb(244,250,247));contentLayer.addView(dashboard,new FrameLayout.LayoutParams(-1,-1));
-  dashboardList=new LinearLayout(this);dashboardList.setOrientation(1);dashboardList.setPadding(dp(12),dp(12),dp(12),dp(20));dashboardList.setBackgroundColor(Color.rgb(244,250,247));dashboard.addView(dashboardList);
+  dashboardList=new LinearLayout(this);dashboardList.setOrientation(1);dashboardList.setPadding(dp(20),dp(14),dp(20),dp(24));dashboardList.setBackgroundColor(Color.rgb(244,250,247));dashboard.addView(dashboardList);
   WebSettings settings=browser.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);settings.setSupportZoom(true);settings.setBuiltInZoomControls(true);settings.setDisplayZoomControls(false);
   browser.setWebViewClient(new WebViewClient(){
    @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){
@@ -366,11 +366,20 @@ public class GemBrowserActivity extends Activity {
   renderDashboard();
   finishAutoReview();
  }
+ private void addMetric(LinearLayout row,String value,String label,int color){
+  LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);tile.setGravity(Gravity.CENTER_VERTICAL);
+  tile.setPadding(dp(10),dp(10),dp(6),dp(10));
+  tile.setBackground(glass(0xfff9fffd,18));
+  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(70),1);
+  lp.setMargins(0,0,dp(6),0);row.addView(tile,lp);
+  TextView count=new TextView(this);count.setText(value);count.setTextSize(21);count.setTypeface(null,Typeface.BOLD);count.setTextColor(color);tile.addView(count);
+  TextView caption=new TextView(this);caption.setText(label);caption.setTextSize(11);caption.setTextColor(0xff71858a);tile.addView(caption);
+ }
  private void renderDashboard(){
   if(dashboardList==null)return;
   dashboardList.removeAllViews();
   int white=Color.rgb(27,45,49),muted=Color.rgb(103,121,125),teal=Color.rgb(0,139,126);
-  dashboardList.addView(dashText("Tender Radar • Live results",23,white));
+  TextView resultsHeading=dashText("Matching tenders",24,white);resultsHeading.setTypeface(null,Typeface.BOLD);dashboardList.addView(resultsHeading);
   ArrayList<JSONObject> open=new ArrayList<>();int expired=0,missing=0,analyzed=0;
   Date now=new Date();
   for(JSONObject j:collected.values()){
@@ -386,8 +395,8 @@ public class GemBrowserActivity extends Activity {
    Date ad=parsedDeadline(a.optString("deadlineText")),bd=parsedDeadline(b.optString("deadlineText"));
    return ad==null||bd==null?0:ad.compareTo(bd);
   });
-  dashboardList.addView(dashText(open.size()+" matches   •   "+analyzed+" reviewed   •   "+analyzingBids.size()+" analyzing   •   "+Math.max(0,open.size()-analyzed-analyzingBids.size()-failedAutoReviews.size())+" waiting",15,teal));
-  dashboardList.addView(dashText(expired+" expired hidden • "+missing+" missing dates hidden\nTitle matching is preliminary; verify bid documents and GeM dates.",12,muted));
+  LinearLayout metrics=new LinearLayout(this);metrics.setOrientation(0);metrics.setPadding(0,dp(8),0,dp(8));dashboardList.addView(metrics);addMetric(metrics,String.valueOf(open.size()),"Matches",teal);addMetric(metrics,String.valueOf(analyzed),"Reviewed",0xff25756e);addMetric(metrics,String.valueOf(analyzingBids.size()),"Analyzing",0xffb77722);addMetric(metrics,String.valueOf(Math.max(0,open.size()-analyzed-analyzingBids.size()-failedAutoReviews.size()-apiFailedReviews.size())),"Waiting",0xff72848a);
+  TextView caution=dashText(expired+" expired hidden • "+missing+" missing dates hidden\nAI scores are indicative; verify GeM documents and deadlines.",12,muted);caution.setPadding(0,dp(4),0,dp(12));dashboardList.addView(caution);
 
   if(open.isEmpty())dashboardList.addView(dashText("No open matching tenders found. Run a GeM search and collect results.",15,white));
   for(JSONObject bid:open){
@@ -395,16 +404,16 @@ public class GemBrowserActivity extends Activity {
    JSONObject ai=aiReviews.get(id);
    LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(18),dp(16),dp(18),dp(18));
    android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();
-   bg.setColor(Color.rgb(251,255,254));bg.setCornerRadius(dp(26));bg.setStroke(dp(1),Color.rgb(217,234,231));card.setBackground(bg);card.setElevation(dp(4));
-   LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,dp(8),0,dp(8));dashboardList.addView(card,cp);
-   card.addView(dashText(title,18,white));
+   bg.setColor(Color.rgb(251,255,254));bg.setCornerRadius(dp(26));bg.setStroke(dp(1),Color.rgb(217,234,231));card.setBackground(bg);card.setElevation(dp(2));
+   LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,dp(7),0,dp(10));dashboardList.addView(card,cp);
+   TextView cardTitle=dashText(title,18,white);cardTitle.setTypeface(null,Typeface.BOLD);cardTitle.setMaxLines(2);cardTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);card.addView(cardTitle);
    if(analyzingBids.contains(id)){ProgressBar spinner=new ProgressBar(this);spinner.setIndeterminate(true);spinner.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(teal));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(28),dp(28));sp.setMargins(0,dp(4),0,dp(4));card.addView(spinner,sp);card.addView(dashText("Reading document / AI processing…",12,teal));}
-   card.addView(dashText(id+"\n"+workCategory(title),13,teal));
+   TextView bidId=dashText(id+"  •  "+workCategory(title),13,teal);bidId.setPadding(0,dp(7),0,dp(8));card.addView(bidId);
    card.addView(dashText("Closing  "+due+"\n"+(ai==null?(analyzingBids.contains(id)?"● Analyzing now":apiFailedReviews.contains(id)?"AI connection issue • Retry after reconnect":failedAutoReviews.contains(id)?"Document inaccessible • Manual PDF needed":openRouterKey.trim().isEmpty()?"AI not configured • Set up in Settings":"◷ Waiting in AI queue"):ai.optString("verdict","Needs review")+" • AI assessment (indicative)"),13,muted));
    LinearLayout actions=new LinearLayout(this);actions.setOrientation(0);card.addView(actions);
-   Button openBid=button("View PDF");openBid.setTextColor(Color.rgb(38,91,91));openBid.setBackground(glass(0xffeaf6f4,18));LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(0,dp(48),1);openLp.setMargins(0,0,dp(6),0);actions.addView(openBid,openLp);openBid.setOnClickListener(v->openBidPdf(bid));
+   Button openBid=button("View document");openBid.setTextColor(Color.rgb(38,91,91));openBid.setBackground(glass(0xffeaf6f4,18));LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(0,dp(48),1);openLp.setMargins(0,0,dp(6),0);actions.addView(openBid,openLp);openBid.setOnClickListener(v->openBidPdf(bid));
    Button analyze=button(analyzingBids.contains(id)?"Analyzing…":ai==null?(apiFailedReviews.contains(id)?"Retry after reconnect":failedAutoReviews.contains(id)?"Retry AI review":"AI pending…"):ai.optInt("score",0)+"% • Summary");analyze.setTextColor(Color.WHITE);analyze.setTypeface(null,Typeface.BOLD);analyze.setBackground(rounded(Color.rgb(0,164,146),18,Color.rgb(0,164,146)));LinearLayout.LayoutParams analyzeLp=new LinearLayout.LayoutParams(0,dp(48),1);analyzeLp.setMargins(dp(6),0,0,0);actions.addView(analyze,analyzeLp);
-   analyze.setEnabled(!analyzingBids.contains(id));analyze.setOnClickListener(v->{if(aiReviews.containsKey(id))showSavedReview(id);else{failedAutoReviews.remove(id);apiFailedReviews.remove(id);aiConnectionPaused=false;analyzeInline(bid);}});
+   analyze.setEnabled(!analyzingBids.contains(id));if(analyzingBids.contains(id)){analyze.setText("◌ Analyzing");analyze.setAlpha(0.78f);}analyze.setOnClickListener(v->{if(aiReviews.containsKey(id))showSavedReview(id);else{failedAutoReviews.remove(id);apiFailedReviews.remove(id);aiConnectionPaused=false;analyzeInline(bid);}});
   }
  }
  private void reviewCollected(){
