@@ -339,7 +339,7 @@ public class GemBrowserActivity extends Activity {
    public void afterTextChanged(android.text.Editable x){
     if(!"auto_pdf_ready".equals(extracted.getTag())||x.length()<80)return;
     extracted.setTag("ai_running");
-    String document=x.toString(),token=openRouterKey,modelId=getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free");
+    String document=x.toString(),token=openRouterKey,modelId=getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free");\n    if(incompatibleAiModel(modelId)){state.setText("AI model is incompatible. Choose a chat model in Settings.");apiFailedReviews.add(id);aiConnectionPaused=true;analyzingBids.remove(id);renderDashboard();finishAutoReview();return;}
     state.setText("Analyzing "+id+" with AI…");
     new Thread(()->{
      try{
@@ -593,6 +593,11 @@ public class GemBrowserActivity extends Activity {
    finally{if(conn!=null)conn.disconnect();if(file!=null)file.delete();}
   }).start();
  }
+ private boolean incompatibleAiModel(String id){
+  String m=id==null?"":id.toLowerCase(java.util.Locale.ROOT);
+  return m.contains("embed")||m.contains("embedding")||m.contains("rerank")||m.contains("whisper")||m.contains("transcrib")||m.contains("tts");
+ }
+ private String aiModelHelp(){return "Select a chat/instruct model that supports OpenRouter chat completions. Embedding and reranking models cannot analyze tender text. Example: openai/gpt-4o-mini (may require credits).";}
  private void showAiSettings(){
   LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(20),dp(12),dp(20),dp(8));
   TextView info=new TextView(this);info.setText("OpenRouter AI connection\nYour API key is stored only on this device when Remember is enabled.");info.setTextColor(Color.DKGRAY);content.addView(info);
@@ -604,7 +609,7 @@ public class GemBrowserActivity extends Activity {
   test.setOnClickListener(v->{
    String token=api.getText().toString().trim(),modelId=model.getText().toString().trim();
    if(token.isEmpty()){api.setError("Enter an API key");return;}
-   if(modelId.isEmpty()){model.setError("Enter a model ID");return;}
+   if(modelId.isEmpty()){model.setError("Enter a model ID");return;}\n   if(incompatibleAiModel(modelId)){model.setError("Not a chat model");connection.setText(aiModelHelp());return;}
    test.setEnabled(false);connection.setText("Connecting to OpenRouter…");
    new Thread(()->{
     HttpURLConnection conn=null;String message;
@@ -618,7 +623,7 @@ public class GemBrowserActivity extends Activity {
      if(code>=200&&code<300){try(InputStream in=conn.getInputStream()){byte[] buf=new byte[2048];while(in.read(buf)!=-1){}}message="Connected successfully • model responded (HTTP "+code+")";}
      else if(code==401||code==403)message="Authentication failed (HTTP "+code+"). Check your API key.";
      else if(code==429)message="Rate limit reached (429). Try again later.";
-     else message="OpenRouter returned HTTP "+code+". Check model availability or account limits.";
+     else if(code==400||code==404||code==422)message="Model rejected (HTTP "+code+"). "+aiModelHelp();\n     else message="OpenRouter returned HTTP "+code+". Check model availability or account limits.";
     }catch(Exception e){message="Connection failed: "+e.getClass().getSimpleName()+". Check internet access.";}
     finally{if(conn!=null)conn.disconnect();}
     final String result=message;runOnUiThread(()->{test.setEnabled(true);connection.setText(result);if(result.startsWith("Connected successfully")){openRouterKey=token;getPreferences(0).edit().putString("openrouter_model",modelId).apply();aiConnectionPaused=false;apiFailedReviews.clear();state.setText("AI connected. Resuming pending tender reviews…");renderDashboard();scheduleAutoReview();}});
@@ -629,7 +634,7 @@ public class GemBrowserActivity extends Activity {
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("AI settings").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Save",null).create();
   dialog.setOnShowListener(ignored->dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
    String token=api.getText().toString().trim(),id=model.getText().toString().trim();
-   if(id.isEmpty()){model.setError("Enter model ID");return;}
+   if(id.isEmpty()){model.setError("Enter model ID");return;}\n   if(incompatibleAiModel(id)){model.setError("Not a chat model");connection.setText(aiModelHelp());return;}
    try{if(remember.isChecked()&&!token.isEmpty())storeKey(token);else clearStoredKey();}
    catch(Exception e){connection.setText("Secure storage failed: "+e.getClass().getSimpleName());return;}
    boolean changed=!token.equals(openRouterKey)||!id.equals(getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free"));openRouterKey=token;if(changed){aiConnectionPaused=false;apiFailedReviews.clear();}scheduleAutoReview();getPreferences(0).edit().putString("openrouter_model",id).apply();dialog.dismiss();
