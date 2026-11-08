@@ -168,6 +168,32 @@ public class GemBrowserActivity extends Activity {
    }catch(Exception e){state.setText("Could not parse bid cards. GeM page format may have changed.");}
   });
  }
+ private void startBatch(){
+  if(autoCollecting){state.setText("Stop the current collection first.");return;}
+  batchRunning=true;batchIndex=0;batchButton.setText("Stop batch search");nextBatch();
+ }
+ private void nextBatch(){
+  if(!batchRunning)return;
+  if(batchIndex>=batchTerms.length){
+   batchRunning=false;autoCollecting=false;autoButton.setText("Auto collect all pages");
+   batchButton.setText("One-tap: search 12 equipment groups + collect");
+   updateCollectedCount();state.setText("Batch complete: "+collected.size()+" unique bids. Review shortlist before AI assessment.");return;
+  }
+  String keyword=batchTerms[batchIndex++];term.setText(keyword);
+  state.setText("Searching "+batchIndex+"/"+batchTerms.length+": "+keyword);
+  String js="(function(){try{var inputs=Array.from(document.querySelectorAll('input')).filter(e=>{var r=e.getBoundingClientRect();return r.width>100&&r.height>0&&!e.disabled});"+
+   "var el=inputs.find(e=>/searchBid|search_bid|bid_search/i.test((e.id||'')+' '+(e.name||'')))||inputs.find(e=>{var p=e.parentElement;return p&&/contains/i.test((p.parentElement&&p.parentElement.innerText||'').slice(0,90))})||inputs.filter(e=>/text|search/i.test(e.type||'text')).slice(-1)[0];"+
+   "if(!el)return 'NO_INPUT';var setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(el,"+JSONObject.quote(keyword)+");el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));"+
+   "var r=el.getBoundingClientRect();var buttons=Array.from(document.querySelectorAll('button,input[type=submit],a,[role=button]')).filter(e=>{var b=e.getBoundingClientRect();return b.width>18&&b.height>18&&b.left>=r.right-12&&b.left<r.right+145&&Math.abs(b.top-r.top)<38&&!e.disabled});"+
+   "buttons.sort((a,b)=>Math.abs(a.getBoundingClientRect().left-r.right)-Math.abs(b.getBoundingClientRect().left-r.right));if(!buttons.length)return 'NO_BUTTON';el.blur();buttons[0].click();return 'OK';}catch(e){return 'ERROR'}})()";
+  browser.evaluateJavascript(js,result->{
+   if(!batchRunning)return;
+   if(!result.contains("OK")){state.setText("Could not submit GeM search for "+keyword+". Check webpage; batch stopped.");batchRunning=false;batchButton.setText("One-tap: search 12 equipment groups + collect");return;}
+   autoCollecting=true;autoPages=0;autoStalls=0;autoSignature="";
+   autoButton.setText("Stop auto collection");
+   autoHandler.postDelayed(this::autoStep,2600);
+  });
+ }
  private void stopAutoCollect(String message){
   autoCollecting=false;autoHandler.removeCallbacksAndMessages(null);
   if(autoButton!=null)autoButton.setText("Auto collect all pages");
