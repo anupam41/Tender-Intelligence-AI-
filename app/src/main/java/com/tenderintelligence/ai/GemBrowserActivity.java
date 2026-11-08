@@ -638,7 +638,8 @@ public class GemBrowserActivity extends Activity {
   test.setOnClickListener(v->{
    String token=api.getText().toString().trim(),modelId=model.getText().toString().trim();
    if(token.isEmpty()){api.setError("Enter an API key");return;}
-   if(modelId.isEmpty()){model.setError("Enter a model ID");return;}\n   if(incompatibleAiModel(modelId)){model.setError("Not a chat model");connection.setText(aiModelHelp());return;}
+   if(modelId.isEmpty()){model.setError("Enter a model ID");return;}
+   if(incompatibleAiModel(modelId)){model.setError("Not a chat model");connection.setText(aiModelHelp());return;}
    test.setEnabled(false);connection.setText("Connecting to OpenRouter…");
    new Thread(()->{
     HttpURLConnection conn=null;String message;
@@ -687,7 +688,8 @@ public class GemBrowserActivity extends Activity {
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("AI settings").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Save",null).create();
   dialog.setOnShowListener(ignored->dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
    String token=api.getText().toString().trim(),id=model.getText().toString().trim();
-   if(id.isEmpty()){model.setError("Enter model ID");return;}\n   if(!gemini.getText().toString().trim().isEmpty()||!groq.getText().toString().trim().isEmpty()){}else if(incompatibleAiModel(id)){model.setError("Not a chat model");connection.setText(aiModelHelp());return;}
+   if(id.isEmpty()){model.setError("Enter model ID");return;}
+   if(!gemini.getText().toString().trim().isEmpty()||!groq.getText().toString().trim().isEmpty()){}else if(incompatibleAiModel(id)){model.setError("Not a chat model");connection.setText(aiModelHelp());return;}
    try{if(remember.isChecked()&&!token.isEmpty())storeKey(token);else clearStoredKey();}
    catch(Exception e){connection.setText("Secure storage failed: "+e.getClass().getSimpleName());return;}
 
