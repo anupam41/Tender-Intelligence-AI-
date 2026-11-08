@@ -50,16 +50,14 @@ public class GemBrowserActivity extends Activity {
     "if(!el)return 'NO_BID_INPUT';"+
     "var setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(el,"+org.json.JSONObject.quote(q)+");"+
     "el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));"+
-    "var parent=el.parentElement;var btn=null;for(var i=0;i<4&&parent;i++,parent=parent.parentElement){"+
-    "var buttons=Array.from(parent.querySelectorAll('button,input[type=submit]')).filter(e=>{var r=e.getBoundingClientRect();return r.width>0&&r.height>0});"+
-    "btn=buttons.find(e=>/search|submit/i.test((e.id||'')+' '+(e.title||'')+' '+(e.className||'')+' '+(e.getAttribute('aria-label')||'')))||buttons.find(e=>e.querySelector('.fa-search,.glyphicon-search,.bi-search,svg'));"+
-    "if(btn)break;}"+
-    "if(!btn){var r=el.getBoundingClientRect();btn=Array.from(document.querySelectorAll('button')).find(e=>{var b=e.getBoundingClientRect();return b.width>20&&b.height>20&&b.left>=r.right-5&&b.left<r.right+150&&Math.abs(b.top-r.top)<40})}"+
-    "if(!btn)return 'BID_INPUT_SET_BUT_BUTTON_NOT_FOUND';"+
+    "var r=el.getBoundingClientRect();"+
+    "var candidates=Array.from(document.querySelectorAll('button,input[type=submit],a,[role=button]')).filter(e=>{var b=e.getBoundingClientRect();return b.width>18&&b.height>18&&b.left>=r.right-12&&b.left<r.right+140&&Math.abs(b.top-r.top)<35&&!e.disabled});"+
+    "candidates.sort((a,b)=>Math.abs(a.getBoundingClientRect().left-r.right)-Math.abs(b.getBoundingClientRect().left-r.right));"+
+    "var btn=candidates[0];if(!btn)return 'BID_INPUT_SET_BUT_BUTTON_NOT_FOUND';"+
     "el.blur();btn.click();return 'SEARCH_CLICKED';"+
     "}catch(e){return 'ERROR:'+e.message}})()";
    browser.evaluateJavascript(js,result->{
-    if(result.contains("SEARCH_CLICKED"))state.setText("GeM search requested for "+q+". Scroll down to check bid results.");
+    if(result.contains("SEARCH_CLICKED"))state.setText("GeM bid-search button clicked for "+q+". Check the results below.");
     else if(result.contains("NO_BID_INPUT"))state.setText("GeM bid search field not found. Use the search box inside the webpage.");
     else state.setText("Keyword entered, but GeM's search button was not detected. Tap the blue magnifying glass beside GeM's bid search field.");
    });
