@@ -296,13 +296,15 @@ public class GemBrowserActivity extends Activity {
 
  private final java.util.HashSet<String> analyzingBids=new java.util.HashSet<>();
  private final java.util.HashSet<String> failedAutoReviews=new java.util.HashSet<>();
+ private final java.util.HashSet<String> apiFailedReviews=new java.util.HashSet<>();
+ private boolean aiConnectionPaused=false;
  private boolean autoReviewActive=false;
  private String currentReviewId="";
  private final Runnable autoReviewTask=()->{
-  if(autoReviewActive||openRouterKey==null||openRouterKey.trim().isEmpty()||!showingDashboard)return;
+  if(autoReviewActive||aiConnectionPaused||openRouterKey==null||openRouterKey.trim().isEmpty()||!showingDashboard)return;
   for(JSONObject bid:collected.values()){
    String id=bid.optString("bidId");
-   if(!relevantTitle(bid.optString("title"))||aiReviews.containsKey(id)||analyzingBids.contains(id)||failedAutoReviews.contains(id))continue;
+   if(!relevantTitle(bid.optString("title"))||aiReviews.containsKey(id)||analyzingBids.contains(id)||failedAutoReviews.contains(id)||apiFailedReviews.contains(id))continue;
    Date due=parsedDeadline(bid.optString("deadlineText"));
    if(due==null||!due.after(new Date()))continue;
    autoReviewActive=true;currentReviewId=id;analyzeInline(bid);return;
@@ -341,7 +343,7 @@ public class GemBrowserActivity extends Activity {
       String response=new JSONObject(output.toString("UTF-8")).getJSONArray("choices").getJSONObject(0).getJSONObject("message").optString("content","No analysis returned");
       runOnUiThread(()->{saveAiReview(bid,response,modelId);state.setText("AI review saved for "+bid.optString("bidId"));renderDashboard();});
 
-     }catch(Exception e){runOnUiThread(()->{state.setText("AI review failed for "+id+": "+e.getMessage());failedAutoReviews.add(id);});}
+     }catch(Exception e){runOnUiThread(()->{state.setText("AI connection failed for "+id+". Analysis paused until connection is restored in Settings.");apiFailedReviews.add(id);aiConnectionPaused=true;});}
      finally{runOnUiThread(()->{analyzingBids.remove(id);renderDashboard();finishAutoReview();});}
     }).start();
    }
@@ -398,11 +400,11 @@ public class GemBrowserActivity extends Activity {
    card.addView(dashText(title,18,white));
    if(analyzingBids.contains(id)){ProgressBar spinner=new ProgressBar(this);spinner.setIndeterminate(true);spinner.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(teal));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(28),dp(28));sp.setMargins(0,dp(4),0,dp(4));card.addView(spinner,sp);card.addView(dashText("Reading document / AI processing…",12,teal));}
    card.addView(dashText(id+"\n"+workCategory(title),13,teal));
-   card.addView(dashText("Closing  "+due+"\n"+(ai==null?(analyzingBids.contains(id)?"● Analyzing now":failedAutoReviews.contains(id)?"Document inaccessible • Manual PDF needed":openRouterKey.trim().isEmpty()?"AI not configured • Set up in Settings":"◷ Waiting in AI queue"):ai.optString("verdict","Needs review")+" • AI assessment (indicative)"),13,muted));
+   card.addView(dashText("Closing  "+due+"\n"+(ai==null?(analyzingBids.contains(id)?"● Analyzing now":apiFailedReviews.contains(id)?"AI connection issue • Retry after reconnect":failedAutoReviews.contains(id)?"Document inaccessible • Manual PDF needed":openRouterKey.trim().isEmpty()?"AI not configured • Set up in Settings":"◷ Waiting in AI queue"):ai.optString("verdict","Needs review")+" • AI assessment (indicative)"),13,muted));
    LinearLayout actions=new LinearLayout(this);actions.setOrientation(0);card.addView(actions);
    Button openBid=button("View PDF");openBid.setTextColor(Color.rgb(38,91,91));openBid.setBackground(glass(0xffeaf6f4,18));LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(0,dp(48),1);openLp.setMargins(0,0,dp(6),0);actions.addView(openBid,openLp);openBid.setOnClickListener(v->openBidPdf(bid));
-   Button analyze=button(analyzingBids.contains(id)?"Analyzing…":ai==null?(failedAutoReviews.contains(id)?"Retry AI review":"AI pending…"):ai.optInt("score",0)+"% • Summary");analyze.setTextColor(Color.WHITE);analyze.setTypeface(null,Typeface.BOLD);analyze.setBackground(rounded(Color.rgb(0,164,146),18,Color.rgb(0,164,146)));LinearLayout.LayoutParams analyzeLp=new LinearLayout.LayoutParams(0,dp(48),1);analyzeLp.setMargins(dp(6),0,0,0);actions.addView(analyze,analyzeLp);
-   analyze.setEnabled(!analyzingBids.contains(id));analyze.setOnClickListener(v->{if(aiReviews.containsKey(id))showSavedReview(id);else{failedAutoReviews.remove(id);analyzeInline(bid);}});
+   Button analyze=button(analyzingBids.contains(id)?"Analyzing…":ai==null?(apiFailedReviews.contains(id)?"Retry after reconnect":failedAutoReviews.contains(id)?"Retry AI review":"AI pending…"):ai.optInt("score",0)+"% • Summary");analyze.setTextColor(Color.WHITE);analyze.setTypeface(null,Typeface.BOLD);analyze.setBackground(rounded(Color.rgb(0,164,146),18,Color.rgb(0,164,146)));LinearLayout.LayoutParams analyzeLp=new LinearLayout.LayoutParams(0,dp(48),1);analyzeLp.setMargins(dp(6),0,0,0);actions.addView(analyze,analyzeLp);
+   analyze.setEnabled(!analyzingBids.contains(id));analyze.setOnClickListener(v->{if(aiReviews.containsKey(id))showSavedReview(id);else{failedAutoReviews.remove(id);apiFailedReviews.remove(id);aiConnectionPaused=false;analyzeInline(bid);}});
   }
  }
  private void reviewCollected(){
@@ -596,7 +598,7 @@ public class GemBrowserActivity extends Activity {
      else message="OpenRouter returned HTTP "+code+". Check model availability or account limits.";
     }catch(Exception e){message="Connection failed: "+e.getClass().getSimpleName()+". Check internet access.";}
     finally{if(conn!=null)conn.disconnect();}
-    final String result=message;runOnUiThread(()->{test.setEnabled(true);connection.setText(result);});
+    final String result=message;runOnUiThread(()->{test.setEnabled(true);connection.setText(result);if(result.startsWith("Connected successfully")){openRouterKey=token;getPreferences(0).edit().putString("openrouter_model",modelId).apply();aiConnectionPaused=false;apiFailedReviews.clear();state.setText("AI connected. Resuming pending tender reviews…");renderDashboard();scheduleAutoReview();}});
    }).start();
   });
   Button forget=button("Forget saved API key");content.addView(forget);forget.setOnClickListener(v->{clearStoredKey();openRouterKey="";api.setText("");remember.setChecked(false);connection.setText("Saved key removed");});
@@ -607,7 +609,7 @@ public class GemBrowserActivity extends Activity {
    if(id.isEmpty()){model.setError("Enter model ID");return;}
    try{if(remember.isChecked()&&!token.isEmpty())storeKey(token);else clearStoredKey();}
    catch(Exception e){connection.setText("Secure storage failed: "+e.getClass().getSimpleName());return;}
-   openRouterKey=token;scheduleAutoReview();getPreferences(0).edit().putString("openrouter_model",id).apply();dialog.dismiss();
+   boolean changed=!token.equals(openRouterKey)||!id.equals(getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free"));openRouterKey=token;if(changed){aiConnectionPaused=false;apiFailedReviews.clear();}scheduleAutoReview();getPreferences(0).edit().putString("openrouter_model",id).apply();dialog.dismiss();
   }));
   dialog.show();
  }
