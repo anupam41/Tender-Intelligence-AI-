@@ -190,7 +190,6 @@ public class GemBrowserActivity extends Activity {
   try{JSONArray a=new JSONArray(getPreferences(0).getString("gem_ai_reviews","[]"));for(int i=0;i<a.length();i++){JSONObject j=a.optJSONObject(i);if(j!=null&&!j.optString("bidId").isEmpty())aiReviews.put(j.optString("bidId"),j);}}catch(Exception ignored){}
  }
  private void saveAiReview(JSONObject bid,String response,String modelId){
-  String lower=response.toLowerCase(Locale.ROOT);
   String verdict="Needs review";
   java.util.regex.Matcher matcher=java.util.regex.Pattern.compile("(?i)verdict[^\\\\n]{0,50}?(not relevant|irrelevant|unclear|needs review|relevant)").matcher(response);
   if(matcher.find()){String v=matcher.group(1).toLowerCase(Locale.ROOT);verdict=v.equals("relevant")?"Relevant":v.equals("not relevant")||v.equals("irrelevant")?"Not relevant":"Needs review";}
