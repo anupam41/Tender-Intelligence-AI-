@@ -27,6 +27,9 @@ import android.util.Base64;
 /** User-driven browser for public GeM bid listings. Does not scrape or bypass access controls. */
 public class GemBrowserActivity extends Activity {
  private WebView browser;
+ private ScrollView dashboard;
+ private LinearLayout dashboardList;
+ private boolean showingDashboard=false;
  private boolean autoCollecting=false;
  private int autoPages=0,autoStalls=0;
  private String autoSignature="";
@@ -96,7 +99,7 @@ public class GemBrowserActivity extends Activity {
   });
   LinearLayout captureRow=new LinearLayout(this);captureRow.setOrientation(LinearLayout.HORIZONTAL);page.addView(captureRow);
   Button collect=button("Collect visible bids");captureRow.addView(collect,new LinearLayout.LayoutParams(0,dp(52),2));collect.setOnClickListener(v->collectVisible());
-  Button review=button("Review shortlist");captureRow.addView(review,new LinearLayout.LayoutParams(0,dp(52),2));review.setOnClickListener(v->reviewCollected());
+  Button review=button("Tender dashboard");captureRow.addView(review,new LinearLayout.LayoutParams(0,dp(52),2));review.setOnClickListener(v->toggleDashboard());
   autoButton=button("Auto collect all pages");page.addView(autoButton,new LinearLayout.LayoutParams(-1,dp(48)));
   autoButton.setOnClickListener(v->{if(autoCollecting){batchRunning=false;stopAutoCollect("Stopped by user.");}else startAutoCollect();});
   batchButton=button("One-tap: search 12 equipment groups + collect");page.addView(batchButton,new LinearLayout.LayoutParams(-1,dp(48)));
@@ -117,6 +120,8 @@ public class GemBrowserActivity extends Activity {
    });
   });
   state=new TextView(this);state.setTextColor(Color.rgb(45,212,191));state.setText("Opening GeM…");state.setPadding(16,5,16,5);page.addView(state);
+  dashboard=new ScrollView(this);dashboard.setFillViewport(true);dashboard.setVisibility(View.GONE);page.addView(dashboard,new LinearLayout.LayoutParams(-1,0,1));
+  dashboardList=new LinearLayout(this);dashboardList.setOrientation(1);dashboardList.setPadding(dp(12),dp(12),dp(12),dp(20));dashboardList.setBackgroundColor(Color.rgb(9,17,32));dashboard.addView(dashboardList);
   browser=new WebView(this);page.addView(browser,new LinearLayout.LayoutParams(-1,0,1));
   WebSettings settings=browser.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);settings.setSupportZoom(true);settings.setBuiltInZoomControls(true);settings.setDisplayZoomControls(false);
   browser.setWebViewClient(new WebViewClient(){
@@ -162,7 +167,7 @@ public class GemBrowserActivity extends Activity {
      String url=j.optString("url");if(!safe(Uri.parse(url)))j.put("url",GEM);
      if(!collected.containsKey(id)){collected.put(id,j);added++;}
     }
-    persistCollected();updateCollectedCount();
+    persistCollected();updateCollectedCount();if(showingDashboard)renderDashboard();
     state.setText("Detected "+items.length()+" GeM bid IDs; saved "+added+" new bids.");
     if(done!=null)done.run();
    }catch(Exception e){state.setText("Could not parse bid cards. GeM page format may have changed.");}
@@ -264,6 +269,56 @@ public class GemBrowserActivity extends Activity {
  private String qualificationLabel(JSONObject bid){
   int score=qualificationScore(bid);
   return score>=70?"High-priority review":score>=50?"Review scope":"Low-priority review";
+ }
+ private void toggleDashboard(){
+  showingDashboard=!showingDashboard;
+  dashboard.setVisibility(showingDashboard?View.VISIBLE:View.GONE);
+  browser.setVisibility(showingDashboard?View.GONE:View.VISIBLE);
+  if(showingDashboard)renderDashboard();
+  state.setText(showingDashboard?"Dashboard: open tenders with title matches. Technical eligibility requires document review.":"GeM browser ready.");
+ }
+ private TextView dashText(String value,int size,int color){
+  TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);t.setPadding(dp(10),dp(8),dp(10),dp(8));return t;
+ }
+ private void renderDashboard(){
+  if(dashboardList==null)return;
+  dashboardList.removeAllViews();
+  int white=Color.WHITE,muted=Color.rgb(170,190,210),teal=Color.rgb(45,212,191);
+  dashboardList.addView(dashText("Tender Intelligence • Results",22,white));
+  ArrayList<JSONObject> open=new ArrayList<>();int expired=0,missing=0,analyzed=0;
+  Date now=new Date();
+  for(JSONObject j:collected.values()){
+   if(!relevantTitle(j.optString("title")))continue;
+   Date due=parsedDeadline(j.optString("deadlineText"));
+   if(due==null){missing++;continue;}
+   if(!due.after(now)){expired++;continue;}
+   open.add(j);if(aiReviews.containsKey(j.optString("bidId")))analyzed++;
+  }
+  Collections.sort(open,(a,b)->{
+   int byScore=Integer.compare(qualificationScore(b),qualificationScore(a));
+   if(byScore!=0)return byScore;
+   Date ad=parsedDeadline(a.optString("deadlineText")),bd=parsedDeadline(b.optString("deadlineText"));
+   return ad==null||bd==null?0:ad.compareTo(bd);
+  });
+  dashboardList.addView(dashText(collected.size()+" collected   •   "+open.size()+" open title matches   •   "+analyzed+" AI reviewed",15,teal));
+  dashboardList.addView(dashText(expired+" expired hidden • "+missing+" missing dates hidden\nTitle matching is preliminary; verify bid documents and GeM dates.",12,muted));
+  Button refresh=button("Refresh dashboard");dashboardList.addView(refresh);refresh.setOnClickListener(v->renderDashboard());
+  if(open.isEmpty())dashboardList.addView(dashText("No open matching tenders found. Run a GeM search and collect results.",15,white));
+  for(JSONObject bid:open){
+   String id=bid.optString("bidId"),title=bid.optString("title"),due=bid.optString("deadlineText");
+   JSONObject ai=aiReviews.get(id);
+   LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(10),dp(10),dp(10),dp(12));
+   android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();
+   bg.setColor(Color.rgb(18,30,50));bg.setCornerRadius(dp(14));bg.setStroke(dp(1),Color.rgb(44,66,88));card.setBackground(bg);
+   LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,dp(7),0,dp(7));dashboardList.addView(card,cp);
+   card.addView(dashText(title,17,white));
+   card.addView(dashText(id+"\n"+workCategory(title),13,teal));
+   card.addView(dashText("Buyer: not captured from listing\nClosing: "+due+"\nPriority: "+qualificationLabel(bid)+" (title-based)\nAI: "+(ai==null?"Not reviewed":ai.optString("verdict","Needs review")+" • "+ai.optInt("score",0)+"/100 indicative"),13,muted));
+   LinearLayout actions=new LinearLayout(this);actions.setOrientation(0);card.addView(actions);
+   Button openBid=button("Open bid");actions.addView(openBid,new LinearLayout.LayoutParams(0,dp(48),1));openBid.setOnClickListener(v->showBidActions(bid));
+   Button analyze=button(ai==null?"AI review":"View AI");actions.addView(analyze,new LinearLayout.LayoutParams(0,dp(48),1));
+   analyze.setOnClickListener(v->{if(ai==null)showAiDialog(bid);else showSavedReview(id);});
+  }
  }
  private void reviewCollected(){
   if(collected.isEmpty()){state.setText("No bids collected. Search GeM, then tap Collect visible bids.");return;}
