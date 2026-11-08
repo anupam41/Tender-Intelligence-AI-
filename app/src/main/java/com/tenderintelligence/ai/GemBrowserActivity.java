@@ -137,7 +137,7 @@ public class GemBrowserActivity extends Activity {
    }catch(Exception e){state.setText("Could not parse bid cards. GeM page format may have changed.");}
   });
  }
- private String cleanDeadline(String value){return value.matches("(?i)\\\\d{2}-\\\\d{2}-\\\\d{4}(?:\\\\s+\\\\d{1,2}:\\\\d{2}\\\\s*(?:AM|PM))?")?value:"Not verified";}
+ private String cleanDeadline(String value){return value.matches("(?i)\\d{2}-\\d{2}-\\d{4}(?:\\s+\\d{1,2}:\\d{2}\\s*(?:AM|PM))?")?value:"Not verified";}
  private boolean relevantTitle(String value){return value.toLowerCase(java.util.Locale.ROOT).matches(".*(heat exchanger|condenser|retub|re-tub|cooler|tube bundle|pressure vessel|evaporator|economi[sz]er|chiller|radiator|cooling coil|heater|swas|air preheater|shell and tube|shell & tube).*");}
  private void reviewCollected(){
   if(collected.isEmpty()){state.setText("No bids collected. Search GeM, then tap Collect visible bids.");return;}
