@@ -484,7 +484,7 @@ public class GemBrowserActivity extends Activity {
   LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(18),dp(12),dp(18),dp(12));
   TextView verdict=new TextView(this);verdict.setText(j.optString("verdict")+" • "+j.optInt("score")+"/100 (indicative)");verdict.setTextSize(20);verdict.setTypeface(null,Typeface.BOLD);verdict.setTextColor(j.optString("verdict").equals("Relevant")?Color.rgb(0,110,88):Color.rgb(120,82,20));content.addView(verdict);
   TextView priority=new TextView(this);priority.setText("Tender priority: "+j.optString("priority","Needs review")+" • Fabrication suitability requires technical verification");priority.setTextSize(14);priority.setPadding(0,dp(6),0,dp(4));content.addView(priority);
-  TextView caution=new TextView(this);caution.setText("AI-generated assessment • Not independently verified • Score derived from verdict, not calibrated probability");caution.setTextSize(12);caution.setPadding(0,dp(8),0,dp(12));content.addView(caution);
+  TextView caution=new TextView(this);caution.setText("Evidence: "+j.optString("source","Older review: document source not recorded")+"\nProvisional AI assessment • Full technical specification not verified • Score reflects relevance only, not eligibility or bid readiness");caution.setTextSize(12);caution.setPadding(0,dp(8),0,dp(12));content.addView(caution);
   String report=j.optString("report").replaceAll("(?m)^#{1,6}\\\\s*","").replace("**","").replace("__","");
   TextView body=new TextView(this);body.setText(report);body.setTextSize(15);body.setTextColor(Color.DKGRAY);body.setTextIsSelectable(true);content.addView(body);
   JSONObject bid=collected.get(id);
