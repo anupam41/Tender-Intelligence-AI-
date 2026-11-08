@@ -189,12 +189,17 @@ public class GemBrowserActivity extends Activity {
   EditText model=new EditText(this);model.setHint("OpenRouter model");model.setSingleLine(true);model.setText("openai/gpt-4o-mini");layout.addView(model);
   EditText scope=new EditText(this);scope.setHint("Paste tender document / technical scope");scope.setMinLines(5);scope.setMaxLines(12);layout.addView(scope);
   ScrollView scroll=new ScrollView(this);scroll.addView(layout);
-  new android.app.AlertDialog.Builder(this).setTitle("AI technical review: "+bid.optString("bidId")).setView(scroll)
-   .setNegativeButton("Cancel",null).setPositiveButton("Analyze",(d,w)->{
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("AI technical review: "+bid.optString("bidId")).setView(scroll)
+   .setNegativeButton("Cancel",null).setPositiveButton("Analyze",null).create();
+  dialog.setOnShowListener(ignored->dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
     String token=api.getText().toString().trim(),modelId=model.getText().toString().trim(),document=scope.getText().toString().trim();
     openRouterKey=token;
-    if(token.isEmpty()||modelId.isEmpty()||document.length()<80){state.setText("AI analysis requires an OpenRouter key, model and at least 80 characters of tender scope.");return;}
+    if(token.isEmpty()){api.setError("Enter OpenRouter API key");api.requestFocus();return;}
+    if(modelId.isEmpty()){model.setError("Enter model ID");model.requestFocus();return;}
+    if(document.length()<80){scope.setError("Paste at least 80 characters of actual tender scope");scope.requestFocus();return;}
+    dialog.dismiss();
     state.setText("Analyzing tender scope with OpenRouter…");
+    android.app.AlertDialog progress=new android.app.AlertDialog.Builder(this).setTitle("Analyzing tender").setMessage("Contacting OpenRouter. This can take up to a minute.").setCancelable(false).create();progress.show();
     new Thread(()->{
      try{
       JSONObject payload=new JSONObject().put("model",modelId);
@@ -209,10 +214,11 @@ public class GemBrowserActivity extends Activity {
       ByteArrayOutputStream output=new ByteArrayOutputStream();try(InputStream in=conn.getInputStream()){byte[] buf=new byte[4096];int n;while((n=in.read(buf))!=-1){if(output.size()+n>200000)throw new IOException("Response too large");output.write(buf,0,n);}}
       conn.disconnect();
       String response=new JSONObject(output.toString("UTF-8")).getJSONArray("choices").getJSONObject(0).getJSONObject("message").optString("content","No analysis returned");
-      runOnUiThread(()->{state.setText("AI review completed for "+bid.optString("bidId"));new android.app.AlertDialog.Builder(this).setTitle("AI assessment (not verified)").setMessage(response).setPositiveButton("Close",null).show();});
-     }catch(Exception e){runOnUiThread(()->state.setText("AI review failed: "+e.getMessage()));}
+      runOnUiThread(()->{progress.dismiss();state.setText("AI review completed for "+bid.optString("bidId"));new android.app.AlertDialog.Builder(this).setTitle("AI assessment (not verified)").setMessage(response).setPositiveButton("Close",null).show();});
+     }catch(Exception e){runOnUiThread(()->{progress.dismiss();state.setText("AI review failed: "+e.getMessage());new android.app.AlertDialog.Builder(this).setTitle("OpenRouter analysis failed").setMessage(e.getMessage()+"\nCheck model availability, API key and internet connection.").setPositiveButton("OK",null).show();});}
     }).start();
-   }).show();
+   }));
+  dialog.show();
  }
  private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
  private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(12);b.setTextColor(Color.BLACK);b.setMinHeight(dp(44));b.setPadding(dp(4),0,dp(4),0);return b;}
