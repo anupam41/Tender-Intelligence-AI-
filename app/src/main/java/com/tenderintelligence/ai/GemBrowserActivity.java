@@ -307,7 +307,7 @@ public class GemBrowserActivity extends Activity {
    public void onTextChanged(CharSequence x,int a,int b,int c){}
    public void afterTextChanged(android.text.Editable x){
     if(!"auto_pdf_ready".equals(extracted.getTag())||x.length()<80)return;
-    extracted.setTag(null);
+    extracted.setTag("ai_running");
     String document=x.toString(),token=openRouterKey,modelId=getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free");
     state.setText("Analyzing "+id+" with AI…");
     new Thread(()->{
@@ -335,7 +335,7 @@ public class GemBrowserActivity extends Activity {
   state.setText("Reading GeM document for "+id+"…");
   loadPublicPdfInto(bid,extracted,trigger);
   autoHandler.postDelayed(()->{
-   if(analyzingBids.contains(id)&&!"auto_pdf_ready".equals(extracted.getTag())&&extracted.length()<80){
+   if(analyzingBids.contains(id)&&!"ai_running".equals(extracted.getTag())&&extracted.length()<80){
     analyzingBids.remove(id);renderDashboard();
     state.setText("Public PDF not available for "+id+". Manual import may be needed.");
    }
@@ -373,6 +373,7 @@ public class GemBrowserActivity extends Activity {
    bg.setColor(Color.rgb(20,32,51));bg.setCornerRadius(dp(20));bg.setStroke(dp(1),Color.rgb(47,68,92));card.setBackground(bg);
    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,dp(8),0,dp(8));dashboardList.addView(card,cp);
    card.addView(dashText(title,18,white));
+   if(analyzingBids.contains(id)){ProgressBar spinner=new ProgressBar(this);spinner.setIndeterminate(true);spinner.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(teal));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(28),dp(28));sp.setMargins(0,dp(4),0,dp(4));card.addView(spinner,sp);card.addView(dashText("Reading document / AI processing…",12,teal));}
    card.addView(dashText(id+"\n"+workCategory(title),13,teal));
    card.addView(dashText("Buyer: not captured from listing\nClosing: "+due+"\nPriority: "+qualificationLabel(bid)+" (title-based)\nAI: "+(ai==null?"Not reviewed":ai.optString("verdict","Needs review")+" • "+ai.optInt("score",0)+"/100 indicative"),13,muted));
    LinearLayout actions=new LinearLayout(this);actions.setOrientation(0);card.addView(actions);
