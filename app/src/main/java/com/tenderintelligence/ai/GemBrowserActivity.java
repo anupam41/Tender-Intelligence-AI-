@@ -595,7 +595,7 @@ public class GemBrowserActivity extends Activity {
  }
  private void clearProviderKey(String provider){getPreferences(0).edit().remove(provider+"_iv").remove(provider+"_encrypted").apply();}
  private String callProvider(String provider,String token,String instructions,String prompt) throws Exception{
-  String model=provider.equals("gemini")?"gemini-2.5-flash":provider.equals("groq")?"llama-3.3-70b-versatile":getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free");
+  String model=provider.equals("gemini")?getPreferences(0).getString("gemini_model","gemini-2.5-flash"):provider.equals("groq")?getPreferences(0).getString("groq_model","llama-3.3-70b-versatile"):getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free");
   String endpoint=provider.equals("gemini")?"https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent":provider.equals("groq")?"https://api.groq.com/openai/v1/chat/completions":"https://openrouter.ai/api/v1/chat/completions";
   HttpURLConnection conn=(HttpURLConnection)new URL(endpoint).openConnection();
   try{
@@ -605,7 +605,7 @@ public class GemBrowserActivity extends Activity {
    if(provider.equals("gemini"))payload=new JSONObject().put("contents",new JSONArray().put(new JSONObject().put("parts",new JSONArray().put(new JSONObject().put("text",instructions+"\n\n"+prompt))))).put("generationConfig",new JSONObject().put("maxOutputTokens",2200));
    else payload=new JSONObject().put("model",model).put("max_tokens",2200).put("messages",new JSONArray().put(new JSONObject().put("role","system").put("content",instructions)).put(new JSONObject().put("role","user").put("content",prompt)));
    try(OutputStream out=conn.getOutputStream()){out.write(payload.toString().getBytes(StandardCharsets.UTF_8));}
-   int code=conn.getResponseCode();if(code<200||code>=300)throw new IOException(provider+" HTTP "+code);
+   int code=conn.getResponseCode();if(code<200||code>=300){String detail="";try(InputStream err=conn.getErrorStream()){if(err!=null){byte[] bytes=new byte[2048];int n=err.read(bytes);if(n>0)detail=new String(bytes,0,n,StandardCharsets.UTF_8);}}throw new IOException(provider+" HTTP "+code+" "+detail.substring(0,Math.min(detail.length(),260)));}
    ByteArrayOutputStream buffer=new ByteArrayOutputStream();
    try(InputStream in=conn.getInputStream()){byte[] bytes=new byte[4096];int n;while((n=in.read(bytes))!=-1){if(buffer.size()+n>250000)throw new IOException("AI response too large");buffer.write(bytes,0,n);}}
    JSONObject response=new JSONObject(buffer.toString("UTF-8"));
@@ -664,10 +664,14 @@ public class GemBrowserActivity extends Activity {
   TextView extraLabel=new TextView(this);extraLabel.setText("Other AI providers • Gemini first, Groq second");extraLabel.setTextColor(Color.DKGRAY);extraLabel.setPadding(0,dp(16),0,0);content.addView(extraLabel);
   EditText gemini=new EditText(this);gemini.setHint("Google Gemini API key");gemini.setInputType(129);gemini.setSingleLine(true);gemini.setText(geminiKey);content.addView(gemini);
   EditText groq=new EditText(this);groq.setHint("Groq API key");groq.setInputType(129);groq.setSingleLine(true);groq.setText(groqKey);content.addView(groq);
+
+  EditText geminiModel=new EditText(this);geminiModel.setSingleLine(true);geminiModel.setHint("Gemini model");geminiModel.setText(getPreferences(0).getString("gemini_model","gemini-2.5-flash"));content.addView(geminiModel);
+  EditText groqModel=new EditText(this);groqModel.setSingleLine(true);groqModel.setHint("Groq model");groqModel.setText(getPreferences(0).getString("groq_model","llama-3.3-70b-versatile"));content.addView(groqModel);
   CheckBox rememberProviders=new CheckBox(this);rememberProviders.setText("Remember Gemini and Groq keys securely");rememberProviders.setChecked(getPreferences(0).getBoolean("remember_provider_keys",false));content.addView(rememberProviders);
   Button testProviders=button("Test Gemini / Groq connections");content.addView(testProviders);
   testProviders.setOnClickListener(v->{
    String g=gemini.getText().toString().trim(),q=groq.getText().toString().trim();
+   getPreferences(0).edit().putString("gemini_model",geminiModel.getText().toString().trim()).putString("groq_model",groqModel.getText().toString().trim()).apply();
    testProviders.setEnabled(false);connection.setText("Testing AI providers…");
    new Thread(()->{
     StringBuilder results=new StringBuilder();
@@ -695,6 +699,7 @@ public class GemBrowserActivity extends Activity {
 
    String g=gemini.getText().toString().trim(),q=groq.getText().toString().trim();
    boolean providersChanged=!g.equals(geminiKey)||!q.equals(groqKey);
+   getPreferences(0).edit().putString("gemini_model",geminiModel.getText().toString().trim()).putString("groq_model",groqModel.getText().toString().trim()).apply();
    try{
     if(rememberProviders.isChecked()){if(!g.isEmpty())saveProviderKey("gemini",g);else clearProviderKey("gemini");if(!q.isEmpty())saveProviderKey("groq",q);else clearProviderKey("groq");}
     else{clearProviderKey("gemini");clearProviderKey("groq");}
