@@ -323,7 +323,9 @@ public class GemBrowserActivity extends Activity {
   LinearLayout layout=new LinearLayout(this);layout.setOrientation(1);layout.setPadding(dp(16),dp(8),dp(16),dp(8));
   TextView explanation=new TextView(this);explanation.setText("Paste the tender scope or extracted document text. AI cannot verify a bid from its truncated title alone. OpenRouter key can be encrypted with Android Keystore and remembered on this device.");layout.addView(explanation);
   EditText api=new EditText(this);api.setHint("OpenRouter API key");api.setSingleLine(true);api.setInputType(129);api.setText(openRouterKey);layout.addView(api);
-  EditText model=new EditText(this);model.setHint("OpenRouter model");model.setSingleLine(true);model.setText("openai/gpt-4o-mini");layout.addView(model);
+  EditText model=new EditText(this);model.setHint("OpenRouter model");model.setSingleLine(true);model.setText(getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free"));layout.addView(model);
+   CheckBox remember=new CheckBox(this);remember.setText("Remember API key securely on this device");remember.setChecked(getPreferences(0).getBoolean("remember_openrouter_key",false));layout.addView(remember);
+   Button forget=button("Forget saved API key");layout.addView(forget);forget.setOnClickListener(v->{clearStoredKey();openRouterKey="";api.setText("");remember.setChecked(false);state.setText("Saved OpenRouter key removed.");});
   EditText scope=new EditText(this);scope.setHint("Paste tender document / technical scope");scope.setMinLines(5);scope.setMaxLines(12);layout.addView(scope);
   Button importPdf=button("Import tender PDF (no copying)");layout.addView(importPdf);
   importPdf.setOnClickListener(v->{pendingPdfScope=scope;Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT);pick.setType("application/pdf");pick.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(pick,PICK_TENDER_PDF);});
