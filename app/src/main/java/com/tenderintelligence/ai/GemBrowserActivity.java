@@ -53,7 +53,7 @@ public class GemBrowserActivity extends Activity {
  private TextView state;
  private final LinkedHashMap<String,JSONObject> collected=new LinkedHashMap<>();
  private TextView collectedCount;
- private String openRouterKey="",geminiKey="",groqKey="";
+ private static final String OMNI_URL="http://127.0.0.1:20128/v1/chat/completions";
  private static final String KEY_ALIAS="TenderIntelligenceOpenRouterKey";
  private EditText pendingPdfScope;
  private final LinkedHashMap<String,JSONObject> aiReviews=new LinkedHashMap<>();
@@ -120,7 +120,7 @@ public class GemBrowserActivity extends Activity {
   scanProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);scanProgress.setMax(batchTerms.length);scanProgress.setProgress(0);scanProgress.setIndeterminate(false);scanProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.rgb(0,175,152)));scanProgress.setVisibility(View.GONE);LinearLayout.LayoutParams progressLp=new LinearLayout.LayoutParams(-1,dp(5));progressLp.setMargins(dp(24),0,dp(24),0);page.addView(scanProgress,progressLp);
   scanProgressLabel=new TextView(this);scanProgressLabel.setTextColor(Color.rgb(47,99,99));scanProgressLabel.setPadding(dp(24),dp(10),dp(24),dp(5));scanProgressLabel.setTextSize(13);scanProgressLabel.setText("Ready to scan • Results will appear below");page.addView(scanProgressLabel);
   collectedCount=new TextView(this);collectedCount.setTextColor(Color.rgb(0,129,115));collectedCount.setPadding(dp(24),dp(4),dp(24),dp(4));collectedCount.setTextSize(13);page.addView(collectedCount);
-  restoreCollected();restoreAiReviews();openRouterKey=readStoredKey();geminiKey=readProviderKey("gemini");groqKey=readProviderKey("groq");updateCollectedCount();
+  restoreCollected();restoreAiReviews();getPreferences(0).edit().remove("openrouter_key_iv").remove("openrouter_key_cipher").remove("gemini_iv").remove("gemini_encrypted").remove("groq_iv").remove("groq_encrypted").remove("remember_openrouter_key").remove("remember_provider_keys").apply();updateCollectedCount();
   Button next=button("Next");findRow.addView(next);next.setOnClickListener(v->{
    state.setText("Looking for GeM next results page…");
    String js="(function(){"+
@@ -315,7 +315,7 @@ public class GemBrowserActivity extends Activity {
  private boolean autoReviewActive=false;
  private String currentReviewId="";
  private final Runnable autoReviewTask=()->{
-  if(autoReviewActive||aiConnectionPaused||(openRouterKey.isEmpty()&&geminiKey.isEmpty()&&groqKey.isEmpty())||!showingDashboard)return;
+  if(autoReviewActive||aiConnectionPaused||!showingDashboard)return;
   for(JSONObject bid:collected.values()){
    String id=bid.optString("bidId");
    if(!relevantTitle(bid.optString("title"))||aiReviews.containsKey(id)||analyzingBids.contains(id)||failedAutoReviews.contains(id)||apiFailedReviews.contains(id))continue;
@@ -330,7 +330,7 @@ public class GemBrowserActivity extends Activity {
   String id=bid.optString("bidId");
   if(analyzingBids.contains(id))return;
   if(aiReviews.containsKey(id)){showSavedReview(id);return;}
-  if(openRouterKey.isEmpty()&&geminiKey.isEmpty()&&groqKey.isEmpty()){state.setText("Add an AI provider key in Settings.");finishAutoReview();return;}
+  
   analyzingBids.add(id);renderDashboard();
   EditText extracted=new EditText(this);
   extracted.addTextChangedListener(new android.text.TextWatcher(){
@@ -339,8 +339,7 @@ public class GemBrowserActivity extends Activity {
    public void afterTextChanged(android.text.Editable x){
     if(!"auto_pdf_ready".equals(extracted.getTag())||x.length()<80)return;
     extracted.setTag("ai_running");
-    String document=x.toString(),token=openRouterKey,modelId=getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free");
-    if(geminiKey.isEmpty()&&groqKey.isEmpty()&&incompatibleAiModel(modelId)){state.setText("AI model is incompatible. Choose a chat model in Settings.");apiFailedReviews.add(id);aiConnectionPaused=true;analyzingBids.remove(id);renderDashboard();finishAutoReview();return;}
+    String document=x.toString(),modelId=omniModel();
     state.setText("Analyzing "+id+" with AI…");
     new Thread(()->{
      try{
@@ -413,7 +412,7 @@ public class GemBrowserActivity extends Activity {
    TextView cardTitle=dashText(title,18,white);cardTitle.setTypeface(null,Typeface.BOLD);cardTitle.setMaxLines(2);cardTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);card.addView(cardTitle);
    if(analyzingBids.contains(id)){ProgressBar spinner=new ProgressBar(this);spinner.setIndeterminate(true);spinner.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(teal));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(28),dp(28));sp.setMargins(0,dp(4),0,dp(4));card.addView(spinner,sp);card.addView(dashText("Reading document / AI processing…",12,teal));}
    TextView bidId=dashText(id+"  •  "+workCategory(title),13,teal);bidId.setPadding(0,dp(7),0,dp(8));card.addView(bidId);
-   card.addView(dashText("Closing  "+due+"\n"+(ai==null?(analyzingBids.contains(id)?"● Analyzing now":apiFailedReviews.contains(id)?"AI connection issue • Retry after reconnect":failedAutoReviews.contains(id)?"Document inaccessible • Manual PDF needed":openRouterKey.trim().isEmpty()?"AI not configured • Set up in Settings":"◷ Waiting in AI queue"):ai.optString("verdict","Needs review")+" • AI assessment (indicative)"),13,muted));
+   card.addView(dashText("Closing  "+due+"\n"+(ai==null?(analyzingBids.contains(id)?"● Analyzing now":apiFailedReviews.contains(id)?"AI connection issue • Retry after reconnect":failedAutoReviews.contains(id)?"Document inaccessible • Manual PDF needed":"◷ Waiting in AI queue"):ai.optString("verdict","Needs review")+" • AI assessment (indicative)"),13,muted));
    LinearLayout actions=new LinearLayout(this);actions.setOrientation(0);card.addView(actions);
    Button openBid=button("View document");openBid.setTextColor(Color.rgb(38,91,91));openBid.setBackground(glass(themeColor(0xffeaf6f4,0xff1a3036),22));LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(0,dp(48),1);openLp.setMargins(0,0,dp(6),0);actions.addView(openBid,openLp);openBid.setOnClickListener(v->openBidPdf(bid));
    Button analyze=button(analyzingBids.contains(id)?"Analyzing…":ai==null?(apiFailedReviews.contains(id)?"Retry after reconnect":failedAutoReviews.contains(id)?"Retry AI review":"AI pending…"):ai.optInt("score",0)+"% • Summary");analyze.setTextColor(Color.WHITE);analyze.setTypeface(null,Typeface.BOLD);analyze.setBackground(rounded(Color.rgb(0,164,146),22,Color.rgb(0,164,146)));LinearLayout.LayoutParams analyzeLp=new LinearLayout.LayoutParams(0,dp(48),1);analyzeLp.setMargins(dp(6),0,0,0);actions.addView(analyze,analyzeLp);
@@ -493,30 +492,6 @@ public class GemBrowserActivity extends Activity {
   ScrollView scroll=new ScrollView(this);scroll.addView(content);
   new android.app.AlertDialog.Builder(this).setTitle("AI review • "+id).setView(scroll).setPositiveButton("Close",null).show();
  }
- private SecretKey deviceSecret() throws Exception{
-  KeyStore store=KeyStore.getInstance("AndroidKeyStore");store.load(null);
-  if(store.containsAlias(KEY_ALIAS))return ((KeyStore.SecretKeyEntry)store.getEntry(KEY_ALIAS,null)).getSecretKey();
-  KeyGenerator generator=KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES,"AndroidKeyStore");
-  generator.init(new KeyGenParameterSpec.Builder(KEY_ALIAS,KeyProperties.PURPOSE_ENCRYPT|KeyProperties.PURPOSE_DECRYPT).setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).setKeySize(256).build());
-  return generator.generateKey();
- }
- private void storeKey(String value) throws Exception{
-  Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");cipher.init(Cipher.ENCRYPT_MODE,deviceSecret());
-  byte[] encrypted=cipher.doFinal(value.getBytes(StandardCharsets.UTF_8));
-  getPreferences(0).edit().putString("openrouter_key_iv",Base64.encodeToString(cipher.getIV(),Base64.NO_WRAP)).putString("openrouter_key_cipher",Base64.encodeToString(encrypted,Base64.NO_WRAP)).putBoolean("remember_openrouter_key",true).commit();
- }
- private String readStoredKey(){
-  String iv=getPreferences(0).getString("openrouter_key_iv",""),ciphertext=getPreferences(0).getString("openrouter_key_cipher","");
-  if(iv.isEmpty()||ciphertext.isEmpty())return "";
-  try{
-   Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");cipher.init(Cipher.DECRYPT_MODE,deviceSecret(),new GCMParameterSpec(128,Base64.decode(iv,Base64.NO_WRAP)));
-   return new String(cipher.doFinal(Base64.decode(ciphertext,Base64.NO_WRAP)),StandardCharsets.UTF_8);
-  }catch(Exception e){clearStoredKey();return "";}
- }
- private void clearStoredKey(){
-  getPreferences(0).edit().remove("openrouter_key_iv").remove("openrouter_key_cipher").putBoolean("remember_openrouter_key",false).commit();
-  // Keep shared Android Keystore alias while Gemini or Groq keys may still use it.
- }
  private boolean safeGemDocument(Uri uri){
   String host=uri==null?null:uri.getHost();
   return uri!=null&&"https".equalsIgnoreCase(uri.getScheme())&&host!=null&&(host.equals("gem.gov.in")||host.endsWith(".gem.gov.in"));
@@ -584,155 +559,42 @@ public class GemBrowserActivity extends Activity {
   }).start();
  }
 
- private void saveProviderKey(String provider,String key) throws Exception{
-  Cipher c=Cipher.getInstance("AES/GCM/NoPadding");c.init(Cipher.ENCRYPT_MODE,deviceSecret());
-  getPreferences(0).edit().putString(provider+"_iv",Base64.encodeToString(c.getIV(),Base64.NO_WRAP)).putString(provider+"_encrypted",Base64.encodeToString(c.doFinal(key.getBytes(StandardCharsets.UTF_8)),Base64.NO_WRAP)).apply();
- }
- private String readProviderKey(String provider){
-  String iv=getPreferences(0).getString(provider+"_iv",""),data=getPreferences(0).getString(provider+"_encrypted","");
-  if(iv.isEmpty()||data.isEmpty())return "";
-  try{Cipher c=Cipher.getInstance("AES/GCM/NoPadding");c.init(Cipher.DECRYPT_MODE,deviceSecret(),new GCMParameterSpec(128,Base64.decode(iv,Base64.NO_WRAP)));return new String(c.doFinal(Base64.decode(data,Base64.NO_WRAP)),StandardCharsets.UTF_8);}catch(Exception e){return "";}
- }
- private void clearProviderKey(String provider){getPreferences(0).edit().remove(provider+"_iv").remove(provider+"_encrypted").apply();}
- private String callProvider(String provider,String token,String instructions,String prompt) throws Exception{
-  String model=provider.equals("gemini")?getPreferences(0).getString("gemini_model","gemini-3.8-flash"):provider.equals("groq")?getPreferences(0).getString("groq_model","llama-3.3-70b-versatile"):getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free");
-  String endpoint=provider.equals("gemini")?"https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent":provider.equals("groq")?"https://api.groq.com/openai/v1/chat/completions":"https://openrouter.ai/api/v1/chat/completions";
-  HttpURLConnection conn=(HttpURLConnection)new URL(endpoint).openConnection();
-  try{
-   conn.setRequestMethod("POST");conn.setConnectTimeout(18000);conn.setReadTimeout(65000);conn.setDoOutput(true);conn.setRequestProperty("Content-Type","application/json");
-   if(provider.equals("gemini"))conn.setRequestProperty("x-goog-api-key",token);else conn.setRequestProperty("Authorization","Bearer "+token);
-   JSONObject payload;
-   if(provider.equals("gemini"))payload=new JSONObject().put("contents",new JSONArray().put(new JSONObject().put("parts",new JSONArray().put(new JSONObject().put("text",instructions+"\n\n"+prompt))))).put("generationConfig",new JSONObject().put("maxOutputTokens",2200));
-   else payload=new JSONObject().put("model",model).put("max_tokens",2200).put("messages",new JSONArray().put(new JSONObject().put("role","system").put("content",instructions)).put(new JSONObject().put("role","user").put("content",prompt)));
-   try(OutputStream out=conn.getOutputStream()){out.write(payload.toString().getBytes(StandardCharsets.UTF_8));}
-   int code=conn.getResponseCode();if(code<200||code>=300){String detail="";try(InputStream err=conn.getErrorStream()){if(err!=null){byte[] bytes=new byte[2048];int n=err.read(bytes);if(n>0)detail=new String(bytes,0,n,StandardCharsets.UTF_8);}}throw new IOException(provider+" HTTP "+code+" "+detail.substring(0,Math.min(detail.length(),260)));}
-   ByteArrayOutputStream buffer=new ByteArrayOutputStream();
-   try(InputStream in=conn.getInputStream()){byte[] bytes=new byte[4096];int n;while((n=in.read(bytes))!=-1){if(buffer.size()+n>250000)throw new IOException("AI response too large");buffer.write(bytes,0,n);}}
-   JSONObject response=new JSONObject(buffer.toString("UTF-8"));
-   String answer=provider.equals("gemini")?response.getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text"):response.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
-   if(answer.trim().isEmpty())throw new IOException("Empty AI response");return answer;
-  }finally{conn.disconnect();}
- }
+
+ private String omniModel(){return getPreferences(0).getString("omni_model","liquid/lfm-3.1-7b:free");}
  private String requestProviderReview(String instructions,String prompt) throws Exception{
-  String errors="";
-  for(String provider:new String[]{"gemini","groq","openrouter"}){
-   String token=provider.equals("gemini")?geminiKey:provider.equals("groq")?groqKey:openRouterKey;
-   if(token.isEmpty())continue;
-   try{return callProvider(provider,token,instructions,prompt);}catch(Exception e){errors+=e.getMessage()+"; ";}
-  }
-  throw new IOException(errors.isEmpty()?"No AI provider configured":errors);
+  HttpURLConnection conn=(HttpURLConnection)new URL(OMNI_URL).openConnection();
+  try{
+   conn.setRequestMethod("POST");conn.setConnectTimeout(3500);conn.setReadTimeout(65000);conn.setDoOutput(true);
+   conn.setRequestProperty("Content-Type","application/json");
+   JSONObject body=new JSONObject().put("model",omniModel()).put("max_tokens",2000).put("messages",new JSONArray().put(new JSONObject().put("role","system").put("content",instructions)).put(new JSONObject().put("role","user").put("content",prompt)));
+   try(OutputStream out=conn.getOutputStream()){out.write(body.toString().getBytes(StandardCharsets.UTF_8));}
+   int code=conn.getResponseCode();
+   if(code<200||code>=300)throw new IOException("OmniRoute HTTP "+code+"; check model availability and free-tier limits");
+   ByteArrayOutputStream buffer=new ByteArrayOutputStream();
+   try(InputStream in=conn.getInputStream()){byte[] chunk=new byte[4096];int n;while((n=in.read(chunk))!=-1){if(buffer.size()+n>250000)throw new IOException("AI response too large");buffer.write(chunk,0,n);}}
+   String answer=new JSONObject(buffer.toString("UTF-8")).getJSONArray("choices").getJSONObject(0).getJSONObject("message").optString("content","");
+   if(answer.trim().isEmpty())throw new IOException("OmniRoute returned an empty response");return answer;
+  }catch(java.net.ConnectException e){throw new IOException("OmniRoute is offline. Start omniroute in Termux.",e);}
+  finally{conn.disconnect();}
  }
- private boolean incompatibleAiModel(String id){
-  String m=id==null?"":id.toLowerCase(java.util.Locale.ROOT);
-  return m.contains("embed")||m.contains("embedding")||m.contains("rerank")||m.contains("whisper")||m.contains("transcrib")||m.contains("tts");
- }
- private String aiModelHelp(){return "Select a chat/instruct model that supports OpenRouter chat completions. Embedding and reranking models cannot analyze tender text. Example: openai/gpt-4o-mini (may require credits).";}
  private void showAiSettings(){
-  LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(20),dp(12),dp(20),dp(8));
-  TextView info=new TextView(this);info.setText("AI providers: Gemini → Groq → OpenRouter. Keys are encrypted on this device when Remember is enabled.");info.setTextColor(Color.DKGRAY);content.addView(info);
-  EditText api=new EditText(this);api.setHint("OpenRouter API key");api.setSingleLine(true);api.setInputType(129);api.setText(openRouterKey);content.addView(api);
-  EditText model=new EditText(this);model.setSingleLine(true);model.setHint("Model ID");model.setText(getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free"));content.addView(model);
-  CheckBox remember=new CheckBox(this);remember.setText("Remember key securely (Android Keystore)");remember.setChecked(getPreferences(0).getBoolean("remember_openrouter_key",false));content.addView(remember);
-  TextView connection=new TextView(this);connection.setText("Connection not tested");connection.setTextColor(Color.DKGRAY);connection.setPadding(0,dp(12),0,dp(12));content.addView(connection);
-  Button test=button("Test AI connection");content.addView(test);
+  LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(20),dp(12),dp(20),dp(12));
+  TextView info=new TextView(this);info.setText("Local OmniRoute • Termux must be running on this phone. No cloud API keys are needed in Tender Radar.");content.addView(info);
+  TextView address=new TextView(this);address.setText("Server: http://127.0.0.1:20128/v1");address.setPadding(0,dp(12),0,dp(8));content.addView(address);
+  EditText model=new EditText(this);model.setSingleLine(true);model.setHint("OmniRoute model ID");model.setText(omniModel());content.addView(model);
+  TextView result=new TextView(this);result.setText("Not tested");result.setPadding(0,dp(12),0,dp(12));content.addView(result);
+  Button test=button("Test local connection");content.addView(test);
   test.setOnClickListener(v->{
-   String token=api.getText().toString().trim(),modelId=model.getText().toString().trim();
-   if(token.isEmpty()){api.setError("Enter an API key");return;}
-   if(modelId.isEmpty()){model.setError("Enter a model ID");return;}
-   if(incompatibleAiModel(modelId)){model.setError("Not a chat model");connection.setText(aiModelHelp());return;}
-   test.setEnabled(false);connection.setText("Connecting to OpenRouter…");
-   new Thread(()->{
-    HttpURLConnection conn=null;String message;
-    try{
-     conn=(HttpURLConnection)new URL("https://openrouter.ai/api/v1/chat/completions").openConnection();
-     conn.setRequestMethod("POST");conn.setConnectTimeout(15000);conn.setReadTimeout(35000);conn.setDoOutput(true);
-     conn.setRequestProperty("Authorization","Bearer "+token);conn.setRequestProperty("Content-Type","application/json");
-     JSONObject body=new JSONObject().put("model",modelId).put("max_tokens",12).put("messages",new JSONArray().put(new JSONObject().put("role","user").put("content","Reply OK")));
-     try(OutputStream out=conn.getOutputStream()){out.write(body.toString().getBytes(StandardCharsets.UTF_8));}
-     int code=conn.getResponseCode();
-     if(code>=200&&code<300){try(InputStream in=conn.getInputStream()){byte[] buf=new byte[2048];while(in.read(buf)!=-1){}}message="Connected successfully • model responded (HTTP "+code+")";}
-     else if(code==401||code==403)message="Authentication failed (HTTP "+code+"). Check your API key.";
-     else if(code==429)message="Rate limit reached (429). Try again later.";
-     else if(code==400||code==404||code==422)message="Model rejected (HTTP "+code+"). "+aiModelHelp();
-     else message="OpenRouter returned HTTP "+code+". Check model availability or account limits.";
-    }catch(Exception e){message="Connection failed: "+e.getClass().getSimpleName()+". Check internet access.";}
-    finally{if(conn!=null)conn.disconnect();}
-    final String result=message;runOnUiThread(()->{test.setEnabled(true);connection.setText(result);if(result.startsWith("Connected successfully")){openRouterKey=token;getPreferences(0).edit().putString("openrouter_model",modelId).apply();aiConnectionPaused=false;apiFailedReviews.clear();state.setText("AI connected. Resuming pending tender reviews…");renderDashboard();scheduleAutoReview();}});
-   }).start();
+   String id=model.getText().toString().trim();if(id.isEmpty()){model.setError("Enter a model ID");return;}
+   getPreferences(0).edit().putString("omni_model",id).apply();test.setEnabled(false);result.setText("Testing local OmniRoute…");
+   new Thread(()->{String message;try{String answer=requestProviderReview("Reply briefly.","Reply OK");message="Connected • "+answer.substring(0,Math.min(answer.length(),100));}
+    catch(Exception e){message="Connection failed: "+e.getMessage();}
+    String status=message;runOnUiThread(()->{test.setEnabled(true);result.setText(status);if(status.startsWith("Connected")){aiConnectionPaused=false;apiFailedReviews.clear();scheduleAutoReview();}});}).start();
   });
-
-  TextView extraLabel=new TextView(this);extraLabel.setText("Other AI providers • Gemini first, Groq second");extraLabel.setTextColor(Color.DKGRAY);extraLabel.setPadding(0,dp(16),0,0);content.addView(extraLabel);
-  EditText gemini=new EditText(this);gemini.setHint("Google Gemini API key");gemini.setInputType(129);gemini.setSingleLine(true);gemini.setText(geminiKey);content.addView(gemini);
-  EditText groq=new EditText(this);groq.setHint("Groq API key");groq.setInputType(129);groq.setSingleLine(true);groq.setText(groqKey);content.addView(groq);
-
-  EditText geminiModel=new EditText(this);geminiModel.setSingleLine(true);geminiModel.setHint("Gemini model");geminiModel.setText(getPreferences(0).getString("gemini_model","gemini-3.8-flash"));content.addView(geminiModel);
-  EditText groqModel=new EditText(this);groqModel.setSingleLine(true);groqModel.setHint("Groq model");groqModel.setText(getPreferences(0).getString("groq_model","llama-3.3-70b-versatile"));content.addView(groqModel);
-  CheckBox rememberProviders=new CheckBox(this);rememberProviders.setText("Remember Gemini and Groq keys securely");rememberProviders.setChecked(getPreferences(0).getBoolean("remember_provider_keys",false));content.addView(rememberProviders);
-
-  Button listGroq=button("Find Groq models available to my key");content.addView(listGroq);
-  listGroq.setOnClickListener(v->{
-   String key=groq.getText().toString().trim();if(key.isEmpty()){groq.setError("Enter Groq key first");return;}
-   listGroq.setEnabled(false);connection.setText("Checking available Groq models…");
-   new Thread(()->{
-    String message;
-    HttpURLConnection c=null;
-    try{
-     c=(HttpURLConnection)new URL("https://api.groq.com/openai/v1/models").openConnection();
-     c.setConnectTimeout(15000);c.setReadTimeout(20000);c.setRequestProperty("Authorization","Bearer "+key);
-     int code=c.getResponseCode();if(code!=200)throw new IOException("Groq model list HTTP "+code);
-     ByteArrayOutputStream out=new ByteArrayOutputStream();
-     try(InputStream in=c.getInputStream()){byte[] buf=new byte[4096];int n;while((n=in.read(buf))!=-1){if(out.size()+n>100000)break;out.write(buf,0,n);}}
-     JSONArray data=new JSONObject(out.toString("UTF-8")).getJSONArray("data");
-     ArrayList<String> models=new ArrayList<>();
-     for(int i=0;i<data.length();i++){String id=data.getJSONObject(i).optString("id");if(!id.isEmpty()&&!id.contains("whisper")&&!id.contains("tts")&&!id.contains("guard"))models.add(id);}
-     Collections.sort(models);message=models.isEmpty()?"No chat models listed":android.text.TextUtils.join("\n",models);
-    }catch(Exception e){message="Could not list Groq models: "+e.getMessage();}
-    finally{if(c!=null)c.disconnect();}
-    String result=message;runOnUiThread(()->{listGroq.setEnabled(true);new android.app.AlertDialog.Builder(this).setTitle("Available Groq models").setMessage(result).setPositiveButton("OK",null).show();});
-   }).start();
-  });
-  Button testProviders=button("Test Gemini / Groq connections");content.addView(testProviders);
-  testProviders.setOnClickListener(v->{
-   String g=gemini.getText().toString().trim(),q=groq.getText().toString().trim();
-   getPreferences(0).edit().putString("gemini_model",geminiModel.getText().toString().trim()).putString("groq_model",groqModel.getText().toString().trim()).apply();
-   testProviders.setEnabled(false);connection.setText("Testing AI providers…");
-   new Thread(()->{
-    StringBuilder results=new StringBuilder();
-    for(String provider:new String[]{"gemini","groq"}){
-     String token=provider.equals("gemini")?g:q;
-     if(token.isEmpty()){results.append(provider).append(": key missing; ");continue;}
-     try{callProvider(provider,token,"Reply briefly.","Reply OK");results.append(provider).append(": connected; ");}
-     catch(Exception e){results.append(e.getMessage()).append("; ");}
-    }
-    String message=results.toString();runOnUiThread(()->{
-     testProviders.setEnabled(true);connection.setText(message);
-     if(message.contains("connected")){geminiKey=g;groqKey=q;aiConnectionPaused=false;apiFailedReviews.clear();scheduleAutoReview();}
-    });
-   }).start();
-  });
-  Button forget=button("Forget saved API key");content.addView(forget);forget.setOnClickListener(v->{clearStoredKey();openRouterKey="";api.setText("");remember.setChecked(false);connection.setText("Saved key removed");});
   ScrollView scroll=new ScrollView(this);scroll.addView(content);
-  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("AI settings").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Save",null).create();
-  dialog.setOnShowListener(ignored->dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
-   String token=api.getText().toString().trim(),id=model.getText().toString().trim();
-   if(id.isEmpty()){model.setError("Enter model ID");return;}
-   if(!gemini.getText().toString().trim().isEmpty()||!groq.getText().toString().trim().isEmpty()){}else if(incompatibleAiModel(id)){model.setError("Not a chat model");connection.setText(aiModelHelp());return;}
-   try{if(remember.isChecked()&&!token.isEmpty())storeKey(token);else clearStoredKey();}
-   catch(Exception e){connection.setText("Secure storage failed: "+e.getClass().getSimpleName());return;}
-
-   String g=gemini.getText().toString().trim(),q=groq.getText().toString().trim();
-   boolean providersChanged=!g.equals(geminiKey)||!q.equals(groqKey);
-   getPreferences(0).edit().putString("gemini_model",geminiModel.getText().toString().trim()).putString("groq_model",groqModel.getText().toString().trim()).apply();
-   try{
-    if(rememberProviders.isChecked()){if(!g.isEmpty())saveProviderKey("gemini",g);else clearProviderKey("gemini");if(!q.isEmpty())saveProviderKey("groq",q);else clearProviderKey("groq");}
-    else{clearProviderKey("gemini");clearProviderKey("groq");}
-    getPreferences(0).edit().putBoolean("remember_provider_keys",rememberProviders.isChecked()).apply();
-   }catch(Exception e){connection.setText("Provider key storage failed");return;}
-   geminiKey=g;groqKey=q;
-   if(providersChanged){aiConnectionPaused=false;apiFailedReviews.clear();}
-   boolean changed=providersChanged||!token.equals(openRouterKey)||!id.equals(getPreferences(0).getString("openrouter_model","recursive/flint-v1.0:free"));openRouterKey=token;if(changed){aiConnectionPaused=false;apiFailedReviews.clear();}scheduleAutoReview();getPreferences(0).edit().putString("openrouter_model",id).apply();dialog.dismiss();
-  }));
-  dialog.show();
+  new android.app.AlertDialog.Builder(this).setTitle("OmniRoute AI settings").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Save",(dialog,which)->{
+   String id=model.getText().toString().trim();if(!id.isEmpty()){getPreferences(0).edit().putString("omni_model",id).apply();aiConnectionPaused=false;apiFailedReviews.clear();scheduleAutoReview();}
+  }).show();
  }
  private void showAiDialog(JSONObject bid){
   LinearLayout layout=new LinearLayout(this);layout.setOrientation(1);layout.setPadding(dp(16),dp(8),dp(16),dp(8));
