@@ -417,6 +417,36 @@ public class GemBrowserActivity extends Activity {
   getPreferences(0).edit().remove("openrouter_key_iv").remove("openrouter_key_cipher").putBoolean("remember_openrouter_key",false).commit();
   try{KeyStore store=KeyStore.getInstance("AndroidKeyStore");store.load(null);if(store.containsAlias(KEY_ALIAS))store.deleteEntry(KEY_ALIAS);}catch(Exception ignored){}
  }
+ private boolean safeGemDocument(Uri uri){
+  String host=uri==null?null:uri.getHost();
+  return uri!=null&&"https".equalsIgnoreCase(uri.getScheme())&&host!=null&&(host.equals("gem.gov.in")||host.endsWith(".gem.gov.in"));
+ }
+ private void loadPublicPdfInto(JSONObject bid,EditText target,Button trigger){
+  JSONArray links=bid.optJSONArray("documentLinks");
+  String link="";
+  if(links!=null)for(int i=0;i<links.length();i++){String candidate=links.optString(i);if(safeGemDocument(Uri.parse(candidate))){link=candidate;break;}}
+  if(link.isEmpty()){new android.app.AlertDialog.Builder(this).setTitle("Document not publicly linked").setMessage("The GeM listing does not expose a direct public PDF link. Open the bid's documents in GeM and import a PDF if needed. This app cannot bypass GeM access restrictions.").setPositiveButton("OK",null).show();return;}
+  final String pdfLink=link;trigger.setEnabled(false);target.setText("Reading GeM PDF…");
+  new Thread(()->{
+   File file=null;HttpURLConnection conn=null;
+   try{
+    conn=(HttpURLConnection)new URL(pdfLink).openConnection();
+    conn.setConnectTimeout(15000);conn.setReadTimeout(30000);conn.setInstanceFollowRedirects(false);
+    conn.setRequestProperty("Accept","application/pdf");
+    int code=conn.getResponseCode();if(code!=200)throw new IOException("GeM returned HTTP "+code);
+    String mime=conn.getContentType();
+    if(mime==null||!mime.toLowerCase(Locale.ROOT).contains("pdf"))throw new IOException("GeM did not provide a public PDF");
+    file=File.createTempFile("gem_bid_",".pdf",getCacheDir());
+    try(InputStream in=conn.getInputStream();OutputStream out=new FileOutputStream(file)){
+     byte[] buf=new byte[8192];int n;long total=0;
+     while((n=in.read(buf))!=-1){total+=n;if(total>12*1024*1024)throw new IOException("PDF exceeds 12 MB");out.write(buf,0,n);}
+    }
+    PdfTenderReader.Result result=PdfTenderReader.read(this,Uri.fromFile(file));
+    runOnUiThread(()->{target.setText(result.text);trigger.setEnabled(true);state.setText("GeM PDF extracted ("+result.pages+" pages). Review scope and tap Analyze.");});
+   }catch(Exception e){String message=e.getMessage();runOnUiThread(()->{target.setText("");trigger.setEnabled(true);new android.app.AlertDialog.Builder(this).setTitle("Automatic PDF retrieval unavailable").setMessage(message+"\\nThis GeM document may require a browser session. You can still import it manually.").setPositiveButton("OK",null).show();});}
+   finally{if(conn!=null)conn.disconnect();if(file!=null)file.delete();}
+  }).start();
+ }
  private void showAiDialog(JSONObject bid){
   LinearLayout layout=new LinearLayout(this);layout.setOrientation(1);layout.setPadding(dp(16),dp(8),dp(16),dp(8));
   TextView explanation=new TextView(this);explanation.setText("Paste the tender scope or extracted document text. AI cannot verify a bid from its truncated title alone. OpenRouter key can be encrypted with Android Keystore and remembered on this device.");layout.addView(explanation);
@@ -425,6 +455,7 @@ public class GemBrowserActivity extends Activity {
    CheckBox remember=new CheckBox(this);remember.setText("Remember API key securely on this device");remember.setChecked(getPreferences(0).getBoolean("remember_openrouter_key",false));layout.addView(remember);
    Button forget=button("Forget saved API key");layout.addView(forget);forget.setOnClickListener(v->{clearStoredKey();openRouterKey="";api.setText("");remember.setChecked(false);state.setText("Saved OpenRouter key removed.");});
   EditText scope=new EditText(this);scope.setHint("Paste tender document / technical scope");scope.setMinLines(5);scope.setMaxLines(12);layout.addView(scope);
+  Button automatic=button("Auto-read available GeM tender PDF");layout.addView(automatic);automatic.setOnClickListener(v->loadPublicPdfInto(bid,scope,automatic));
   Button importPdf=button("Import tender PDF (no copying)");layout.addView(importPdf);
   importPdf.setOnClickListener(v->{pendingPdfScope=scope;Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT);pick.setType("application/pdf");pick.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(pick,PICK_TENDER_PDF);});
   EditText publicPdfUrl=new EditText(this);publicPdfUrl.setHint("Optional public GeM PDF URL (https://...)");publicPdfUrl.setSingleLine(true);layout.addView(publicPdfUrl);
@@ -447,6 +478,7 @@ public class GemBrowserActivity extends Activity {
    }).start();
   });
   ScrollView scroll=new ScrollView(this);scroll.addView(layout);
+  JSONArray discovered=bid.optJSONArray("documentLinks");if(discovered!=null&&discovered.length()>0)loadPublicPdfInto(bid,scope,automatic);
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("AI technical review: "+bid.optString("bidId")).setView(scroll)
    .setNegativeButton("Cancel",null).setPositiveButton("Analyze",null).create();
   dialog.setOnShowListener(ignored->dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
