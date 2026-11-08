@@ -400,7 +400,8 @@ public class GemBrowserActivity extends Activity {
  }
  private void showShortlist(){
   LinearLayout list=new LinearLayout(this);list.setOrientation(1);list.setPadding(dp(14),dp(8),dp(14),dp(8));
-  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Shortlisted tenders ("+shortlisted.size()+")").setView(list).setPositiveButton("Close",null).create();
+  ScrollView scroll=new ScrollView(this);scroll.addView(list);
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Shortlisted tenders ("+shortlisted.size()+")").setView(scroll).setPositiveButton("Close",null).create();
   if(shortlisted.isEmpty())list.addView(dashText("No shortlisted tenders yet.",15,themeColor(0xff1b2d31,0xffeff9f8)));
   for(JSONObject bid:new ArrayList<>(shortlisted.values())){
    String id=bid.optString("bidId");
@@ -410,8 +411,6 @@ public class GemBrowserActivity extends Activity {
    Button restore=button("Remove from shortlist / show again");list.addView(restore);
    restore.setOnClickListener(v->{shortlisted.remove(id);persistShortlist();dialog.dismiss();renderDashboard();updateCollectedCount();});
   }
-  ScrollView scroll=new ScrollView(this);list.setPadding(dp(14),dp(8),dp(14),dp(8));
-  dialog.setOnShowListener(d->{});
   dialog.show();
  }
  private void renderDashboard(){
