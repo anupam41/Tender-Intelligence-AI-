@@ -194,7 +194,7 @@ public class GemBrowserActivity extends Activity {
     state.setText("Collecting page "+autoPages+"…");
     collectVisible(()->{
      if(!autoCollecting)return;
-     if(autoPages>=(batchRunning?25:100)){stopAutoCollect("Reached page safety limit.");return;}
+     if(autoPages>=(batchRunning?25:100)){if(batchRunning){autoCollecting=false;autoHandler.postDelayed(this::nextBatch,600);}else stopAutoCollect("Reached page safety limit.");return;}
      String nextJs="(function(){var a=Array.from(document.querySelectorAll('a,button')).find(e=>{var r=e.getBoundingClientRect();return r.width>0&&r.height>0&&!e.disabled&&e.getAttribute('aria-disabled')!=='true'&&!e.classList.contains('disabled')&&/^(next|next page|›|»|>)$/i.test((e.innerText||'').trim())});if(!a)return 'END';a.click();return 'NEXT'})()";
      browser.evaluateJavascript(nextJs,out->{
       if(!autoCollecting)return;
