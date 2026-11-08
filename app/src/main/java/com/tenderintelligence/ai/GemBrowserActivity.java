@@ -237,8 +237,8 @@ public class GemBrowserActivity extends Activity {
    try{
     JSONObject data=new JSONObject(new JSONArray("["+result+"]").getString(0));
     String signature=data.optString("signature");int count=data.optInt("count");
-    if(count==0){if(++autoStalls>=8){if(batchRunning){autoCollecting=false;autoHandler.postDelayed(this::nextBatch,600);}else stopAutoCollect("No GeM bid cards detected. Search first and wait for results.");return;}autoHandler.postDelayed(this::autoStep,1500);return;}
-    if(signature.equals(autoSignature)){if(++autoStalls>=8){if(batchRunning){autoCollecting=false;autoHandler.postDelayed(this::nextBatch,600);}else stopAutoCollect("GeM results did not change. Pagination may be blocked.");return;}autoHandler.postDelayed(this::autoStep,1500);return;}
+    if(count==0){if(++autoStalls>=8){autoCollecting=false;batchRunning=false;if(batchButton!=null)batchButton.setText("Find tenders • Scan equipment categories");if(scanProgressLabel!=null)scanProgressLabel.setText("Scan paused • GeM returned no detectable bid cards for "+batchTerms[Math.max(0,batchIndex-1)]);state.setText("No GeM bid cards detected. Check that the GeM listing loaded and displays results. Scan stopped instead of skipping categories.");return;}autoHandler.postDelayed(this::autoStep,1500);return;}
+    if(signature.equals(autoSignature)){if(++autoStalls>=8){autoCollecting=false;batchRunning=false;if(batchButton!=null)batchButton.setText("Find tenders • Scan equipment categories");state.setText("GeM results did not change. Scan stopped to avoid silently skipping bids. Open the GeM listing and check search or pagination.");return;}autoHandler.postDelayed(this::autoStep,1500);return;}
     autoSignature=signature;autoStalls=0;autoPages++;if(scanProgressLabel!=null&&batchRunning)scanProgressLabel.setText("Scanning "+batchIndex+"/"+batchTerms.length+" • page "+autoPages+" • "+collected.size()+" collected");
     state.setText("Collecting page "+autoPages+"…");
     collectVisible(()->{
