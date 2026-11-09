@@ -366,11 +366,11 @@ public class GemBrowserActivity extends Activity {
  private void addMetric(LinearLayout row,String value,String label,int color){
   LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);tile.setGravity(Gravity.CENTER);
   tile.setPadding(dp(6),dp(10),dp(6),dp(10));
-  tile.setBackground(glass(themeColor(0xfff9fffd,0xff1a3036),22));
+  tile.setBackground(glass(themeColor(0xfff9fffd,0xff1a3036),20));
   LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(70),1);
   lp.setMargins(0,0,dp(6),0);row.addView(tile,lp);
   TextView count=new TextView(this);count.setText(value);count.setTextSize(21);count.setTypeface(null,Typeface.BOLD);count.setTextColor(darkMode()?0xff7de4d7:color);count.setGravity(Gravity.CENTER);tile.addView(count,new LinearLayout.LayoutParams(-1,-2));
-  TextView caption=new TextView(this);caption.setText(label);caption.setTextSize(11);caption.setTextColor(themeColor(0xff71858a,0xffa3bdc1));caption.setGravity(Gravity.CENTER);tile.addView(caption,new LinearLayout.LayoutParams(-1,-2));
+  TextView caption=new TextView(this);caption.setText(label);caption.setTextSize(12);caption.setTextColor(themeColor(0xff71858a,0xffa3bdc1));caption.setGravity(Gravity.CENTER);tile.addView(caption,new LinearLayout.LayoutParams(-1,-2));
  }
  private void restoreShortlist(){
   try{JSONArray a=new JSONArray(getPreferences(0).getString("shortlisted_tenders","[]"));for(int i=0;i<a.length();i++){JSONObject j=a.optJSONObject(i);if(j!=null&&!j.optString("bidId").isEmpty())shortlisted.put(j.optString("bidId"),j);}}catch(Exception ignored){}
@@ -437,8 +437,8 @@ public class GemBrowserActivity extends Activity {
   if(dashboardList==null)return;
   while(dashboardList.getChildCount()>1)dashboardList.removeViewAt(1);
   int white=themeColor(0xff1b2d31,0xffeff9f8),muted=themeColor(0xff67797d,0xff9fb4b7),teal=themeColor(0xff008b7e,0xff57d7c6);
-  Button shortlistLibrary=button("Tender management  •  "+shortlisted.size()+" saved");shortlistLibrary.setTextSize(14);shortlistLibrary.setTextColor(uiAccent());shortlistLibrary.setMinHeight(dp(52));dashboardList.addView(shortlistLibrary);shortlistLibrary.setOnClickListener(v->showShortlist());
-  TextView resultsHeading=dashText("Matching tenders",24,white);resultsHeading.setTypeface(null,Typeface.BOLD);dashboardList.addView(resultsHeading);
+  Button shortlistLibrary=button("Tender management  •  "+shortlisted.size()+" saved");shortlistLibrary.setContentDescription("Open tender management, "+shortlisted.size()+" saved tenders");shortlistLibrary.setTextSize(14);shortlistLibrary.setTextColor(uiAccent());shortlistLibrary.setMinHeight(dp(52));dashboardList.addView(shortlistLibrary);shortlistLibrary.setOnClickListener(v->showShortlist());
+  TextView resultsHeading=dashText("Matching tenders",22,white);resultsHeading.setTypeface(null,Typeface.BOLD);dashboardList.addView(resultsHeading);
   ArrayList<JSONObject> open=new ArrayList<>();int expired=0,missing=0,analyzed=0;
   Date now=new Date();
   for(JSONObject j:collected.values()){
@@ -737,10 +737,20 @@ public class GemBrowserActivity extends Activity {
  private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
  private android.graphics.drawable.GradientDrawable glass(int color,int radius){android.graphics.drawable.GradientDrawable g=new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,darkMode()?new int[]{0xff263f46,color,0xff13262e}:new int[]{0xfffcffff,color,0xffe2f3f0});g.setCornerRadius(dp(radius));g.setStroke(dp(1),themeColor(0xffd5e9e6,0xff38555d));return g;}
  private android.graphics.drawable.GradientDrawable rounded(int color,int radius,int border){android.graphics.drawable.GradientDrawable d=new android.graphics.drawable.GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));d.setStroke(dp(1),border);return d;}
+ private int adaptiveColor(int attr,int fallback){
+  android.util.TypedValue value=new android.util.TypedValue();
+  if(getTheme().resolveAttribute(attr,value,true)){
+   if(value.resourceId!=0){try{return getColor(value.resourceId);}catch(Exception ignored){}}
+   if(value.type>=android.util.TypedValue.TYPE_FIRST_COLOR_INT&&value.type<=android.util.TypedValue.TYPE_LAST_COLOR_INT)return value.data;
+  }
+  return fallback;
+ }
+ private int adaptiveSurface(){return adaptiveColor(android.R.attr.colorBackground,themeColor(0xfff6faf9,0xff101b21));}
+ private int adaptivePrimary(){return adaptiveColor(android.R.attr.colorAccent,themeColor(0xff008f82,0xff70e0d0));}
  private int uiText(){return themeColor(0xff193136,0xffeaf7f5);}
  private int uiMuted(){return themeColor(0xff60777a,0xffafc5c8);}
- private int uiSurface(){return themeColor(0xfffbfffe,0xff172830);}
- private int uiAccent(){return themeColor(0xff007f73,0xff70e0d0);}
+ private int uiSurface(){return adaptiveColor(android.R.attr.colorBackground,themeColor(0xfffbfffe,0xff172830));}
+ private int uiAccent(){return adaptivePrimary();}
  private void styleDialog(android.app.AlertDialog dialog){
   if(dialog.getWindow()==null)return;
   android.graphics.drawable.GradientDrawable background=new android.graphics.drawable.GradientDrawable();
@@ -759,6 +769,6 @@ public class GemBrowserActivity extends Activity {
   e.setTextColor(uiText());e.setHintTextColor(uiMuted());
   e.setBackgroundTintList(android.content.res.ColorStateList.valueOf(uiAccent()));
  }
- private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(12);b.setTextColor(uiText());b.setBackground(glass(themeColor(0xffe7f5f1,0xff20383e),18));b.setMinHeight(dp(44));b.setPadding(dp(4),0,dp(4),0);return b;}
+ private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(14);b.setTextColor(uiText());b.setBackground(glass(themeColor(0xffe7f5f1,0xff20383e),18));b.setMinHeight(dp(48));b.setPadding(dp(4),0,dp(4),0);return b;}
  @Override public void onBackPressed(){if(browser!=null&&browser.canGoBack())browser.goBack();else super.onBackPressed();}
 }
