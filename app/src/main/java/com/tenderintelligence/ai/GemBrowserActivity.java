@@ -431,13 +431,13 @@ public class GemBrowserActivity extends Activity {
    Button restore=button("Remove from shortlist / show again");list.addView(restore);
    restore.setOnClickListener(v->{shortlisted.remove(id);persistShortlist();dialog.dismiss();renderDashboard();updateCollectedCount();});
   }
-  dialog.show();
+  dialog.setOnShowListener(x->styleDialog(dialog));dialog.show();styleDialog(dialog);
  }
  private void renderDashboard(){
   if(dashboardList==null)return;
   while(dashboardList.getChildCount()>1)dashboardList.removeViewAt(1);
   int white=themeColor(0xff1b2d31,0xffeff9f8),muted=themeColor(0xff67797d,0xff9fb4b7),teal=themeColor(0xff008b7e,0xff57d7c6);
-  Button shortlistLibrary=button("Tender management ("+shortlisted.size()+") • Pipeline");dashboardList.addView(shortlistLibrary);shortlistLibrary.setOnClickListener(v->showShortlist());
+  Button shortlistLibrary=button("Tender management  •  "+shortlisted.size()+" saved");shortlistLibrary.setTextSize(14);shortlistLibrary.setTextColor(uiAccent());shortlistLibrary.setMinHeight(dp(52));dashboardList.addView(shortlistLibrary);shortlistLibrary.setOnClickListener(v->showShortlist());
   TextView resultsHeading=dashText("Matching tenders",24,white);resultsHeading.setTypeface(null,Typeface.BOLD);dashboardList.addView(resultsHeading);
   ArrayList<JSONObject> open=new ArrayList<>();int expired=0,missing=0,analyzed=0;
   Date now=new Date();
@@ -645,11 +645,11 @@ public class GemBrowserActivity extends Activity {
  }
  private void showAiSettings(){
   LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(20),dp(12),dp(20),dp(12));
-  TextView info=new TextView(this);info.setText("Local OmniRoute • Termux must be running on this phone. Enter the local OmniRoute gateway key below. Your provider keys stay in OmniRoute.");content.addView(info);
-  TextView address=new TextView(this);address.setText("Server: http://127.0.0.1:20128/v1");address.setPadding(0,dp(12),0,dp(8));content.addView(address);
-  EditText model=new EditText(this);model.setSingleLine(true);model.setHint("OmniRoute model ID");model.setText(omniModel());content.addView(model);
-  EditText apiKey=new EditText(this);apiKey.setSingleLine(true);apiKey.setHint("OmniRoute gateway API key");apiKey.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);apiKey.setText(OmniSecret.load(this));content.addView(apiKey);
-  TextView result=new TextView(this);result.setText("Not tested");result.setPadding(0,dp(12),0,dp(12));content.addView(result);
+  TextView info=new TextView(this);info.setTextColor(uiText());info.setText("Local OmniRoute • Termux must be running on this phone. Enter the local OmniRoute gateway key below. Your provider keys stay in OmniRoute.");content.addView(info);
+  TextView address=new TextView(this);address.setTextColor(uiMuted());address.setText("Server: http://127.0.0.1:20128/v1");address.setPadding(0,dp(12),0,dp(8));content.addView(address);
+  EditText model=new EditText(this);model.setSingleLine(true);model.setHint("OmniRoute model ID");model.setText(omniModel());styleDialogField(model);content.addView(model);
+  EditText apiKey=new EditText(this);apiKey.setSingleLine(true);apiKey.setHint("OmniRoute gateway API key");apiKey.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);apiKey.setText(OmniSecret.load(this));styleDialogField(apiKey);content.addView(apiKey);
+  TextView result=new TextView(this);result.setTextColor(uiMuted());result.setText("Not tested");result.setPadding(0,dp(12),0,dp(12));content.addView(result);
   Button test=button("Test local connection");content.addView(test);
   test.setOnClickListener(v->{
    String id=model.getText().toString().trim();if(id.isEmpty()){model.setError("Enter a model ID");return;}
@@ -737,6 +737,28 @@ public class GemBrowserActivity extends Activity {
  private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
  private android.graphics.drawable.GradientDrawable glass(int color,int radius){android.graphics.drawable.GradientDrawable g=new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,darkMode()?new int[]{0xff263f46,color,0xff13262e}:new int[]{0xfffcffff,color,0xffe2f3f0});g.setCornerRadius(dp(radius));g.setStroke(dp(1),themeColor(0xffd5e9e6,0xff38555d));return g;}
  private android.graphics.drawable.GradientDrawable rounded(int color,int radius,int border){android.graphics.drawable.GradientDrawable d=new android.graphics.drawable.GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));d.setStroke(dp(1),border);return d;}
- private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(12);b.setTextColor(Color.BLACK);b.setMinHeight(dp(44));b.setPadding(dp(4),0,dp(4),0);return b;}
+ private int uiText(){return themeColor(0xff193136,0xffeaf7f5);}
+ private int uiMuted(){return themeColor(0xff60777a,0xffafc5c8);}
+ private int uiSurface(){return themeColor(0xfffbfffe,0xff172830);}
+ private int uiAccent(){return themeColor(0xff007f73,0xff70e0d0);}
+ private void styleDialog(android.app.AlertDialog dialog){
+  if(dialog.getWindow()==null)return;
+  android.graphics.drawable.GradientDrawable background=new android.graphics.drawable.GradientDrawable();
+  background.setColor(uiSurface());background.setCornerRadius(dp(24));
+  dialog.getWindow().setBackgroundDrawable(background);
+  int titleId=getResources().getIdentifier("alertTitle","id","android");
+  TextView title=dialog.findViewById(titleId);if(title!=null)title.setTextColor(uiText());
+  for(int which:new int[]{-1,-2,-3}){
+   Button b=dialog.getButton(which);if(b!=null){b.setTextColor(uiAccent());b.setAllCaps(false);}
+  }
+ }
+ private android.app.AlertDialog showStyledDialog(android.app.AlertDialog.Builder builder){
+  android.app.AlertDialog d=builder.create();d.setOnShowListener(x->styleDialog(d));d.show();styleDialog(d);return d;
+ }
+ private void styleDialogField(EditText e){
+  e.setTextColor(uiText());e.setHintTextColor(uiMuted());
+  e.setBackgroundTintList(android.content.res.ColorStateList.valueOf(uiAccent()));
+ }
+ private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(12);b.setTextColor(uiText());b.setBackground(glass(themeColor(0xffe7f5f1,0xff20383e),18));b.setMinHeight(dp(44));b.setPadding(dp(4),0,dp(4),0);return b;}
  @Override public void onBackPressed(){if(browser!=null&&browser.canGoBack())browser.goBack();else super.onBackPressed();}
 }
