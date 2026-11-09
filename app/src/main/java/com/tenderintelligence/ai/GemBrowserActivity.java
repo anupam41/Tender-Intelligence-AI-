@@ -74,7 +74,7 @@ public class GemBrowserActivity extends Activity {
   };pickerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);picker.setAdapter(pickerAdapter);picker.setVisibility(View.GONE);page.addView(picker);
   picker.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> parent){}public void onItemSelected(AdapterView<?> parent,View view,int position,long id){if(position>0)term.setText(options[position]);}});
   LinearLayout findRow=new LinearLayout(this);findRow.setOrientation(LinearLayout.HORIZONTAL);findRow.setVisibility(View.GONE);page.addView(findRow);
-  term=new EditText(this);term.setSingleLine(true);term.setTextColor(Color.WHITE);term.setHintTextColor(Color.LTGRAY);term.setHint("Or type equipment keyword");term.setTextSize(14);findRow.addView(term,new LinearLayout.LayoutParams(0,44,1));
+  term=new EditText(this);term.setSingleLine(true);term.setTextColor(themeColor(0xff1b2d31,0xffeff9f8));term.setHintTextColor(themeColor(0xff65787d,0xff9bb2b6));term.setHint("Or type equipment keyword");term.setTextSize(14);findRow.addView(term,new LinearLayout.LayoutParams(0,44,1));
   Button find=button("Search");findRow.addView(find);find.setOnClickListener(v->{
    String q=term.getText().toString().trim();
    state.setText("Submitting GeM bid search…");
