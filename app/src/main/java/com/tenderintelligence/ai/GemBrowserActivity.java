@@ -547,15 +547,15 @@ public class GemBrowserActivity extends Activity {
  private void showSavedReview(String id){
   JSONObject j=aiReviews.get(id);if(j==null){new android.app.AlertDialog.Builder(this).setMessage("No AI assessment saved for this bid yet.").setPositiveButton("OK",null).show();return;}
   LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(18),dp(12),dp(18),dp(12));
-  TextView verdict=new TextView(this);verdict.setText(j.optString("verdict")+" • "+j.optInt("score")+"/100 (indicative)");verdict.setTextSize(20);verdict.setTypeface(null,Typeface.BOLD);verdict.setTextColor(j.optString("verdict").equals("Relevant")?Color.rgb(0,110,88):Color.rgb(120,82,20));content.addView(verdict);
-  TextView priority=new TextView(this);priority.setText("Tender priority: "+j.optString("priority","Needs review")+" • Fabrication suitability requires technical verification");priority.setTextSize(14);priority.setPadding(0,dp(6),0,dp(4));content.addView(priority);
-  TextView caution=new TextView(this);caution.setText("Evidence: "+j.optString("source","Older review: document source not recorded")+"\nProvisional AI assessment • Full technical specification not verified • Score reflects relevance only, not eligibility or bid readiness");caution.setTextSize(12);caution.setPadding(0,dp(8),0,dp(12));content.addView(caution);
+  TextView verdict=new TextView(this);verdict.setText(j.optString("verdict")+" • "+j.optInt("score")+"/100 (indicative)");verdict.setTextSize(20);verdict.setTypeface(null,Typeface.BOLD);verdict.setTextColor(j.optString("verdict").equals("Relevant")?uiAccent():themeColor(0xff96671e,0xffe5bb76));content.addView(verdict);
+  TextView priority=new TextView(this);priority.setText("Tender priority: "+j.optString("priority","Needs review")+" • Fabrication suitability requires technical verification");priority.setTextSize(14);priority.setTextColor(uiText());priority.setPadding(0,dp(6),0,dp(4));content.addView(priority);
+  TextView caution=new TextView(this);caution.setText("Evidence: "+j.optString("source","Older review: document source not recorded")+"\nProvisional AI assessment • Full technical specification not verified • Score reflects relevance only, not eligibility or bid readiness");caution.setTextSize(12);caution.setTextColor(uiMuted());caution.setPadding(0,dp(8),0,dp(12));content.addView(caution);
   String report=j.optString("report").replaceAll("(?m)^#{1,6}\\\\s*","").replace("**","").replace("__","");
-  TextView body=new TextView(this);body.setText(report);body.setTextSize(15);body.setTextColor(Color.DKGRAY);body.setTextIsSelectable(true);content.addView(body);
+  TextView body=new TextView(this);body.setText(report);body.setTextSize(15);body.setTextColor(uiText());body.setTextIsSelectable(true);content.addView(body);
   JSONObject bid=collected.get(id);
   if(bid!=null){Button link=button("View GeM bid document");content.addView(link);link.setOnClickListener(v->openBidPdf(bid));}
   ScrollView scroll=new ScrollView(this);scroll.addView(content);
-  new android.app.AlertDialog.Builder(this).setTitle("AI review • "+id).setView(scroll).setPositiveButton("Close",null).show();
+  showStyledDialog(new android.app.AlertDialog.Builder(this).setTitle("AI review • "+id).setView(scroll).setPositiveButton("Close",null));
  }
  private boolean safeGemDocument(Uri uri){
   String host=uri==null?null:uri.getHost();
@@ -659,9 +659,9 @@ public class GemBrowserActivity extends Activity {
     String status=message;runOnUiThread(()->{test.setEnabled(true);result.setText(status);if(status.startsWith("Connected")){aiConnectionPaused=false;apiFailedReviews.clear();scheduleAutoReview();}});}).start();
   });
   ScrollView scroll=new ScrollView(this);scroll.addView(content);
-  new android.app.AlertDialog.Builder(this).setTitle("OmniRoute AI settings").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Save",(dialog,which)->{
+  showStyledDialog(new android.app.AlertDialog.Builder(this).setTitle("OmniRoute AI settings").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Save",(dialog,which)->{
    String id=model.getText().toString().trim();if(!id.isEmpty()){try{OmniSecret.save(this,apiKey.getText().toString().trim());getPreferences(0).edit().putString("omni_model",id).apply();aiConnectionPaused=false;apiFailedReviews.clear();scheduleAutoReview();}catch(Exception e){state.setText("Unable to save OmniRoute key securely");}}
-  }).show();
+  }));;
  }
  private void showAiDialog(JSONObject bid){
   LinearLayout layout=new LinearLayout(this);layout.setOrientation(1);layout.setPadding(dp(16),dp(8),dp(16),dp(8));
