@@ -749,8 +749,8 @@ public class GemBrowserActivity extends Activity {
  private int adaptivePrimary(){return adaptiveColor(android.R.attr.colorAccent,themeColor(0xff008f82,0xff70e0d0));}
  private int uiText(){return themeColor(0xff193136,0xffeaf7f5);}
  private int uiMuted(){return themeColor(0xff60777a,0xffafc5c8);}
- private int uiSurface(){return adaptiveColor(android.R.attr.colorBackground,themeColor(0xfffbfffe,0xff172830));}
- private int uiAccent(){return adaptivePrimary();}
+ private int uiSurface(){return themeColor(0xfffbfffe,0xff172830);}
+ private int uiAccent(){return themeColor(0xff007f73,0xff70e0d0);}
  private void styleDialog(android.app.AlertDialog dialog){
   if(dialog.getWindow()==null)return;
   android.graphics.drawable.GradientDrawable background=new android.graphics.drawable.GradientDrawable();
