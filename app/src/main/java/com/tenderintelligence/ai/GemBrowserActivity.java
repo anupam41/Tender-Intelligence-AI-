@@ -155,23 +155,33 @@ public class GemBrowserActivity extends Activity {
   heroContent=new LinearLayout(this);heroContent.setOrientation(1);dashboardList.addView(heroContent);
   // Keep title, subtitle and compact settings gear together in the top header.
   // Previously these were detached and stacked as three giant dashboard rows.
-  for(View item:new View[]{scanRing,statsStrip,batchButton,scanProgress,scanProgressLabel,collectedCount,state}){
-   android.view.ViewGroup parent=(android.view.ViewGroup)item.getParent();
-   if(parent!=null)parent.removeView(item);
-   heroContent.addView(item);
+  // Single cohesive scanning card matching the approved dashboard concept.
+  LinearLayout scanCard=new LinearLayout(this);scanCard.setOrientation(1);scanCard.setPadding(dp(16),dp(14),dp(16),dp(14));
+  scanCard.setBackground(glass(dynamicCard(),16));
+  LinearLayout.LayoutParams scanCardLp=new LinearLayout.LayoutParams(-1,-2);scanCardLp.setMargins(0,dp(4),0,dp(12));heroContent.addView(scanCard,scanCardLp);
+  LinearLayout scanOverview=new LinearLayout(this);scanOverview.setOrientation(0);scanOverview.setGravity(Gravity.CENTER_VERTICAL);scanCard.addView(scanOverview);
+  ((android.view.ViewGroup)scanRing.getParent()).removeView(scanRing);
+  LinearLayout.LayoutParams ringParams=new LinearLayout.LayoutParams(dp(104),dp(104));ringParams.setMargins(0,0,dp(14),0);scanOverview.addView(scanRing,ringParams);
+  LinearLayout scanSummary=new LinearLayout(this);scanSummary.setOrientation(1);scanSummary.setGravity(Gravity.CENTER_VERTICAL);
+  scanOverview.addView(scanSummary,new LinearLayout.LayoutParams(0,-2,1));
+  TextView scanHeading=dashText("Scanning tenders",18,dynamicText());scanHeading.setTypeface(null,Typeface.BOLD);scanSummary.addView(scanHeading);
+  for(View item:new View[]{scanProgressLabel,collectedCount}){
+   ((android.view.ViewGroup)item.getParent()).removeView(item);scanSummary.addView(item);
+   item.setPadding(0,dp(3),0,0);
   }
+  scanProgressLabel.setTextSize(12);collectedCount.setTextSize(12);
+  ((android.view.ViewGroup)batchButton.getParent()).removeView(batchButton);
+  LinearLayout.LayoutParams scanLp=new LinearLayout.LayoutParams(-1,dp(50));scanLp.setMargins(0,dp(12),0,0);scanCard.addView(batchButton,scanLp);
+  ((android.view.ViewGroup)scanProgress.getParent()).removeView(scanProgress);scanCard.addView(scanProgress,new LinearLayout.LayoutParams(-1,dp(4)));
+  ((android.view.ViewGroup)state.getParent()).removeView(state);state.setTextSize(12);state.setTextColor(dynamicMuted());state.setPadding(dp(3),dp(4),dp(3),dp(4));heroContent.addView(state);
+  // Hidden counters still receive scan updates, while the summary displays live totals.
+  statsStrip.setVisibility(View.GONE);
   heading.setPadding(0,0,0,dp(2));note.setPadding(0,0,0,0);
+  heading.setTextColor(dynamicText());note.setTextColor(dynamicMuted());
+  header.setBackground(glass(dynamicCard(),16));
   aiSettingsButton.setText("⚙");aiSettingsButton.setContentDescription("AI settings");
-  LinearLayout.LayoutParams compactSettings=new LinearLayout.LayoutParams(dp(48),dp(48));
-  compactSettings.setMargins(dp(8),0,0,0);aiSettingsButton.setLayoutParams(compactSettings);
-  LinearLayout.LayoutParams ringParams=new LinearLayout.LayoutParams(dp(124),dp(124));
-  ringParams.gravity=Gravity.CENTER_HORIZONTAL;ringParams.setMargins(0,dp(4),0,dp(10));scanRing.setLayoutParams(ringParams);
-  statsStrip.setPadding(0,0,0,dp(6));
-  LinearLayout.LayoutParams scanLp=new LinearLayout.LayoutParams(-1,dp(52));
-  scanLp.setMargins(dp(4),dp(2),dp(4),dp(8));batchButton.setLayoutParams(scanLp);
-  scanProgressLabel.setPadding(dp(4),dp(6),0,dp(2));
-  collectedCount.setPadding(dp(4),0,0,dp(2));
-  state.setPadding(dp(4),dp(2),0,dp(8));
+  aiSettingsButton.setTextColor(dynamicText());aiSettingsButton.setBackground(glass(dynamicSurface(),16));
+  LinearLayout.LayoutParams compactSettings=new LinearLayout.LayoutParams(dp(44),dp(44));compactSettings.setMargins(dp(8),0,0,0);aiSettingsButton.setLayoutParams(compactSettings);
   WebSettings settings=browser.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);settings.setSupportZoom(true);settings.setBuiltInZoomControls(true);settings.setDisplayZoomControls(false);
   browser.setWebViewClient(new WebViewClient(){
    @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){
@@ -185,7 +195,7 @@ public class GemBrowserActivity extends Activity {
   browser.setDownloadListener((url,userAgent,disposition,mime,length)->{Uri uri=Uri.parse(url);if(safe(uri))startActivity(new Intent(Intent.ACTION_VIEW,uri));else state.setText("Download blocked: external URL");});
   browser.loadUrl(GEM);renderDashboard();scheduleAutoReview();
  }
- private void updateCollectedCount(){int matches=0;for(JSONObject j:collected.values())if(relevantTitle(j.optString("title")))matches++;if(bidTotalValue!=null)bidTotalValue.setText(String.valueOf(collected.size()));if(matchTotalValue!=null)matchTotalValue.setText(String.valueOf(matches));if(collectedCount!=null)collectedCount.setText("Collected: "+collected.size()+" • Title matches: "+matches+" • Review closing dates");}
+ private void updateCollectedCount(){int matches=0;for(JSONObject j:collected.values())if(relevantTitle(j.optString("title")))matches++;if(bidTotalValue!=null)bidTotalValue.setText(String.valueOf(collected.size()));if(matchTotalValue!=null)matchTotalValue.setText(String.valueOf(matches));if(collectedCount!=null)collectedCount.setText(matches+" matching tenders • "+collected.size()+" bids collected");}
  // Search data is session-only; shortlist records and their saved reviews are permanent.
  private void clearPreviousSearchSession(){
   collected.clear();
@@ -403,12 +413,12 @@ public class GemBrowserActivity extends Activity {
  }
  private void addMetric(LinearLayout row,String value,String label,int color){
   LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);tile.setGravity(Gravity.CENTER);
-  tile.setPadding(dp(4),dp(13),dp(4),dp(13));
-  tile.setBackground(glass(dynamicCard(),24));
-  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(82),1);
+  tile.setPadding(dp(14),dp(12),dp(14),dp(12));
+  tile.setBackground(glass(dynamicCard(),16));
+  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(78),1);
   lp.setMargins(0,0,dp(6),0);row.addView(tile,lp);
-  TextView count=new TextView(this);count.setText(value);count.setTextSize(23);count.setTypeface(null,Typeface.BOLD);count.setTextColor(dynamicPrimary());count.setGravity(Gravity.CENTER);tile.addView(count,new LinearLayout.LayoutParams(-1,-2));
-  TextView caption=new TextView(this);caption.setText(label);caption.setTextSize(12);caption.setTextColor(dynamicMuted());caption.setGravity(Gravity.CENTER);tile.addView(caption,new LinearLayout.LayoutParams(-1,-2));
+  TextView count=new TextView(this);count.setText(value);count.setTextSize(23);count.setTypeface(null,Typeface.BOLD);count.setTextColor(dynamicPrimary());count.setGravity(Gravity.RIGHT);tile.addView(count,new LinearLayout.LayoutParams(-1,-2));
+  TextView caption=new TextView(this);caption.setText(label);caption.setTextSize(12);caption.setTextColor(dynamicMuted());caption.setGravity(Gravity.LEFT);tile.addView(caption,new LinearLayout.LayoutParams(-1,-2));
  }
  private void restoreShortlist(){
   try{JSONArray a=new JSONArray(getPreferences(0).getString("shortlisted_tenders","[]"));for(int i=0;i<a.length();i++){JSONObject j=a.optJSONObject(i);if(j!=null&&!j.optString("bidId").isEmpty())shortlisted.put(j.optString("bidId"),j);}}catch(Exception ignored){}
@@ -680,7 +690,7 @@ public class GemBrowserActivity extends Activity {
   if(dashboardList==null)return;
   while(dashboardList.getChildCount()>1)dashboardList.removeViewAt(1);
   int white=dynamicText(),muted=dynamicMuted(),teal=dynamicPrimary();
-  Button shortlistLibrary=button("▣  Tender management     "+shortlisted.size()+" saved  ›");shortlistLibrary.setContentDescription("Open tender management, "+shortlisted.size()+" saved tenders");shortlistLibrary.setTextSize(15);shortlistLibrary.setTypeface(null,Typeface.BOLD);shortlistLibrary.setTextColor(dynamicOnPrimary());shortlistLibrary.setBackground(rounded(dynamicPrimary(),24,dynamicPrimary()));shortlistLibrary.setMinHeight(dp(60));LinearLayout.LayoutParams libraryLp=new LinearLayout.LayoutParams(-1,dp(60));libraryLp.setMargins(0,dp(6),0,dp(14));dashboardList.addView(shortlistLibrary,libraryLp);shortlistLibrary.setOnClickListener(v->showShortlist());
+  Button shortlistLibrary=button("▣  Tender management     "+shortlisted.size()+" saved  ›");shortlistLibrary.setContentDescription("Open tender management, "+shortlisted.size()+" saved tenders");shortlistLibrary.setTextSize(15);shortlistLibrary.setTypeface(null,Typeface.BOLD);shortlistLibrary.setTextColor(dynamicText());shortlistLibrary.setBackground(rounded(dynamicTonal(),16,dynamicTonal()));shortlistLibrary.setMinHeight(dp(60));LinearLayout.LayoutParams libraryLp=new LinearLayout.LayoutParams(-1,dp(60));libraryLp.setMargins(0,dp(6),0,dp(14));dashboardList.addView(shortlistLibrary,libraryLp);shortlistLibrary.setOnClickListener(v->showShortlist());
   TextView resultsHeading=dashText("Matching tenders",22,white);resultsHeading.setTypeface(null,Typeface.BOLD);dashboardList.addView(resultsHeading);
   ArrayList<JSONObject> open=new ArrayList<>();int expired=0,missing=0,analyzed=0;
   Date now=new Date();
@@ -704,12 +714,18 @@ public class GemBrowserActivity extends Activity {
    return byScore!=0?byScore:deadlineOrder;
   });
   String[] sortLabels={"Relevance","Closing soon","AI score"};
-  Button sort=button("Sort: "+sortLabels[tenderSortMode]+"  ▾");sort.setTextSize(13);sort.setTextColor(uiAccent());
-  LinearLayout.LayoutParams sortLp=new LinearLayout.LayoutParams(-1,dp(44));sortLp.setMargins(0,dp(4),0,dp(4));dashboardList.addView(sort,sortLp);
+  Button sort=button("Sort: "+sortLabels[tenderSortMode]+"  ▾");sort.setTextSize(13);sort.setTextColor(uiAccent());sort.setBackgroundColor(Color.TRANSPARENT);sort.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+  LinearLayout.LayoutParams sortLp=new LinearLayout.LayoutParams(-1,dp(44));sortLp.setMargins(0,0,0,dp(6));dashboardList.addView(sort,sortLp);
   sort.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Sort matching tenders")
    .setSingleChoiceItems(sortLabels,tenderSortMode,(dialog,which)->{tenderSortMode=which;dialog.dismiss();renderDashboard();})
    .setNegativeButton("Cancel",null).show());
-  LinearLayout metrics=new LinearLayout(this);metrics.setOrientation(0);metrics.setPadding(0,dp(8),0,dp(8));dashboardList.addView(metrics);addMetric(metrics,String.valueOf(open.size()),"Matches",teal);addMetric(metrics,String.valueOf(analyzed),"Reviewed",0xff25756e);addMetric(metrics,String.valueOf(analyzingBids.size()),"Analyzing",0xffb77722);addMetric(metrics,String.valueOf(Math.max(0,open.size()-analyzed-analyzingBids.size()-failedAutoReviews.size()-apiFailedReviews.size())),"Waiting",0xff72848a);
+  LinearLayout metricsGrid=new LinearLayout(this);metricsGrid.setOrientation(1);dashboardList.addView(metricsGrid);
+  LinearLayout metricsTop=new LinearLayout(this);metricsTop.setOrientation(0);metricsGrid.addView(metricsTop);
+  addMetric(metricsTop,String.valueOf(open.size()),"Matches",teal);addMetric(metricsTop,String.valueOf(analyzed),"Reviewed",teal);
+  LinearLayout metricsBottom=new LinearLayout(this);metricsBottom.setOrientation(0);
+  LinearLayout.LayoutParams bottomLp=new LinearLayout.LayoutParams(-1,-2);bottomLp.setMargins(0,dp(8),0,dp(8));metricsGrid.addView(metricsBottom,bottomLp);
+  addMetric(metricsBottom,String.valueOf(analyzingBids.size()),"Analyzing",teal);
+  addMetric(metricsBottom,String.valueOf(Math.max(0,open.size()-analyzed-analyzingBids.size()-failedAutoReviews.size()-apiFailedReviews.size())),"Waiting",teal);
   TextView caution=dashText(expired+" expired hidden • "+missing+" missing dates hidden\nAI scores are indicative; verify GeM documents and deadlines.",12,muted);caution.setPadding(0,dp(4),0,dp(12));dashboardList.addView(caution);
 
   if(open.isEmpty())dashboardList.addView(dashText("No open matching tenders found. Run a GeM search and collect results.",15,white));
