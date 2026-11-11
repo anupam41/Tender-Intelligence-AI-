@@ -419,10 +419,42 @@ public class GemBrowserActivity extends Activity {
   tile.setBackground(flatShape(dynamicCard(),24));
   LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(78),1);
   lp.setMargins(0,0,dp(6),0);row.addView(tile,lp);
-  String symbol="Matches".equals(label)?"⌕":"Reviewed".equals(label)?"✓":"Analyzing".equals(label)?"◌":"◷";
+  View symbolView=new View(this){
+   private final android.graphics.Paint ink=new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+   @Override protected void onDraw(android.graphics.Canvas canvas){
+    super.onDraw(canvas);
+    float cx=getWidth()/2f,cy=getHeight()/2f,unit=dp(1);
+    ink.setColor(dynamicPrimary());ink.setStyle(android.graphics.Paint.Style.STROKE);
+    ink.setStrokeWidth(dp(2));ink.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+    ink.setStrokeJoin(android.graphics.Paint.Join.ROUND);
+    if("Matches".equals(label)){
+     canvas.drawCircle(cx-unit*2,cy-unit*2,unit*5.5f,ink);
+     canvas.drawLine(cx+unit*2,cy+unit*2,cx+unit*8,cy+unit*8,ink);
+    }else if("Reviewed".equals(label)){
+     canvas.drawCircle(cx,cy,unit*8,ink);
+     android.graphics.Path check=new android.graphics.Path();
+     check.moveTo(cx-unit*4,cy);check.lineTo(cx-unit,cy+unit*3);check.lineTo(cx+unit*5,cy-unit*4);
+     canvas.drawPath(check,ink);
+    }else if("Analyzing".equals(label)){
+     canvas.drawArc(cx-unit*8,cy-unit*8,cx+unit*8,cy+unit*8,-90,265,false,ink);
+     ink.setStyle(android.graphics.Paint.Style.FILL);
+     canvas.drawCircle(cx+unit*7.7f,cy-unit*.8f,unit*1.5f,ink);
+    }else{
+     canvas.drawCircle(cx,cy,unit*8,ink);
+     canvas.drawLine(cx,cy,cx,cy-unit*4.5f,ink);
+     canvas.drawLine(cx,cy,cx+unit*3.5f,cy+unit*2,ink);
+    }
+   }
+  };
+  symbolView.setContentDescription(label+" status icon");
   LinearLayout topLine=new LinearLayout(this);topLine.setOrientation(0);topLine.setGravity(Gravity.CENTER_VERTICAL);tile.addView(topLine,new LinearLayout.LayoutParams(-1,0,1));
-  TextView symbolView=new TextView(this);symbolView.setText(symbol);symbolView.setTextSize(20);symbolView.setTypeface(null,Typeface.BOLD);symbolView.setTextColor(dynamicPrimary());topLine.addView(symbolView,new LinearLayout.LayoutParams(0,-2,1));
-  if("Analyzing".equals(label)){symbolView.setContentDescription("AI review activity");if(!"0".equals(value)){android.view.animation.RotateAnimation spin=new android.view.animation.RotateAnimation(0,360,android.view.animation.Animation.RELATIVE_TO_SELF,.5f,android.view.animation.Animation.RELATIVE_TO_SELF,.5f);spin.setDuration(1600);spin.setRepeatCount(android.view.animation.Animation.INFINITE);spin.setInterpolator(new android.view.animation.LinearInterpolator());symbolView.startAnimation(spin);}}
+  topLine.addView(symbolView,new LinearLayout.LayoutParams(dp(26),dp(26)));
+  if("Analyzing".equals(label)&&!"0".equals(value)){
+   android.view.animation.RotateAnimation spin=new android.view.animation.RotateAnimation(0,360,android.view.animation.Animation.RELATIVE_TO_SELF,.5f,android.view.animation.Animation.RELATIVE_TO_SELF,.5f);
+   spin.setDuration(1300);spin.setRepeatCount(android.view.animation.Animation.INFINITE);
+   spin.setInterpolator(new android.view.animation.LinearInterpolator());symbolView.startAnimation(spin);
+  }
+  topLine.addView(new View(this),new LinearLayout.LayoutParams(0,dp(1),1));
   TextView count=new TextView(this);count.setText(value);count.setTextSize(23);count.setTypeface(null,Typeface.BOLD);count.setTextColor(dynamicPrimary());count.setGravity(Gravity.RIGHT);topLine.addView(count,new LinearLayout.LayoutParams(-2,-2));
   TextView caption=new TextView(this);caption.setText(label);caption.setTextSize(12);caption.setTextColor(dynamicMuted());caption.setGravity(Gravity.LEFT);tile.addView(caption,new LinearLayout.LayoutParams(-1,-2));
  }
@@ -721,7 +753,7 @@ public class GemBrowserActivity extends Activity {
   });
   String[] sortLabels={"Relevance","Closing soon","AI score"};
   Button sort=button("Sort: "+sortLabels[tenderSortMode]+"  ▾");sort.setTextSize(13);sort.setTextColor(uiAccent());sort.setBackgroundColor(Color.TRANSPARENT);sort.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
-  LinearLayout.LayoutParams sortLp=new LinearLayout.LayoutParams(-1,dp(44));sortLp.setMargins(0,0,0,dp(6));dashboardList.addView(sort,sortLp);
+  LinearLayout.LayoutParams sortLp=new LinearLayout.LayoutParams(-1,dp(32));sortLp.setMargins(0,0,0,dp(2));dashboardList.addView(sort,sortLp);
   sort.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Sort matching tenders")
    .setSingleChoiceItems(sortLabels,tenderSortMode,(dialog,which)->{tenderSortMode=which;dialog.dismiss();renderDashboard();})
    .setNegativeButton("Cancel",null).show());
