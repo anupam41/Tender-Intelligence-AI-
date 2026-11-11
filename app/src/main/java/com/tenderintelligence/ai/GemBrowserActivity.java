@@ -262,7 +262,7 @@ public class GemBrowserActivity extends Activity {
    }catch(Exception e){stopAutoCollect("Could not inspect GeM pagination.");}
   });
  }
- @Override protected void onDestroy(){autoCollecting=false;autoHandler.removeCallbacksAndMessages(null);if(browser!=null){browser.destroy();browser=null;}super.onDestroy();}
+ @Override protected void onDestroy(){saveShortlistWordAutomatically();autoCollecting=false;autoHandler.removeCallbacksAndMessages(null);if(browser!=null){browser.destroy();browser=null;}super.onDestroy();}
  private Date parsedDeadline(String value){
   try{SimpleDateFormat format=new SimpleDateFormat("dd-MM-yyyy h:mm a",Locale.ENGLISH);format.setLenient(false);return format.parse(value.trim());}catch(Exception e){return null;}
  }
@@ -383,17 +383,34 @@ public class GemBrowserActivity extends Activity {
  private void persistShortlist(){
   JSONArray a=new JSONArray();for(JSONObject j:shortlisted.values())a.put(j);
   getPreferences(0).edit().putString("shortlisted_tenders",a.toString()).apply();
+  saveShortlistWordAutomatically();
  }
  private void shortlistTender(JSONObject bid){
   String id=bid.optString("bidId");
-  new android.app.AlertDialog.Builder(this).setTitle("Shortlist "+id)
-   .setMessage("Save this tender to your shortlist and hide it from future search results on this device? You can export its GeM link and saved AI summary to Word.")
-   .setNegativeButton("Cancel",null).setPositiveButton("Shortlist", (d,w)->{
-    shortlisted.put(id,bid);persistShortlist();renderDashboard();updateCollectedCount();scheduleAutoReview();
-    new android.app.AlertDialog.Builder(this).setTitle("Tender shortlisted")
-     .setMessage("Saved locally and excluded from future matching results. Export its details and AI summary to Word now?")
-     .setNegativeButton("Later",null).setPositiveButton("Export Word", (d2,w2)->exportShortlistedWord(bid)).show();
-   }).show();
+  if(id.isEmpty()||shortlisted.containsKey(id))return;
+  shortlisted.put(id,bid);
+  persistShortlist();
+  renderDashboard();updateCollectedCount();scheduleAutoReview();
+  android.widget.Toast.makeText(this,"Saved to Tender management",android.widget.Toast.LENGTH_SHORT).show();
+ }
+ private java.io.File shortlistWordFile(){return new java.io.File(getFilesDir(),"Tender_Radar_Shortlisted.docx");}
+ private void saveShortlistWordAutomatically(){
+  if(shortlisted.isEmpty())return;
+  try{TenderWordExport.writeAll(shortlistWordFile(),shortlisted.values(),aiReviews);}
+  catch(Exception e){android.util.Log.e("TenderRadar","Cannot save shortlist report",e);}
+ }
+ private void openSavedShortlistWord(){
+  java.io.File file=shortlistWordFile();
+  if(!file.exists()){android.widget.Toast.makeText(this,"No saved Word report yet",android.widget.Toast.LENGTH_SHORT).show();return;}
+  exportAllShortlistedWord();
+ }
+ private void exportAllShortlistedWord(){
+  if(shortlisted.isEmpty())return;
+  Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+  intent.addCategory(Intent.CATEGORY_OPENABLE);
+  intent.setType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+  intent.putExtra(Intent.EXTRA_TITLE,"Tender_Radar_Shortlisted.docx");
+  try{startActivityForResult(intent,4209);}catch(Exception e){state.setText("No Word document provider available.");}
  }
  private void exportShortlistedWord(JSONObject bid){
   pendingWordBid=bid;
@@ -426,6 +443,12 @@ public class GemBrowserActivity extends Activity {
   int[] counts=new int[TENDER_STAGES.length];for(JSONObject item:shortlisted.values())for(int i=0;i<TENDER_STAGES.length;i++)if(TENDER_STAGES[i].equals(tenderStage(item)))counts[i]++;
   StringBuilder overview=new StringBuilder("Pipeline: ");for(int i=0;i<TENDER_STAGES.length;i++){if(i>0)overview.append(" • ");overview.append(TENDER_STAGES[i]).append(" ").append(counts[i]);}
   list.addView(dashText(overview.toString(),14,themeColor(0xff008b7e,0xff57d7c6)));
+  if(!shortlisted.isEmpty()){
+   Button all=button("Export all shortlisted tenders to Word");list.addView(all);
+   all.setOnClickListener(v->exportAllShortlistedWord());
+   Button saved=button("Open saved Word report");list.addView(saved);
+   saved.setOnClickListener(v->openSavedShortlistWord());
+  }
   if(shortlisted.isEmpty())list.addView(dashText("No shortlisted tenders yet.",15,themeColor(0xff1b2d31,0xffeff9f8)));
   for(JSONObject bid:new ArrayList<>(shortlisted.values())){
    String id=bid.optString("bidId");
@@ -729,6 +752,7 @@ public class GemBrowserActivity extends Activity {
  }
  @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
   super.onActivityResult(requestCode,resultCode,data);
+  if(requestCode==4209){if(resultCode==RESULT_OK&&data!=null&&data.getData()!=null){try{TenderWordExport.writeAll(this,data.getData(),shortlisted.values(),aiReviews);state.setText("Combined shortlist Word report exported.");}catch(Exception e){state.setText("Word export failed: "+e.getMessage());}}return;}
   if(requestCode==SAVE_SHORTLIST_DOCX){if(resultCode==RESULT_OK&&data!=null&&data.getData()!=null&&pendingWordBid!=null){try{TenderWordExport.write(this,data.getData(),pendingWordBid,aiReviews.get(pendingWordBid.optString("bidId")));state.setText("Shortlisted tender exported to Word.");}catch(Exception e){state.setText("Word export failed: "+e.getMessage());}}pendingWordBid=null;return;}
   if(requestCode!=PICK_TENDER_PDF||resultCode!=RESULT_OK||data==null||data.getData()==null||pendingPdfScope==null)return;
   EditText target=pendingPdfScope;Uri uri=data.getData();target.setText("Extracting selected PDF…");
