@@ -22,6 +22,7 @@ public class GemBrowserActivity extends Activity {
  private ScrollView dashboard;
  private LinearLayout dashboardList;
  private boolean showingDashboard=false;
+ private int tenderSortMode=0; // 0 relevance, 1 closing soon, 2 highest AI score
  private boolean autoCollecting=false;
  private int autoPages=0,autoStalls=0;
  private String autoSignature="";
@@ -624,11 +625,23 @@ public class GemBrowserActivity extends Activity {
    open.add(j);if(aiReviews.containsKey(j.optString("bidId")))analyzed++;
   }
   Collections.sort(open,(a,b)->{
-   int byScore=Integer.compare(qualificationScore(b),qualificationScore(a));
-   if(byScore!=0)return byScore;
    Date ad=parsedDeadline(a.optString("deadlineText")),bd=parsedDeadline(b.optString("deadlineText"));
-   return ad==null||bd==null?0:ad.compareTo(bd);
+   int deadlineOrder=ad==null||bd==null?0:ad.compareTo(bd);
+   if(tenderSortMode==1)return deadlineOrder;
+   if(tenderSortMode==2){
+    JSONObject ar=aiReviews.get(a.optString("bidId")),br=aiReviews.get(b.optString("bidId"));
+    if(ar!=null&&br==null)return -1;if(ar==null&&br!=null)return 1;
+    if(ar!=null&&br!=null){int aiOrder=Integer.compare(br.optInt("score",0),ar.optInt("score",0));if(aiOrder!=0)return aiOrder;}
+   }
+   int byScore=Integer.compare(qualificationScore(b),qualificationScore(a));
+   return byScore!=0?byScore:deadlineOrder;
   });
+  String[] sortLabels={"Relevance","Closing soon","AI score"};
+  Button sort=button("Sort: "+sortLabels[tenderSortMode]+"  ▾");sort.setTextSize(13);sort.setTextColor(uiAccent());
+  LinearLayout.LayoutParams sortLp=new LinearLayout.LayoutParams(-1,dp(44));sortLp.setMargins(0,dp(4),0,dp(4));dashboardList.addView(sort,sortLp);
+  sort.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Sort matching tenders")
+   .setSingleChoiceItems(sortLabels,tenderSortMode,(dialog,which)->{tenderSortMode=which;dialog.dismiss();renderDashboard();})
+   .setNegativeButton("Cancel",null).show());
   LinearLayout metrics=new LinearLayout(this);metrics.setOrientation(0);metrics.setPadding(0,dp(8),0,dp(8));dashboardList.addView(metrics);addMetric(metrics,String.valueOf(open.size()),"Matches",teal);addMetric(metrics,String.valueOf(analyzed),"Reviewed",0xff25756e);addMetric(metrics,String.valueOf(analyzingBids.size()),"Analyzing",0xffb77722);addMetric(metrics,String.valueOf(Math.max(0,open.size()-analyzed-analyzingBids.size()-failedAutoReviews.size()-apiFailedReviews.size())),"Waiting",0xff72848a);
   TextView caution=dashText(expired+" expired hidden • "+missing+" missing dates hidden\nAI scores are indicative; verify GeM documents and deadlines.",12,muted);caution.setPadding(0,dp(4),0,dp(12));dashboardList.addView(caution);
 
