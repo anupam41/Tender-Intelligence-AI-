@@ -61,9 +61,12 @@ public class GemBrowserActivity extends Activity {
   if(sessionReportId==null)sessionReportId=newSessionReportId();
   getWindow().setStatusBarColor(themeColor(0xfff4faf7,0xff0a121a));getWindow().setNavigationBarColor(themeColor(0xfff4faf7,0xff0a121a));getWindow().getDecorView().setSystemUiVisibility(darkMode()?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
   LinearLayout page=new LinearLayout(this);page.setOrientation(1);page.setBackgroundColor(themeColor(0xfff4faf7,0xff0a121a));setContentView(page);page.setOnApplyWindowInsetsListener((v,insets)->{int top=android.os.Build.VERSION.SDK_INT>=30?insets.getInsets(android.view.WindowInsets.Type.statusBars()).top:insets.getSystemWindowInsetTop();v.setPadding(0,top,0,0);return insets;});
-  TextView heading=new TextView(this);heading.setText("Tender Radar");heading.setTextSize(30);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(themeColor(0xff16272b,0xffeaf8f5));heading.setPadding(dp(24),dp(18),dp(24),dp(4));page.addView(heading);
-  TextView note=new TextView(this);note.setText("Discover industrial tenders • GeM");note.setTextColor(themeColor(0xff65787d,0xff9bb2b6));note.setPadding(dp(24),0,dp(24),dp(18));page.addView(note);
-  Button aiSettingsButton=button("⚙");aiSettingsButton.setTextSize(14);aiSettingsButton.setTextColor(themeColor(0xff195d5c,0xffb7f1e8));aiSettingsButton.setBackground(glass(themeColor(0xffe8f7f5,0xff162a30),22));aiSettingsButton.setElevation(dp(2));LinearLayout.LayoutParams settingsLp=new LinearLayout.LayoutParams(-1,dp(48));settingsLp.setMargins(dp(20),0,dp(20),dp(12));page.addView(aiSettingsButton,settingsLp);aiSettingsButton.setOnClickListener(v->showAiSettings());
+  LinearLayout header=new LinearLayout(this);header.setOrientation(0);header.setGravity(Gravity.CENTER_VERTICAL);header.setPadding(dp(20),dp(12),dp(20),0);page.addView(header);
+  LinearLayout brand=new LinearLayout(this);brand.setOrientation(1);header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
+  TextView heading=new TextView(this);heading.setText("Tender Radar");heading.setTextSize(30);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(themeColor(0xff16272b,0xffeaf8f5));brand.addView(heading);
+  TextView note=new TextView(this);note.setText("Discover industrial tenders • GeM");note.setTextSize(13);note.setTextColor(themeColor(0xff65787d,0xff9bb2b6));brand.addView(note);
+  Button aiSettingsButton=button("⚙");aiSettingsButton.setContentDescription("AI settings");aiSettingsButton.setTextSize(23);aiSettingsButton.setTextColor(themeColor(0xff195d5c,0xffb7f1e8));aiSettingsButton.setBackground(glass(themeColor(0xffe8f7f5,0xff162a30),22));LinearLayout.LayoutParams settingsLp=new LinearLayout.LayoutParams(dp(52),dp(52));settingsLp.setMargins(dp(10),0,0,0);header.addView(aiSettingsButton,settingsLp);aiSettingsButton.setOnClickListener(v->showAiSettings());
+  View headerSpace=new View(this);page.addView(headerSpace,new LinearLayout.LayoutParams(1,dp(16)));
   LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.HORIZONTAL);controls.setVisibility(View.GONE);page.addView(controls);
   Button back=button("Back");controls.addView(back,new LinearLayout.LayoutParams(0,40,1));back.setOnClickListener(v->{if(browser.canGoBack())browser.goBack();else finish();});
   Button home=button("GeM home");controls.addView(home,new LinearLayout.LayoutParams(0,40,1));home.setOnClickListener(v->browser.loadUrl(GEM));
@@ -543,28 +546,33 @@ public class GemBrowserActivity extends Activity {
    }).setNegativeButton("Cancel",null).show();
  }
  private void showShortlist(){
-  LinearLayout list=new LinearLayout(this);list.setOrientation(1);list.setPadding(dp(14),dp(8),dp(14),dp(8));
+  LinearLayout list=new LinearLayout(this);list.setOrientation(1);list.setPadding(dp(14),dp(8),dp(14),dp(12));
   ScrollView scroll=new ScrollView(this);scroll.addView(list);
-  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Shortlisted tenders ("+shortlisted.size()+")").setView(scroll).setPositiveButton("Close",null).create();
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Tender management • "+shortlisted.size()+" saved").setView(scroll).setPositiveButton("Close",null).create();
   int[] counts=new int[TENDER_STAGES.length];for(JSONObject item:shortlisted.values())for(int i=0;i<TENDER_STAGES.length;i++)if(TENDER_STAGES[i].equals(tenderStage(item)))counts[i]++;
-  StringBuilder overview=new StringBuilder("Pipeline: ");for(int i=0;i<TENDER_STAGES.length;i++){if(i>0)overview.append(" • ");overview.append(TENDER_STAGES[i]).append(" ").append(counts[i]);}
-  list.addView(dashText(overview.toString(),14,themeColor(0xff008b7e,0xff57d7c6)));
+  StringBuilder overview=new StringBuilder();for(int i=0;i<TENDER_STAGES.length;i++){if(i>0)overview.append("  •  ");overview.append(TENDER_STAGES[i]).append(" ").append(counts[i]);}
+  TextView pipeline=dashText(overview.toString(),13,uiAccent());pipeline.setPadding(dp(4),0,dp(4),dp(14));list.addView(pipeline);
+  LinearLayout reports=new LinearLayout(this);reports.setOrientation(1);reports.setPadding(dp(12),dp(12),dp(12),dp(12));reports.setBackground(glass(themeColor(0xffe4f3f0,0xff243d44),18));list.addView(reports);
+  TextView reportTitle=dashText("Word reports",17,uiText());reportTitle.setTypeface(null,Typeface.BOLD);reports.addView(reportTitle);
   if(!shortlisted.isEmpty()){
-   Button all=button("Export all shortlisted tenders to Word");list.addView(all);
-   all.setOnClickListener(v->exportAllShortlistedWord());
-   Button saved=button("Open saved Word report");list.addView(saved);
-   saved.setOnClickListener(v->openSavedShortlistWord());
+   Button saved=button("Open saved report");reports.addView(saved,new LinearLayout.LayoutParams(-1,dp(46)));saved.setOnClickListener(v->openSavedShortlistWord());
+   Button all=button("Export all to Word");reports.addView(all,new LinearLayout.LayoutParams(-1,dp(46)));all.setOnClickListener(v->exportAllShortlistedWord());
   }
-  Button history=button("Word report history");list.addView(history);history.setOnClickListener(v->showWordHistory());
-  if(shortlisted.isEmpty())list.addView(dashText("No shortlisted tenders yet.",15,themeColor(0xff1b2d31,0xffeff9f8)));
+  Button history=button("Report history");reports.addView(history,new LinearLayout.LayoutParams(-1,dp(46)));history.setOnClickListener(v->showWordHistory());
+  TextView section=dashText("Saved tenders",17,uiText());section.setTypeface(null,Typeface.BOLD);section.setPadding(dp(4),dp(18),0,dp(8));list.addView(section);
+  if(shortlisted.isEmpty())list.addView(dashText("No shortlisted tenders yet.",15,uiMuted()));
   for(JSONObject bid:new ArrayList<>(shortlisted.values())){
    String id=bid.optString("bidId");
-   TextView name=dashText("["+tenderStage(bid)+"] "+id+" • "+bid.optString("title"),14,themeColor(0xff1b2d31,0xffeff9f8));list.addView(name);
-   Button statusButton=button("Change status • "+tenderStage(bid));list.addView(statusButton);statusButton.setOnClickListener(v->chooseTenderStage(bid,dialog));
-   Button word=button("Save Word (.docx)");list.addView(word);word.setOnClickListener(v->exportShortlistedWord(bid));
-   Button open=button("Open GeM document");list.addView(open);open.setOnClickListener(v->openBidPdf(bid));
-   Button restore=button("Remove from shortlist / show again");list.addView(restore);
-   restore.setOnClickListener(v->{shortlisted.remove(id);persistShortlist();dialog.dismiss();renderDashboard();updateCollectedCount();});
+   LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(12),dp(12),dp(12),dp(12));card.setBackground(glass(themeColor(0xffe4f3f0,0xff243d44),18));
+   LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,0,0,dp(12));list.addView(card,cp);
+   TextView name=dashText(bid.optString("title","Untitled tender"),16,uiText());name.setTypeface(null,Typeface.BOLD);name.setMaxLines(3);name.setEllipsize(android.text.TextUtils.TruncateAt.END);card.addView(name);
+   TextView meta=dashText(id+"  •  "+tenderStage(bid),13,uiAccent());meta.setPadding(0,dp(6),0,dp(8));card.addView(meta);
+   Button statusButton=button("Change status");card.addView(statusButton,new LinearLayout.LayoutParams(-1,dp(46)));statusButton.setOnClickListener(v->chooseTenderStage(bid,dialog));
+   LinearLayout row=new LinearLayout(this);row.setOrientation(0);card.addView(row);
+   Button word=button("Save Word");LinearLayout.LayoutParams half1=new LinearLayout.LayoutParams(0,dp(46),1);row.addView(word,half1);word.setOnClickListener(v->exportShortlistedWord(bid));
+   Button open=button("GeM document");LinearLayout.LayoutParams half2=new LinearLayout.LayoutParams(0,dp(46),1);row.addView(open,half2);open.setOnClickListener(v->openBidPdf(bid));
+   Button restore=button("Remove from shortlist");restore.setTextColor(uiMuted());card.addView(restore,new LinearLayout.LayoutParams(-1,dp(44)));
+   restore.setOnClickListener(v->{shortlisted.remove(id);persistShortlist();dialog.dismiss();renderDashboard();updateCollectedCount();showShortlist();});
   }
   dialog.setOnShowListener(x->styleDialog(dialog));dialog.show();styleDialog(dialog);
  }
