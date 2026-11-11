@@ -577,6 +577,47 @@ public class GemBrowserActivity extends Activity {
   }
   dialog.setOnShowListener(x->styleDialog(dialog));dialog.show();styleDialog(dialog);
  }
+ private void addReviewSection(LinearLayout parent,String heading,String body){
+  if(body==null||body.trim().isEmpty())return;
+  LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(dp(12),dp(12),dp(12),dp(12));
+  panel.setBackground(glass(themeColor(0xffedf7f4,0xff22373d),16));
+  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(8),0,dp(4));parent.addView(panel,lp);
+  TextView title=dashText(heading,15,uiAccent());title.setTypeface(null,Typeface.BOLD);panel.addView(title);
+  TextView text=dashText(body.trim(),14,uiText());text.setTextIsSelectable(true);text.setPadding(0,dp(6),0,0);panel.addView(text);
+ }
+ private void addStructuredReview(LinearLayout parent,String raw){
+  // Reorganize only headings that the AI actually supplied; never invent evidence.
+  String[] titles={"Technical requirements","Manufacturing suitability","Eligibility requirements","Missing information","Recommendation"};
+  String[] patterns={"technical|specifications?|scope of work|equipment details",
+   "fabrication fit|manufacturing|suitability|capability",
+   "eligibility|qualification|experience|turnover|emd",
+   "missing|unclear|not provided|unknown|information required|limitations?",
+   "recommendation|next steps?|action required|conclusion|verdict"};
+  java.util.LinkedHashMap<Integer,StringBuilder> sections=new java.util.LinkedHashMap<>();
+  StringBuilder other=new StringBuilder();int active=-1;
+  for(String line:raw.replace("**","").replace("__","").split("\\r?\\n")){
+   String clean=line.trim().replaceFirst("^#{1,6}\\s*","").replaceFirst("^[-*]\\s+","");
+   if(clean.isEmpty())continue;
+   java.util.regex.Matcher heading=java.util.regex.Pattern.compile("^([A-Za-z][A-Za-z /-]{2,45}):\\s*(.*)$").matcher(clean);
+   boolean matched=false;
+   if(heading.matches()){
+    String label=heading.group(1).toLowerCase(java.util.Locale.ROOT);
+    for(int i=0;i<patterns.length;i++)if(label.matches(".*("+patterns[i]+").*")){
+     active=i;sections.putIfAbsent(i,new StringBuilder());
+     if(!heading.group(2).isEmpty())sections.get(i).append(heading.group(2)).append("\\n");
+     matched=true;break;
+    }
+   }
+   if(!matched){
+    if(active>=0)sections.get(active).append(clean).append("\\n");
+    else other.append(clean).append("\\n");
+   }
+  }
+  if(sections.isEmpty()){addReviewSection(parent,"AI summary",raw.replace("**","").replace("__",""));return;}
+  if(other.length()>0)addReviewSection(parent,"Overview",other.toString());
+  for(int i=0;i<titles.length;i++)if(sections.containsKey(i))addReviewSection(parent,titles[i],sections.get(i).toString());
+  parent.addView(dashText("Sections are reorganized from the saved AI response; omitted sections were not provided by the model.",12,uiMuted()));
+ }
  private void showTenderDetails(JSONObject bid){
   String id=bid.optString("bidId",""),title=bid.optString("title","Untitled tender");
   JSONObject review=aiReviews.get(id);
@@ -596,8 +637,7 @@ public class GemBrowserActivity extends Activity {
    content.addView(dashText(review.optString("verdict","Needs review")+"  •  "+review.optInt("score",0)+"/100 (indicative)",16,uiAccent()));
    content.addView(dashText("Priority: "+review.optString("priority","Needs review"),14,uiText()));
    content.addView(dashText("Evidence: "+review.optString("source","Source not recorded"),13,uiMuted()));
-   String cleanedReport=review.optString("report","No summary provided").replace("**","").replace("__","").replaceAll("(?m)^\\s*#{1,6}\\s*","");
-   TextView report=dashText(cleanedReport,14,uiText());report.setTextIsSelectable(true);content.addView(report);
+   addStructuredReview(content,review.optString("report","No summary provided"));
   }
   content.addView(dashText("Assessment is provisional. Confirm specifications, buyer requirements, eligibility and deadlines on GeM.",12,uiMuted()));
   Button document=button("Open GeM document");content.addView(document);document.setOnClickListener(v->openBidPdf(bid));
