@@ -55,6 +55,7 @@ public class GemBrowserActivity extends Activity {
  private int dynamicText(){return systemTone(darkMode()?"neutral1_50":"neutral1_900",themeColor(0xff1c1b1f,0xffe6e1e5));}
  private int dynamicMuted(){return systemTone(darkMode()?"neutral2_300":"neutral2_600",themeColor(0xff66636b,0xffc7c3cc));}
  private TextView scanProgressLabel;
+ private Button managementHeaderButton;
  private boolean scanMode=true;
  private EditText term;
  private TextView state;
@@ -80,6 +81,7 @@ public class GemBrowserActivity extends Activity {
   LinearLayout brand=new LinearLayout(this);brand.setOrientation(1);header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
   TextView heading=new TextView(this);heading.setText("Tender Radar");heading.setTextSize(27);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(dynamicText());brand.addView(heading);
   TextView note=new TextView(this);note.setText("Your industrial tender workspace");note.setTextSize(13);note.setTextColor(dynamicMuted());brand.addView(note);
+  managementHeaderButton=button("▣ "+shortlisted.size());managementHeaderButton.setContentDescription("Tender management, "+shortlisted.size()+" saved");managementHeaderButton.setTextSize(14);managementHeaderButton.setTextColor(dynamicPrimary());managementHeaderButton.setBackground(flatShape(dynamicTonal(),14));LinearLayout.LayoutParams manageHeaderLp=new LinearLayout.LayoutParams(dp(72),dp(48));manageHeaderLp.setMargins(dp(8),0,0,0);header.addView(managementHeaderButton,manageHeaderLp);managementHeaderButton.setOnClickListener(v->showShortlist());
   Button aiSettingsButton=button("⚙");aiSettingsButton.setContentDescription("AI settings");aiSettingsButton.setTextSize(23);aiSettingsButton.setTextColor(dynamicPrimary());aiSettingsButton.setBackground(flatShape(dynamicTonal(),14));LinearLayout.LayoutParams settingsLp=new LinearLayout.LayoutParams(dp(52),dp(52));settingsLp.setMargins(dp(10),0,0,0);header.addView(aiSettingsButton,settingsLp);aiSettingsButton.setOnClickListener(v->showAiSettings());
   View headerSpace=new View(this);page.addView(headerSpace,new LinearLayout.LayoutParams(1,dp(8)));
   LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.HORIZONTAL);controls.setVisibility(View.GONE);page.addView(controls);
@@ -413,11 +415,15 @@ public class GemBrowserActivity extends Activity {
  }
  private void addMetric(LinearLayout row,String value,String label,int color){
   LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);tile.setGravity(Gravity.CENTER);
-  tile.setPadding(dp(14),dp(12),dp(14),dp(12));
-  tile.setBackground(glass(dynamicCard(),16));
+  tile.setPadding(dp(14),dp(8),dp(14),dp(8));
+  tile.setBackground(flatShape(dynamicCard(),16));
   LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(78),1);
   lp.setMargins(0,0,dp(6),0);row.addView(tile,lp);
-  TextView count=new TextView(this);count.setText(value);count.setTextSize(23);count.setTypeface(null,Typeface.BOLD);count.setTextColor(dynamicPrimary());count.setGravity(Gravity.RIGHT);tile.addView(count,new LinearLayout.LayoutParams(-1,-2));
+  String symbol="Matches".equals(label)?"⌕":"Reviewed".equals(label)?"✓":"Analyzing".equals(label)?"◌":"◷";
+  LinearLayout topLine=new LinearLayout(this);topLine.setOrientation(0);topLine.setGravity(Gravity.CENTER_VERTICAL);tile.addView(topLine,new LinearLayout.LayoutParams(-1,0,1));
+  TextView symbolView=new TextView(this);symbolView.setText(symbol);symbolView.setTextSize(20);symbolView.setTypeface(null,Typeface.BOLD);symbolView.setTextColor(dynamicPrimary());topLine.addView(symbolView,new LinearLayout.LayoutParams(0,-2,1));
+  if("Analyzing".equals(label)){symbolView.setContentDescription("AI review activity");if(!"0".equals(value)){android.view.animation.RotateAnimation spin=new android.view.animation.RotateAnimation(0,360,android.view.animation.Animation.RELATIVE_TO_SELF,.5f,android.view.animation.Animation.RELATIVE_TO_SELF,.5f);spin.setDuration(1600);spin.setRepeatCount(android.view.animation.Animation.INFINITE);spin.setInterpolator(new android.view.animation.LinearInterpolator());symbolView.startAnimation(spin);}}
+  TextView count=new TextView(this);count.setText(value);count.setTextSize(23);count.setTypeface(null,Typeface.BOLD);count.setTextColor(dynamicPrimary());count.setGravity(Gravity.RIGHT);topLine.addView(count,new LinearLayout.LayoutParams(-2,-2));
   TextView caption=new TextView(this);caption.setText(label);caption.setTextSize(12);caption.setTextColor(dynamicMuted());caption.setGravity(Gravity.LEFT);tile.addView(caption,new LinearLayout.LayoutParams(-1,-2));
  }
  private void restoreShortlist(){
@@ -690,7 +696,7 @@ public class GemBrowserActivity extends Activity {
   if(dashboardList==null)return;
   while(dashboardList.getChildCount()>1)dashboardList.removeViewAt(1);
   int white=dynamicText(),muted=dynamicMuted(),teal=dynamicPrimary();
-  Button shortlistLibrary=button("▣  Tender management     "+shortlisted.size()+" saved  ›");shortlistLibrary.setContentDescription("Open tender management, "+shortlisted.size()+" saved tenders");shortlistLibrary.setTextSize(15);shortlistLibrary.setTypeface(null,Typeface.BOLD);shortlistLibrary.setTextColor(dynamicText());shortlistLibrary.setBackground(flatShape(dynamicTonal(),16));shortlistLibrary.setMinHeight(dp(60));LinearLayout.LayoutParams libraryLp=new LinearLayout.LayoutParams(-1,dp(60));libraryLp.setMargins(0,dp(6),0,dp(14));dashboardList.addView(shortlistLibrary,libraryLp);shortlistLibrary.setOnClickListener(v->showShortlist());
+  if(managementHeaderButton!=null){managementHeaderButton.setText("▣ "+shortlisted.size());managementHeaderButton.setContentDescription("Tender management, "+shortlisted.size()+" saved");}
   TextView resultsHeading=dashText("Matching tenders",22,white);resultsHeading.setTypeface(null,Typeface.BOLD);dashboardList.addView(resultsHeading);
   ArrayList<JSONObject> open=new ArrayList<>();int expired=0,missing=0,analyzed=0;
   Date now=new Date();
