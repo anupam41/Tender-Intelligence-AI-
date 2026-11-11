@@ -644,12 +644,8 @@ public class GemBrowserActivity extends Activity {
    }
    TextView statusText=dashText(status,12,ai==null?muted:teal);statusText.setPadding(0,dp(2),0,dp(9));statusRow.addView(statusText);
    LinearLayout actions=new LinearLayout(this);actions.setOrientation(0);actions.setPadding(0,dp(5),0,dp(6));card.addView(actions);
-   Button details=button(ai==null?"Tender details":"Review & details");details.setTextColor(uiText());details.setBackground(glass(themeColor(0xffe4f3f0,0xff29434a),18));
-   LinearLayout.LayoutParams detailsLp=new LinearLayout.LayoutParams(0,dp(48),1);detailsLp.setMargins(0,0,dp(5),0);actions.addView(details,detailsLp);details.setOnClickListener(v->showTenderDetails(bid));
-   Button analyze=button(analyzingBids.contains(id)?"Analyzing…":ai==null?(apiFailedReviews.contains(id)?"Retry AI":failedAutoReviews.contains(id)?"Retry review":"Run AI review"):ai.optInt("score",0)+"% • Review");
-   analyze.setTextColor(Color.WHITE);analyze.setTypeface(null,Typeface.BOLD);analyze.setBackground(rounded(Color.rgb(0,164,146),18,Color.rgb(0,164,146)));
-   LinearLayout.LayoutParams analyzeLp=new LinearLayout.LayoutParams(0,dp(48),1);analyzeLp.setMargins(dp(5),0,0,0);actions.addView(analyze,analyzeLp);
-   analyze.setEnabled(!analyzingBids.contains(id));analyze.setOnClickListener(v->{if(aiReviews.containsKey(id))showTenderDetails(bid);else{failedAutoReviews.remove(id);apiFailedReviews.remove(id);aiConnectionPaused=false;analyzeInline(bid);}});
+   Button details=button("Tender details");details.setTextColor(uiText());details.setBackground(glass(themeColor(0xffe4f3f0,0xff29434a),18));
+   LinearLayout.LayoutParams detailsLp=new LinearLayout.LayoutParams(-1,dp(48));actions.addView(details,detailsLp);details.setOnClickListener(v->showTenderDetails(bid));
    LinearLayout secondary=new LinearLayout(this);secondary.setOrientation(0);card.addView(secondary);
    Button openBid=button("GeM document");openBid.setTextColor(uiAccent());LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(0,dp(44),1);openLp.setMargins(0,0,dp(5),0);secondary.addView(openBid,openLp);openBid.setOnClickListener(v->openBidPdf(bid));
    Button shortlist=button("Shortlist");shortlist.setTextColor(uiAccent());LinearLayout.LayoutParams shortLp=new LinearLayout.LayoutParams(0,dp(44),1);shortLp.setMargins(dp(5),0,0,0);secondary.addView(shortlist,shortLp);shortlist.setOnClickListener(v->shortlistTender(bid));
