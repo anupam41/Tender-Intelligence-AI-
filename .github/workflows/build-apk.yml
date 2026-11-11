@@ -44,6 +44,26 @@ jobs:
             echo "enabled=false" >> "$GITHUB_OUTPUT"
             echo "Release signing not configured; debug APK is still available."
           fi
+      - name: Validate release signing credentials
+        if: steps.signing.outputs.enabled == 'true'
+        env:
+          STORE_PASSWORD: ${{ secrets.TENDER_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.TENDER_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.TENDER_KEY_PASSWORD }}
+        run: |
+          if ! keytool -list -keystore "$RUNNER_TEMP/tender-release.jks" -storepass "$STORE_PASSWORD" >/dev/null 2>&1; then
+            echo "::error::Cannot open the keystore. Check TENDER_KEYSTORE_BASE64 and TENDER_STORE_PASSWORD."
+            exit 1
+          fi
+          if ! keytool -list -keystore "$RUNNER_TEMP/tender-release.jks" -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
+            echo "::error::Key alias not found. Check TENDER_KEY_ALIAS."
+            exit 1
+          fi
+          if ! keytool -certreq -alias "$KEY_ALIAS" -keystore "$RUNNER_TEMP/tender-release.jks" -storepass "$STORE_PASSWORD" -keypass "$KEY_PASSWORD" -file "$RUNNER_TEMP/tender-signing-test.csr" >/dev/null 2>&1; then
+            echo "::error::Cannot unlock the signing key. Check TENDER_KEY_PASSWORD and alias."
+            exit 1
+          fi
+          rm -f "$RUNNER_TEMP/tender-signing-test.csr"
       - name: Build signed release APK
         if: steps.signing.outputs.enabled == 'true'
         env:
