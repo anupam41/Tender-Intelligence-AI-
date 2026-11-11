@@ -136,15 +136,28 @@ public class GemBrowserActivity extends Activity {
   state=new TextView(this);state.setTextColor(Color.rgb(102,119,121));state.setText("Opening GeM…");state.setPadding(dp(24),dp(4),dp(24),dp(10));state.setTextSize(12);page.addView(state);
   FrameLayout contentLayer=new FrameLayout(this);page.addView(contentLayer,new LinearLayout.LayoutParams(-1,0,1));
   browser=new WebView(this);contentLayer.addView(browser,new FrameLayout.LayoutParams(-1,-1));
-  dashboard=new ScrollView(this);dashboard.setFillViewport(true);dashboard.setVisibility(View.VISIBLE);showingDashboard=true;dashboard.setBackgroundColor(themeColor(0xfff4faf7,0xff0a121a));contentLayer.addView(dashboard,new FrameLayout.LayoutParams(-1,-1));
-  dashboardList=new LinearLayout(this);dashboardList.setOrientation(1);dashboardList.setPadding(dp(20),dp(14),dp(20),dp(24));dashboardList.setBackgroundColor(themeColor(0xfff4faf7,0xff0a121a));dashboard.addView(dashboardList);
+  dashboard=new ScrollView(this);dashboard.setFillViewport(true);dashboard.setVisibility(View.VISIBLE);showingDashboard=true;dashboard.setBackgroundColor(themeColor(0xfff1f7f8,0xff0b161d));contentLayer.addView(dashboard,new FrameLayout.LayoutParams(-1,-1));
+  dashboardList=new LinearLayout(this);dashboardList.setOrientation(1);dashboardList.setPadding(dp(20),dp(8),dp(20),dp(24));dashboardList.setBackgroundColor(themeColor(0xfff1f7f8,0xff0b161d));dashboard.addView(dashboardList);
   heroContent=new LinearLayout(this);heroContent.setOrientation(1);dashboardList.addView(heroContent);
-  for(View item:new View[]{heading,note,aiSettingsButton,scanRing,statsStrip,batchButton,scanProgress,scanProgressLabel,collectedCount,state}){android.view.ViewGroup parent=(android.view.ViewGroup)item.getParent();if(parent!=null)parent.removeView(item);heroContent.addView(item);}
-  heading.setPadding(dp(4),dp(10),0,dp(2));note.setPadding(dp(4),0,0,dp(14));
-  aiSettingsButton.setText("⚙  Settings");LinearLayout.LayoutParams settingsBarLp=new LinearLayout.LayoutParams(-1,dp(48));settingsBarLp.setMargins(dp(4),dp(2),dp(4),dp(12));aiSettingsButton.setLayoutParams(settingsBarLp);
-  LinearLayout.LayoutParams ringParams=new LinearLayout.LayoutParams(dp(208),dp(208));ringParams.gravity=Gravity.CENTER_HORIZONTAL;ringParams.setMargins(0,dp(4),0,dp(12));scanRing.setLayoutParams(ringParams);
-  statsStrip.setPadding(0,dp(4),0,dp(8));LinearLayout.LayoutParams scanLp=new LinearLayout.LayoutParams(-1,dp(56));scanLp.setMargins(dp(4),dp(4),dp(4),dp(12));batchButton.setLayoutParams(scanLp);
-  scanProgressLabel.setPadding(dp(4),dp(12),0,dp(4));collectedCount.setPadding(dp(4),0,0,dp(4));state.setPadding(dp(4),dp(4),0,dp(18));
+  // Keep title, subtitle and compact settings gear together in the top header.
+  // Previously these were detached and stacked as three giant dashboard rows.
+  for(View item:new View[]{scanRing,statsStrip,batchButton,scanProgress,scanProgressLabel,collectedCount,state}){
+   android.view.ViewGroup parent=(android.view.ViewGroup)item.getParent();
+   if(parent!=null)parent.removeView(item);
+   heroContent.addView(item);
+  }
+  heading.setPadding(0,0,0,dp(2));note.setPadding(0,0,0,0);
+  aiSettingsButton.setText("⚙");aiSettingsButton.setContentDescription("AI settings");
+  LinearLayout.LayoutParams compactSettings=new LinearLayout.LayoutParams(dp(48),dp(48));
+  compactSettings.setMargins(dp(8),0,0,0);aiSettingsButton.setLayoutParams(compactSettings);
+  LinearLayout.LayoutParams ringParams=new LinearLayout.LayoutParams(dp(124),dp(124));
+  ringParams.gravity=Gravity.CENTER_HORIZONTAL;ringParams.setMargins(0,dp(4),0,dp(10));scanRing.setLayoutParams(ringParams);
+  statsStrip.setPadding(0,0,0,dp(6));
+  LinearLayout.LayoutParams scanLp=new LinearLayout.LayoutParams(-1,dp(52));
+  scanLp.setMargins(dp(4),dp(2),dp(4),dp(8));batchButton.setLayoutParams(scanLp);
+  scanProgressLabel.setPadding(dp(4),dp(6),0,dp(2));
+  collectedCount.setPadding(dp(4),0,0,dp(2));
+  state.setPadding(dp(4),dp(2),0,dp(8));
   WebSettings settings=browser.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);settings.setSupportZoom(true);settings.setBuiltInZoomControls(true);settings.setDisplayZoomControls(false);
   browser.setWebViewClient(new WebViewClient(){
    @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){
