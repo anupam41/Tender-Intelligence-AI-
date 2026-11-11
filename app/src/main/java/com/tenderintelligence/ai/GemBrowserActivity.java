@@ -175,7 +175,7 @@ public class GemBrowserActivity extends Activity {
   ((android.view.ViewGroup)batchButton.getParent()).removeView(batchButton);
   LinearLayout.LayoutParams scanLp=new LinearLayout.LayoutParams(-1,dp(50));scanLp.setMargins(0,dp(12),0,0);scanCard.addView(batchButton,scanLp);
   ((android.view.ViewGroup)scanProgress.getParent()).removeView(scanProgress);scanCard.addView(scanProgress,new LinearLayout.LayoutParams(-1,dp(4)));
-  ((android.view.ViewGroup)state.getParent()).removeView(state);state.setTextSize(12);state.setTextColor(dynamicMuted());state.setPadding(dp(3),dp(8),dp(3),0);scanCard.addView(state);
+  ((android.view.ViewGroup)state.getParent()).removeView(state);state.setTextSize(12);state.setTextColor(dynamicMuted());state.setPadding(dp(3),dp(8),dp(3),0);state.setMinLines(2);state.setMaxLines(2);state.setEllipsize(android.text.TextUtils.TruncateAt.END);scanCard.addView(state);
   // Hidden counters still receive scan updates, while the summary displays live totals.
   statsStrip.setVisibility(View.GONE);
   heading.setPadding(0,0,0,dp(2));note.setPadding(0,0,0,0);
