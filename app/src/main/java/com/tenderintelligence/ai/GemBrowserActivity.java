@@ -49,8 +49,8 @@ public class GemBrowserActivity extends Activity {
  }
  private int dynamicPrimary(){return systemTone(darkMode()?"accent1_200":"accent1_600",themeColor(0xff007f73,0xff70e0d0));}
  private int dynamicOnPrimary(){return systemTone(darkMode()?"accent1_900":"accent1_0",darkMode()?0xff18242b:Color.WHITE);}
- private int dynamicSurface(){return systemTone(darkMode()?"neutral1_900":"neutral1_10",themeColor(0xfff1f1f3,0xff151518));}
- private int dynamicCard(){return systemTone(darkMode()?"neutral1_800":"neutral1_0",themeColor(0xffffffff,0xff252528));}
+ private int dynamicSurface(){return darkMode()?0xff0b0b0d:0xfff1f1f3;}
+ private int dynamicCard(){return darkMode()?0xff202022:0xffffffff;}
  private int dynamicTonal(){return systemTone(darkMode()?"accent1_800":"accent1_100",themeColor(0xffe9e1f5,0xff42384e));}
  private int dynamicText(){return systemTone(darkMode()?"neutral1_50":"neutral1_900",themeColor(0xff1c1b1f,0xffe6e1e5));}
  private int dynamicMuted(){return systemTone(darkMode()?"neutral2_300":"neutral2_600",themeColor(0xff66636b,0xffc7c3cc));}
@@ -77,7 +77,7 @@ public class GemBrowserActivity extends Activity {
   if(sessionReportId==null)sessionReportId=newSessionReportId();
   getWindow().setStatusBarColor(themeColor(0xfff4faf7,0xff0a121a));getWindow().setNavigationBarColor(themeColor(0xfff4faf7,0xff0a121a));getWindow().getDecorView().setSystemUiVisibility(darkMode()?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
   LinearLayout page=new LinearLayout(this);page.setOrientation(1);page.setBackgroundColor(dynamicSurface());setContentView(page);page.setOnApplyWindowInsetsListener((v,insets)->{int top=android.os.Build.VERSION.SDK_INT>=30?insets.getInsets(android.view.WindowInsets.Type.statusBars()).top:insets.getSystemWindowInsetTop();v.setPadding(0,top,0,0);return insets;});
-  LinearLayout header=new LinearLayout(this);header.setOrientation(0);header.setGravity(Gravity.CENTER_VERTICAL);header.setPadding(dp(20),dp(16),dp(20),dp(14));header.setBackground(glass(dynamicCard(),20));LinearLayout.LayoutParams headerLp=new LinearLayout.LayoutParams(-1,-2);headerLp.setMargins(dp(12),dp(8),dp(12),0);page.addView(header,headerLp);
+  LinearLayout header=new LinearLayout(this);header.setOrientation(0);header.setGravity(Gravity.CENTER_VERTICAL);header.setPadding(dp(20),dp(16),dp(20),dp(14));header.setBackground(flatShape(dynamicCard(),24));LinearLayout.LayoutParams headerLp=new LinearLayout.LayoutParams(-1,-2);headerLp.setMargins(dp(12),dp(8),dp(12),0);page.addView(header,headerLp);
   LinearLayout brand=new LinearLayout(this);brand.setOrientation(1);header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
   TextView heading=new TextView(this);heading.setText("Tender Radar");heading.setTextSize(27);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(dynamicText());brand.addView(heading);
   TextView note=new TextView(this);note.setText("Your industrial tender workspace");note.setTextSize(13);note.setTextColor(dynamicMuted());brand.addView(note);
@@ -416,7 +416,7 @@ public class GemBrowserActivity extends Activity {
  private void addMetric(LinearLayout row,String value,String label,int color){
   LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);tile.setGravity(Gravity.CENTER);
   tile.setPadding(dp(14),dp(8),dp(14),dp(8));
-  tile.setBackground(flatShape(dynamicCard(),16));
+  tile.setBackground(flatShape(dynamicCard(),24));
   LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(78),1);
   lp.setMargins(0,0,dp(6),0);row.addView(tile,lp);
   String symbol="Matches".equals(label)?"⌕":"Reviewed".equals(label)?"✓":"Analyzing".equals(label)?"◌":"◷";
@@ -740,7 +740,7 @@ public class GemBrowserActivity extends Activity {
    JSONObject ai=aiReviews.get(id);
    LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(18),dp(17),dp(18),dp(18));
    android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();
-   bg.setColor(dynamicCard());bg.setCornerRadius(dp(20));card.setBackground(bg);card.setElevation(0);
+   bg.setColor(dynamicCard());bg.setCornerRadius(dp(24));card.setBackground(bg);card.setElevation(0);
    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,dp(9),0,dp(12));dashboardList.addView(card,cp);
    TextView cardTitle=dashText(title,18,white);cardTitle.setTypeface(null,Typeface.BOLD);cardTitle.setMaxLines(3);cardTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);cardTitle.setPadding(dp(2),dp(3),dp(2),dp(5));card.addView(cardTitle);
    cardTitle.setOnClickListener(v->showTenderDetails(bid));
@@ -1063,8 +1063,8 @@ public class GemBrowserActivity extends Activity {
  }
  private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
  private android.graphics.drawable.GradientDrawable flatShape(int color,int radius){android.graphics.drawable.GradientDrawable d=new android.graphics.drawable.GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
- private android.graphics.drawable.GradientDrawable glass(int color,int radius){android.graphics.drawable.GradientDrawable g=new android.graphics.drawable.GradientDrawable();g.setColor(color);g.setCornerRadius(dp(radius));g.setStroke(dp(1),systemTone(darkMode()?"neutral2_700":"neutral2_200",themeColor(0xffe2e2e5,0xff44444b)));return g;}
- private android.graphics.drawable.GradientDrawable rounded(int color,int radius,int border){android.graphics.drawable.GradientDrawable d=new android.graphics.drawable.GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));d.setStroke(dp(1),border);return d;}
+ private android.graphics.drawable.GradientDrawable glass(int color,int radius){return flatShape(color,24);}
+ private android.graphics.drawable.GradientDrawable rounded(int color,int radius,int border){return flatShape(color,24);}
  private int adaptiveColor(int attr,int fallback){
   android.util.TypedValue value=new android.util.TypedValue();
   if(getTheme().resolveAttribute(attr,value,true)){
@@ -1082,7 +1082,7 @@ public class GemBrowserActivity extends Activity {
  private void styleDialog(android.app.AlertDialog dialog){
   if(dialog.getWindow()==null)return;
   android.graphics.drawable.GradientDrawable background=new android.graphics.drawable.GradientDrawable();
-  background.setColor(uiSurface());background.setCornerRadius(dp(20));
+  background.setColor(dynamicCard());background.setCornerRadius(dp(24));
   dialog.getWindow().setBackgroundDrawable(background);
   int titleId=getResources().getIdentifier("alertTitle","id","android");
   TextView title=dialog.findViewById(titleId);if(title!=null)title.setTextColor(uiText());
