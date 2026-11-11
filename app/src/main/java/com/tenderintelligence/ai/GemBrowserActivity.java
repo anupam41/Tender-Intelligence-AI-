@@ -115,7 +115,7 @@ public class GemBrowserActivity extends Activity {
   scanProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);scanProgress.setMax(batchTerms.length);scanProgress.setProgress(0);scanProgress.setIndeterminate(false);scanProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.rgb(0,175,152)));scanProgress.setVisibility(View.GONE);LinearLayout.LayoutParams progressLp=new LinearLayout.LayoutParams(-1,dp(5));progressLp.setMargins(dp(24),0,dp(24),0);page.addView(scanProgress,progressLp);
   scanProgressLabel=new TextView(this);scanProgressLabel.setTextColor(Color.rgb(47,99,99));scanProgressLabel.setPadding(dp(24),dp(10),dp(24),dp(5));scanProgressLabel.setTextSize(13);scanProgressLabel.setText("Ready to scan • Results will appear below");page.addView(scanProgressLabel);
   collectedCount=new TextView(this);collectedCount.setTextColor(Color.rgb(0,129,115));collectedCount.setPadding(dp(24),dp(4),dp(24),dp(4));collectedCount.setTextSize(13);page.addView(collectedCount);
-  restoreAiReviews();restoreShortlist();if(bundle==null)clearPreviousSearchSession();getPreferences(0).edit().remove("openrouter_key_iv").remove("openrouter_key_cipher").remove("gemini_iv").remove("gemini_encrypted").remove("groq_iv").remove("groq_encrypted").remove("remember_openrouter_key").remove("remember_provider_keys").apply();updateCollectedCount();
+  restoreAiReviews();restoreShortlist();if(bundle==null){migratePreviousReports();shortlisted.clear();persistShortlist();clearPreviousSearchSession();}getPreferences(0).edit().remove("openrouter_key_iv").remove("openrouter_key_cipher").remove("gemini_iv").remove("gemini_encrypted").remove("groq_iv").remove("groq_encrypted").remove("remember_openrouter_key").remove("remember_provider_keys").apply();updateCollectedCount();
   Button next=button("Next");findRow.addView(next);next.setOnClickListener(v->{
    state.setText("Looking for GeM next results page…");
    String js="(function(){"+
@@ -385,7 +385,44 @@ public class GemBrowserActivity extends Activity {
  private String sessionReportId;
  private String selectedHistoryReportId;
  private String newSessionReportId(){return new java.text.SimpleDateFormat("yyyyMMdd_HHmmss",java.util.Locale.US).format(new java.util.Date());}
- private java.io.File historyFile(String session){return new java.io.File(getFilesDir(),"Tender_Radar_"+session+".docx");}
+ private java.io.File reportsFolder(){
+  java.io.File base=getExternalFilesDir(android.os.Environment.DIRECTORY_DOCUMENTS);
+  java.io.File folder=new java.io.File(base==null?getFilesDir():base,"TenderRadar");
+  if(!folder.exists()&&!folder.mkdirs())android.util.Log.w("TenderRadar","Report folder unavailable");
+  return folder;
+ }
+ private java.io.File historyFile(String session){return new java.io.File(reportsFolder(),"Tender_Radar_"+session+".docx");}
+ private void openHistoryReport(String session){
+  java.io.File file=historyFile(session);
+  if(!file.exists()){saveHistoryReports();file=historyFile(session);}
+  if(!file.exists()){android.widget.Toast.makeText(this,"Report unavailable",android.widget.Toast.LENGTH_SHORT).show();return;}
+  try{
+   android.net.Uri uri=androidx.core.content.FileProvider.getUriForFile(this,getPackageName()+".fileprovider",file);
+   Intent view=new Intent(Intent.ACTION_VIEW);
+   view.setDataAndType(uri,"application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+   view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+   startActivity(Intent.createChooser(view,"Open Word report"));
+  }catch(Exception e){android.widget.Toast.makeText(this,"Install a Word-compatible viewer or use Export",android.widget.Toast.LENGTH_LONG).show();}
+ }
+ private void migratePreviousReports(){
+  JSONArray records=historyRecords();
+  java.util.HashSet<String> ids=new java.util.HashSet<>();
+  for(int i=0;i<records.length();i++){JSONObject rec=records.optJSONObject(i);if(rec!=null){JSONObject bid=rec.optJSONObject("bid");if(bid!=null)ids.add(bid.optString("bidId"));}}
+  boolean changed=false;
+  for(JSONObject bid:shortlisted.values()){
+   String id=bid.optString("bidId");if(id.isEmpty()||ids.contains(id))continue;
+   JSONObject rec=new JSONObject();
+   try{rec.put("session","previous_saved");rec.put("savedAt",System.currentTimeMillis());rec.put("bid",new JSONObject(bid.toString()));records.put(rec);changed=true;}catch(Exception ignored){}
+  }
+  if(changed)getPreferences(0).edit().putString("shortlist_history_v1",records.toString()).apply();
+  saveHistoryReports();
+ }
+ private boolean isPreviouslyShortlisted(String id){
+  if(shortlisted.containsKey(id))return true;
+  JSONArray records=historyRecords();
+  for(int i=0;i<records.length();i++){JSONObject rec=records.optJSONObject(i);JSONObject bid=rec==null?null:rec.optJSONObject("bid");if(bid!=null&&id.equals(bid.optString("bidId")))return true;}
+  return false;
+ }
  private JSONArray historyRecords(){
   try{return new JSONArray(getPreferences(0).getString("shortlist_history_v1","[]"));}
   catch(Exception e){return new JSONArray();}
@@ -442,7 +479,9 @@ public class GemBrowserActivity extends Activity {
     display=new java.text.SimpleDateFormat("dd MMM yyyy, h:mm a",java.util.Locale.getDefault()).format(date);
    }catch(Exception ignored){}
    list.addView(dashText(display+" • "+groups.get(key)+" tender(s)",14,uiText()));
-   Button export=button("Export Word report");list.addView(export);
+   Button open=button("Open Word report");list.addView(open);
+   open.setOnClickListener(v->openHistoryReport(key));
+   Button export=button("Export copy");list.addView(export);
    export.setOnClickListener(v->exportHistoryReport(key));
   }
   dialog.show();styleDialog(dialog);
@@ -454,7 +493,7 @@ public class GemBrowserActivity extends Activity {
  }
  private void shortlistTender(JSONObject bid){
   String id=bid.optString("bidId");
-  if(id.isEmpty()||shortlisted.containsKey(id))return;
+  if(id.isEmpty()||isPreviouslyShortlisted(id))return;
   shortlisted.put(id,bid);
   persistShortlist();saveHistoryRecord(bid);
   renderDashboard();updateCollectedCount();scheduleAutoReview();
@@ -538,7 +577,7 @@ public class GemBrowserActivity extends Activity {
   ArrayList<JSONObject> open=new ArrayList<>();int expired=0,missing=0,analyzed=0;
   Date now=new Date();
   for(JSONObject j:collected.values()){
-   if(shortlisted.containsKey(j.optString("bidId"))||!relevantTitle(j.optString("title")))continue;
+   if(isPreviouslyShortlisted(j.optString("bidId"))||!relevantTitle(j.optString("title")))continue;
    Date due=parsedDeadline(j.optString("deadlineText"));
    if(due==null){missing++;continue;}
    if(!due.after(now)){expired++;continue;}
