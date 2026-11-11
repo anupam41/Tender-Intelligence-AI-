@@ -656,14 +656,32 @@ public class GemBrowserActivity extends Activity {
    TextView cardTitle=dashText(title,18,white);cardTitle.setTypeface(null,Typeface.BOLD);cardTitle.setMaxLines(3);cardTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);cardTitle.setPadding(dp(2),dp(3),dp(2),dp(5));card.addView(cardTitle);
    cardTitle.setOnClickListener(v->showTenderDetails(bid));
    TextView bidId=dashText(id+"  •  "+workCategory(title),12,teal);bidId.setPadding(dp(2),dp(4),dp(2),dp(4));card.addView(bidId);
-   String status=ai==null?(analyzingBids.contains(id)?"Analyzing technical documents":apiFailedReviews.contains(id)?"AI connection issue":failedAutoReviews.contains(id)?"Document unavailable • Manual review":"Waiting for AI review"):ai.optString("verdict","Needs review")+" • "+ai.optInt("score",0)+"/100";
-   TextView closing=dashText("Closes "+due,13,muted);closing.setPadding(dp(2),dp(4),dp(2),0);card.addView(closing);
-   LinearLayout statusRow=new LinearLayout(this);statusRow.setOrientation(0);statusRow.setGravity(Gravity.CENTER_VERTICAL);card.addView(statusRow);
-   if(analyzingBids.contains(id)){
-    ProgressBar spinner=new ProgressBar(this);spinner.setIndeterminate(true);spinner.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(teal));
-    LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(18),dp(18));sp.setMargins(dp(2),0,dp(6),0);statusRow.addView(spinner,sp);
+   boolean isAnalyzing=ai==null&&analyzingBids.contains(id);
+   boolean isConnectionError=ai==null&&apiFailedReviews.contains(id);
+   boolean isDocumentError=ai==null&&failedAutoReviews.contains(id);
+   boolean isReviewed=ai!=null;
+   String status=isReviewed?"Reviewed • "+ai.optString("verdict","Needs review")+" • "+ai.optInt("score",0)+"/100":
+    isAnalyzing?"Analyzing technical documents":isConnectionError?"AI connection failed • Retry":
+    isDocumentError?"Document unavailable • Manual review":"Waiting for AI review";
+   int statusColor=isReviewed?themeColor(0xff086b60,0xff83e1d0):
+    isAnalyzing?themeColor(0xff176b92,0xff8dd5ff):
+    (isConnectionError||isDocumentError)?themeColor(0xff9b4b13,0xffffc58a):themeColor(0xff526b75,0xffb4c7ce);
+   int statusSurface=isReviewed?themeColor(0xffd9f4eb,0xff20483f):
+    isAnalyzing?themeColor(0xffe0f2ff,0xff193d52):
+    (isConnectionError||isDocumentError)?themeColor(0xffffeddb,0xff4c3223):themeColor(0xffeaf0f1,0xff26363e);
+   TextView closing=dashText("Closes "+due,13,muted);closing.setPadding(dp(2),dp(4),dp(2),dp(5));card.addView(closing);
+   LinearLayout statusRow=new LinearLayout(this);statusRow.setOrientation(0);statusRow.setGravity(Gravity.CENTER_VERTICAL);
+   statusRow.setPadding(dp(10),dp(6),dp(10),dp(6));statusRow.setBackground(glass(statusSurface,12));
+   LinearLayout.LayoutParams statusLp=new LinearLayout.LayoutParams(-1,-2);statusLp.setMargins(0,dp(2),0,dp(8));card.addView(statusRow,statusLp);
+   if(isAnalyzing){
+    ProgressBar spinner=new ProgressBar(this);spinner.setIndeterminate(true);spinner.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(statusColor));
+    LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(16),dp(16));sp.setMargins(0,0,dp(8),0);statusRow.addView(spinner,sp);
+   }else{
+    TextView marker=dashText(isReviewed?"✓":(isConnectionError||isDocumentError)?"!":"○",14,statusColor);
+    marker.setTypeface(null,Typeface.BOLD);
+    LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(-2,-2);mp.setMargins(0,0,dp(8),0);statusRow.addView(marker,mp);
    }
-   TextView statusText=dashText(status,12,ai==null?muted:teal);statusText.setPadding(0,dp(2),0,dp(9));statusRow.addView(statusText);
+   TextView statusText=dashText(status,12,statusColor);statusText.setTypeface(null,Typeface.BOLD);statusRow.addView(statusText,new LinearLayout.LayoutParams(0,-2,1));
    LinearLayout actions=new LinearLayout(this);actions.setOrientation(0);actions.setPadding(0,dp(5),0,dp(6));card.addView(actions);
    Button details=button("Tender details");details.setTextColor(uiText());details.setBackground(glass(themeColor(0xffe4f3f0,0xff29434a),18));
    LinearLayout.LayoutParams detailsLp=new LinearLayout.LayoutParams(-1,dp(48));actions.addView(details,detailsLp);details.setOnClickListener(v->showTenderDetails(bid));
