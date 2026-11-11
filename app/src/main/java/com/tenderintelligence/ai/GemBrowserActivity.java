@@ -175,7 +175,7 @@ public class GemBrowserActivity extends Activity {
   ((android.view.ViewGroup)batchButton.getParent()).removeView(batchButton);
   LinearLayout.LayoutParams scanLp=new LinearLayout.LayoutParams(-1,dp(50));scanLp.setMargins(0,dp(12),0,0);scanCard.addView(batchButton,scanLp);
   ((android.view.ViewGroup)scanProgress.getParent()).removeView(scanProgress);scanCard.addView(scanProgress,new LinearLayout.LayoutParams(-1,dp(4)));
-  ((android.view.ViewGroup)state.getParent()).removeView(state);state.setTextSize(12);state.setTextColor(dynamicMuted());state.setPadding(dp(3),dp(4),dp(3),dp(4));heroContent.addView(state);
+  ((android.view.ViewGroup)state.getParent()).removeView(state);state.setTextSize(12);state.setTextColor(dynamicMuted());state.setPadding(dp(3),dp(8),dp(3),0);scanCard.addView(state);
   // Hidden counters still receive scan updates, while the summary displays live totals.
   statsStrip.setVisibility(View.GONE);
   heading.setPadding(0,0,0,dp(2));note.setPadding(0,0,0,0);
@@ -729,7 +729,8 @@ public class GemBrowserActivity extends Activity {
   while(dashboardList.getChildCount()>1)dashboardList.removeViewAt(1);
   int white=dynamicText(),muted=dynamicMuted(),teal=dynamicPrimary();
   if(managementHeaderButton!=null){managementHeaderButton.setText("▣ "+shortlisted.size());managementHeaderButton.setContentDescription("Tender management, "+shortlisted.size()+" saved");}
-  TextView resultsHeading=dashText("Matching tenders",22,white);resultsHeading.setTypeface(null,Typeface.BOLD);dashboardList.addView(resultsHeading);
+  LinearLayout resultsToolbar=new LinearLayout(this);resultsToolbar.setOrientation(0);resultsToolbar.setGravity(Gravity.CENTER_VERTICAL);dashboardList.addView(resultsToolbar,new LinearLayout.LayoutParams(-1,dp(48)));
+  TextView resultsHeading=dashText("Matching tenders",22,white);resultsHeading.setTypeface(null,Typeface.BOLD);resultsToolbar.addView(resultsHeading,new LinearLayout.LayoutParams(0,-2,1));
   ArrayList<JSONObject> open=new ArrayList<>();int expired=0,missing=0,analyzed=0;
   Date now=new Date();
   for(JSONObject j:collected.values()){
@@ -753,7 +754,7 @@ public class GemBrowserActivity extends Activity {
   });
   String[] sortLabels={"Relevance","Closing soon","AI score"};
   Button sort=button("Sort: "+sortLabels[tenderSortMode]+"  ▾");sort.setTextSize(13);sort.setTextColor(uiAccent());sort.setBackgroundColor(Color.TRANSPARENT);sort.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
-  LinearLayout.LayoutParams sortLp=new LinearLayout.LayoutParams(-1,dp(32));sortLp.setMargins(0,0,0,dp(2));dashboardList.addView(sort,sortLp);
+  LinearLayout.LayoutParams sortLp=new LinearLayout.LayoutParams(-2,dp(40));sortLp.setMargins(dp(8),0,0,0);resultsToolbar.addView(sort,sortLp);
   sort.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Sort matching tenders")
    .setSingleChoiceItems(sortLabels,tenderSortMode,(dialog,which)->{tenderSortMode=which;dialog.dismiss();renderDashboard();})
    .setNegativeButton("Cancel",null).show());
