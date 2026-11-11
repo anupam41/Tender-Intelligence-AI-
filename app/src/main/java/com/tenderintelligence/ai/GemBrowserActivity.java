@@ -57,6 +57,8 @@ public class GemBrowserActivity extends Activity {
  }
  @Override public void onCreate(Bundle bundle){
   super.onCreate(bundle);
+  if(bundle!=null)sessionReportId=bundle.getString("report_session_id");
+  if(sessionReportId==null)sessionReportId=newSessionReportId();
   getWindow().setStatusBarColor(themeColor(0xfff4faf7,0xff0a121a));getWindow().setNavigationBarColor(themeColor(0xfff4faf7,0xff0a121a));getWindow().getDecorView().setSystemUiVisibility(darkMode()?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
   LinearLayout page=new LinearLayout(this);page.setOrientation(1);page.setBackgroundColor(themeColor(0xfff4faf7,0xff0a121a));setContentView(page);page.setOnApplyWindowInsetsListener((v,insets)->{int top=android.os.Build.VERSION.SDK_INT>=30?insets.getInsets(android.view.WindowInsets.Type.statusBars()).top:insets.getSystemWindowInsetTop();v.setPadding(0,top,0,0);return insets;});
   TextView heading=new TextView(this);heading.setText("Tender Radar");heading.setTextSize(30);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(themeColor(0xff16272b,0xffeaf8f5));heading.setPadding(dp(24),dp(18),dp(24),dp(4));page.addView(heading);
@@ -380,16 +382,81 @@ public class GemBrowserActivity extends Activity {
  private void restoreShortlist(){
   try{JSONArray a=new JSONArray(getPreferences(0).getString("shortlisted_tenders","[]"));for(int i=0;i<a.length();i++){JSONObject j=a.optJSONObject(i);if(j!=null&&!j.optString("bidId").isEmpty())shortlisted.put(j.optString("bidId"),j);}}catch(Exception ignored){}
  }
+ private String sessionReportId;
+ private String selectedHistoryReportId;
+ private String newSessionReportId(){return new java.text.SimpleDateFormat("yyyyMMdd_HHmmss",java.util.Locale.US).format(new java.util.Date());}
+ private java.io.File historyFile(String session){return new java.io.File(getFilesDir(),"Tender_Radar_"+session+".docx");}
+ private JSONArray historyRecords(){
+  try{return new JSONArray(getPreferences(0).getString("shortlist_history_v1","[]"));}
+  catch(Exception e){return new JSONArray();}
+ }
+ private void saveHistoryRecord(JSONObject bid){
+  JSONArray records=historyRecords();
+  JSONObject record=new JSONObject();
+  try{
+   record.put("session",sessionReportId);
+   record.put("savedAt",System.currentTimeMillis());
+   record.put("bid",new JSONObject(bid.toString()));
+   records.put(record);
+   getPreferences(0).edit().putString("shortlist_history_v1",records.toString()).apply();
+  }catch(Exception e){android.util.Log.e("TenderRadar","Could not store session history",e);}
+  saveHistoryReports();
+ }
+ private void saveHistoryReports(){
+  JSONArray records=historyRecords();
+  java.util.LinkedHashMap<String,java.util.ArrayList<JSONObject>> groups=new java.util.LinkedHashMap<>();
+  for(int i=0;i<records.length();i++){
+   JSONObject rec=records.optJSONObject(i);if(rec==null)continue;
+   String key=rec.optString("session");JSONObject bid=rec.optJSONObject("bid");
+   if(key.isEmpty()||bid==null)continue;
+   if(!groups.containsKey(key))groups.put(key,new java.util.ArrayList<>());
+   groups.get(key).add(bid);
+  }
+  for(java.util.Map.Entry<String,java.util.ArrayList<JSONObject>> group:groups.entrySet())
+   try{TenderWordExport.writeAll(historyFile(group.getKey()),group.getValue(),aiReviews);}
+   catch(Exception e){android.util.Log.e("TenderRadar","Session Word history failed",e);}
+ }
+ private void exportHistoryReport(String session){
+  selectedHistoryReportId=session;
+  Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+  intent.addCategory(Intent.CATEGORY_OPENABLE);
+  intent.setType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+  intent.putExtra(Intent.EXTRA_TITLE,"Tender_Radar_"+session+".docx");
+  try{startActivityForResult(intent,4210);}catch(Exception e){state.setText("Word export is unavailable.");}
+ }
+ private void showWordHistory(){
+  JSONArray records=historyRecords();
+  java.util.LinkedHashMap<String,Integer> groups=new java.util.LinkedHashMap<>();
+  for(int i=0;i<records.length();i++){
+   JSONObject rec=records.optJSONObject(i);if(rec==null)continue;
+   String key=rec.optString("session");if(!key.isEmpty())groups.put(key,groups.containsKey(key)?groups.get(key)+1:1);
+  }
+  LinearLayout list=new LinearLayout(this);list.setOrientation(1);list.setPadding(dp(14),dp(8),dp(14),dp(8));
+  ScrollView scroll=new ScrollView(this);scroll.addView(list);
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Word report history").setView(scroll).setPositiveButton("Close",null).create();
+  if(groups.isEmpty())list.addView(dashText("No session reports yet. Shortlist a tender to create one.",14,uiText()));
+  java.util.ArrayList<String> keys=new java.util.ArrayList<>(groups.keySet());java.util.Collections.reverse(keys);
+  for(String key:keys){
+   String display=key;
+   try{java.util.Date date=new java.text.SimpleDateFormat("yyyyMMdd_HHmmss",java.util.Locale.US).parse(key);
+    display=new java.text.SimpleDateFormat("dd MMM yyyy, h:mm a",java.util.Locale.getDefault()).format(date);
+   }catch(Exception ignored){}
+   list.addView(dashText(display+" • "+groups.get(key)+" tender(s)",14,uiText()));
+   Button export=button("Export Word report");list.addView(export);
+   export.setOnClickListener(v->exportHistoryReport(key));
+  }
+  dialog.show();styleDialog(dialog);
+ }
  private void persistShortlist(){
   JSONArray a=new JSONArray();for(JSONObject j:shortlisted.values())a.put(j);
   getPreferences(0).edit().putString("shortlisted_tenders",a.toString()).apply();
-  saveShortlistWordAutomatically();
+  saveShortlistWordAutomatically();saveHistoryReports();
  }
  private void shortlistTender(JSONObject bid){
   String id=bid.optString("bidId");
   if(id.isEmpty()||shortlisted.containsKey(id))return;
   shortlisted.put(id,bid);
-  persistShortlist();
+  persistShortlist();saveHistoryRecord(bid);
   renderDashboard();updateCollectedCount();scheduleAutoReview();
   android.widget.Toast.makeText(this,"Saved to Tender management",android.widget.Toast.LENGTH_SHORT).show();
  }
@@ -449,6 +516,7 @@ public class GemBrowserActivity extends Activity {
    Button saved=button("Open saved Word report");list.addView(saved);
    saved.setOnClickListener(v->openSavedShortlistWord());
   }
+  Button history=button("Word report history");list.addView(history);history.setOnClickListener(v->showWordHistory());
   if(shortlisted.isEmpty())list.addView(dashText("No shortlisted tenders yet.",15,themeColor(0xff1b2d31,0xffeff9f8)));
   for(JSONObject bid:new ArrayList<>(shortlisted.values())){
    String id=bid.optString("bidId");
@@ -752,6 +820,16 @@ public class GemBrowserActivity extends Activity {
  }
  @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
   super.onActivityResult(requestCode,resultCode,data);
+  if(requestCode==4210){if(resultCode==RESULT_OK&&data!=null&&data.getData()!=null&&selectedHistoryReportId!=null){
+   try{
+    java.io.File file=historyFile(selectedHistoryReportId);
+    try(java.io.InputStream in=new java.io.FileInputStream(file);java.io.OutputStream out=getContentResolver().openOutputStream(data.getData())){
+     if(out==null)throw new java.io.IOException("Destination unavailable");
+     byte[] buf=new byte[8192];int n;while((n=in.read(buf))!=-1)out.write(buf,0,n);
+    }
+    state.setText("Session Word report exported.");
+   }catch(Exception e){state.setText("Session export failed: "+e.getMessage());}
+  }selectedHistoryReportId=null;return;}
   if(requestCode==4209){if(resultCode==RESULT_OK&&data!=null&&data.getData()!=null){try{TenderWordExport.writeAll(this,data.getData(),shortlisted.values(),aiReviews);state.setText("Combined shortlist Word report exported.");}catch(Exception e){state.setText("Word export failed: "+e.getMessage());}}return;}
   if(requestCode==SAVE_SHORTLIST_DOCX){if(resultCode==RESULT_OK&&data!=null&&data.getData()!=null&&pendingWordBid!=null){try{TenderWordExport.write(this,data.getData(),pendingWordBid,aiReviews.get(pendingWordBid.optString("bidId")));state.setText("Shortlisted tender exported to Word.");}catch(Exception e){state.setText("Word export failed: "+e.getMessage());}}pendingWordBid=null;return;}
   if(requestCode!=PICK_TENDER_PDF||resultCode!=RESULT_OK||data==null||data.getData()==null||pendingPdfScope==null)return;
@@ -799,6 +877,7 @@ public class GemBrowserActivity extends Activity {
   e.setBackgroundTintList(android.content.res.ColorStateList.valueOf(uiAccent()));
  }
  private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(14);b.setTextColor(uiText());b.setBackground(glass(themeColor(0xffe7f5f1,0xff20383e),18));b.setMinHeight(dp(48));b.setPadding(dp(4),0,dp(4),0);return b;}
+ @Override protected void onSaveInstanceState(Bundle out){out.putString("report_session_id",sessionReportId);super.onSaveInstanceState(out);}
  private long lastBackPressMs=0L;
  @Override public void onBackPressed(){
   // A WebView's internal GeM page history must not intercept exit from the dashboard.
