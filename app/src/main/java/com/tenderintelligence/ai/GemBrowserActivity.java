@@ -568,6 +568,37 @@ public class GemBrowserActivity extends Activity {
   }
   dialog.setOnShowListener(x->styleDialog(dialog));dialog.show();styleDialog(dialog);
  }
+ private void showTenderDetails(JSONObject bid){
+  String id=bid.optString("bidId",""),title=bid.optString("title","Untitled tender");
+  JSONObject review=aiReviews.get(id);
+  LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(16),dp(10),dp(16),dp(12));
+  TextView heading=dashText(title,21,uiText());heading.setTypeface(null,Typeface.BOLD);heading.setTextIsSelectable(true);content.addView(heading);
+  TextView identifier=dashText(id+"  •  "+workCategory(title),13,uiAccent());identifier.setTextIsSelectable(true);content.addView(identifier);
+  String buyer=bid.optString("buyer",bid.optString("buyerName",""));
+  if(!buyer.isEmpty())content.addView(dashText("Buyer: "+buyer,14,uiText()));
+  content.addView(dashText("Closing date: "+bid.optString("deadlineText","Not provided"),14,uiText()));
+  TextView section=dashText("AI assessment",17,uiText());section.setTypeface(null,Typeface.BOLD);content.addView(section);
+  if(review==null){
+   content.addView(dashText("No completed AI review yet. The tender must be checked against its technical documents.",14,uiMuted()));
+   Button run=button(analyzingBids.contains(id)?"AI review in progress":"Run AI review");content.addView(run);
+   run.setEnabled(!analyzingBids.contains(id));
+   run.setOnClickListener(v->{failedAutoReviews.remove(id);apiFailedReviews.remove(id);aiConnectionPaused=false;analyzeInline(bid);});
+  }else{
+   content.addView(dashText(review.optString("verdict","Needs review")+"  •  "+review.optInt("score",0)+"/100 (indicative)",16,uiAccent()));
+   content.addView(dashText("Priority: "+review.optString("priority","Needs review"),14,uiText()));
+   content.addView(dashText("Evidence: "+review.optString("source","Source not recorded"),13,uiMuted()));
+   TextView report=dashText(review.optString("report","No summary provided"),14,uiText());report.setTextIsSelectable(true);content.addView(report);
+  }
+  content.addView(dashText("Assessment is provisional. Confirm specifications, buyer requirements, eligibility and deadlines on GeM.",12,uiMuted()));
+  Button document=button("Open GeM document");content.addView(document);document.setOnClickListener(v->openBidPdf(bid));
+  if(!isPreviouslyShortlisted(id)){
+   Button save=button("Shortlist tender");save.setTextColor(uiAccent());content.addView(save);
+   save.setOnClickListener(v->{shortlistTender(bid);save.setEnabled(false);save.setText("Saved to Tender management");});
+  }else content.addView(dashText("Already saved in Tender management / history",13,uiAccent()));
+  ScrollView scroll=new ScrollView(this);scroll.addView(content);
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Tender details").setView(scroll).setPositiveButton("Close",null).create();
+  dialog.setOnShowListener(v->styleDialog(dialog));dialog.show();styleDialog(dialog);
+ }
  private void renderDashboard(){
   if(dashboardList==null)return;
   while(dashboardList.getChildCount()>1)dashboardList.removeViewAt(1);
@@ -600,10 +631,11 @@ public class GemBrowserActivity extends Activity {
    android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();
    bg.setColor(themeColor(0xfffbfffe,0xff14242c));bg.setCornerRadius(dp(22));bg.setStroke(dp(1),themeColor(0xffd9eae7,0xff29434a));card.setBackground(bg);card.setElevation(dp(1));
    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,dp(7),0,dp(10));dashboardList.addView(card,cp);
-   TextView cardTitle=dashText(title,18,white);cardTitle.setTypeface(null,Typeface.BOLD);cardTitle.setMaxLines(2);cardTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);card.addView(cardTitle);
+   TextView cardTitle=dashText(title,18,white);cardTitle.setTypeface(null,Typeface.BOLD);cardTitle.setMaxLines(2);cardTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);card.addView(cardTitle);cardTitle.setOnClickListener(v->showTenderDetails(bid));
    if(analyzingBids.contains(id)){ProgressBar spinner=new ProgressBar(this);spinner.setIndeterminate(true);spinner.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(teal));LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(dp(28),dp(28));sp.setMargins(0,dp(4),0,dp(4));card.addView(spinner,sp);card.addView(dashText("Reading document / AI processing…",12,teal));}
    TextView bidId=dashText(id+"  •  "+workCategory(title),13,teal);bidId.setPadding(0,dp(7),0,dp(8));card.addView(bidId);
    card.addView(dashText("Closing  "+due+"\n"+(ai==null?(analyzingBids.contains(id)?"● Analyzing now":apiFailedReviews.contains(id)?"AI connection issue • Retry after reconnect":failedAutoReviews.contains(id)?"Document inaccessible • Manual PDF needed":"◷ Waiting in AI queue"):ai.optString("verdict","Needs review")+" • Provisional AI assessment"),13,muted));
+   Button details=button("View tender details");details.setTextColor(teal);card.addView(details,new LinearLayout.LayoutParams(-1,dp(44)));details.setOnClickListener(v->showTenderDetails(bid));
    LinearLayout actions=new LinearLayout(this);actions.setOrientation(0);card.addView(actions);
    Button shortlist=button("Shortlist");shortlist.setTextColor(teal);card.addView(shortlist,new LinearLayout.LayoutParams(-1,dp(42)));shortlist.setOnClickListener(v->shortlistTender(bid));
    Button openBid=button("View document");openBid.setTextColor(Color.rgb(38,91,91));openBid.setBackground(glass(themeColor(0xffeaf6f4,0xff1a3036),22));LinearLayout.LayoutParams openLp=new LinearLayout.LayoutParams(0,dp(48),1);openLp.setMargins(0,0,dp(6),0);actions.addView(openBid,openLp);openBid.setOnClickListener(v->openBidPdf(bid));
