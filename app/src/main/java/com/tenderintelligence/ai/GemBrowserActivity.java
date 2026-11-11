@@ -590,26 +590,26 @@ public class GemBrowserActivity extends Activity {
   int[] counts=new int[TENDER_STAGES.length];for(JSONObject item:shortlisted.values())for(int i=0;i<TENDER_STAGES.length;i++)if(TENDER_STAGES[i].equals(tenderStage(item)))counts[i]++;
   StringBuilder overview=new StringBuilder();for(int i=0;i<TENDER_STAGES.length;i++){if(i>0)overview.append("  •  ");overview.append(TENDER_STAGES[i]).append(" ").append(counts[i]);}
   TextView pipeline=dashText(overview.toString(),13,uiAccent());pipeline.setPadding(dp(4),0,dp(4),dp(14));list.addView(pipeline);
-  LinearLayout reports=new LinearLayout(this);reports.setOrientation(1);reports.setPadding(dp(12),dp(12),dp(12),dp(12));reports.setBackground(glass(dynamicSurface(),16));list.addView(reports);
+  LinearLayout reports=new LinearLayout(this);reports.setOrientation(1);reports.setPadding(dp(12),dp(12),dp(12),dp(12));reports.setBackground(glass(dynamicCard(),16));list.addView(reports);
   TextView reportTitle=dashText("Word reports",17,uiText());reportTitle.setTypeface(null,Typeface.BOLD);reports.addView(reportTitle);
   if(!shortlisted.isEmpty()){
-   Button saved=button("Open saved report");saved.setBackground(glass(dynamicCard(),12));reports.addView(saved,new LinearLayout.LayoutParams(-1,dp(46)));saved.setOnClickListener(v->openSavedShortlistWord());
-   Button all=button("Export all to Word");all.setBackground(glass(dynamicCard(),12));reports.addView(all,new LinearLayout.LayoutParams(-1,dp(46)));all.setOnClickListener(v->exportAllShortlistedWord());
+   Button saved=button("Open saved report");saved.setBackground(glass(dynamicCard(),12));reports.addView(saved,spacedAction(0));saved.setOnClickListener(v->openSavedShortlistWord());
+   Button all=button("Export all to Word");all.setBackground(glass(dynamicCard(),12));reports.addView(all,spacedAction(8));all.setOnClickListener(v->exportAllShortlistedWord());
   }
-  Button history=button("Report history");history.setTextColor(dynamicText());history.setBackground(glass(dynamicCard(),12));LinearLayout.LayoutParams historyLp=new LinearLayout.LayoutParams(-1,dp(46));historyLp.setMargins(0,dp(8),0,0);reports.addView(history,historyLp);history.setOnClickListener(v->showWordHistory());
+  Button history=button("Report history");history.setTextColor(dynamicText());history.setBackground(glass(dynamicCard(),12));LinearLayout.LayoutParams historyLp=spacedAction(8);reports.addView(history,historyLp);history.setOnClickListener(v->showWordHistory());
   TextView section=dashText("Saved tenders",17,uiText());section.setTypeface(null,Typeface.BOLD);section.setPadding(dp(4),dp(18),0,dp(8));list.addView(section);
   if(shortlisted.isEmpty())list.addView(dashText("No shortlisted tenders yet.",15,uiMuted()));
   for(JSONObject bid:new ArrayList<>(shortlisted.values())){
    String id=bid.optString("bidId");
-   LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(12),dp(12),dp(12),dp(12));card.setBackground(glass(dynamicSurface(),16));
+   LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(12),dp(12),dp(12),dp(12));card.setBackground(glass(dynamicCard(),16));
    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,0,0,dp(12));list.addView(card,cp);
    TextView name=dashText(bid.optString("title","Untitled tender"),16,uiText());name.setTypeface(null,Typeface.BOLD);name.setMaxLines(3);name.setEllipsize(android.text.TextUtils.TruncateAt.END);card.addView(name);
    TextView meta=dashText(id+"  •  "+tenderStage(bid),13,uiAccent());meta.setPadding(0,dp(6),0,dp(8));card.addView(meta);
-   Button statusButton=button("Change status");card.addView(statusButton,new LinearLayout.LayoutParams(-1,dp(46)));statusButton.setOnClickListener(v->chooseTenderStage(bid,dialog));
-   LinearLayout row=new LinearLayout(this);row.setOrientation(0);card.addView(row);
-   Button word=button("Save Word");LinearLayout.LayoutParams half1=new LinearLayout.LayoutParams(0,dp(46),1);row.addView(word,half1);word.setOnClickListener(v->exportShortlistedWord(bid));
-   Button open=button("GeM document");LinearLayout.LayoutParams half2=new LinearLayout.LayoutParams(0,dp(46),1);row.addView(open,half2);open.setOnClickListener(v->openBidPdf(bid));
-   Button restore=button("Remove from shortlist");restore.setTextColor(uiMuted());card.addView(restore,new LinearLayout.LayoutParams(-1,dp(44)));
+   Button statusButton=button("Change status");card.addView(statusButton,spacedAction(4));statusButton.setOnClickListener(v->chooseTenderStage(bid,dialog));
+   LinearLayout row=new LinearLayout(this);row.setOrientation(0);LinearLayout.LayoutParams rowLp=new LinearLayout.LayoutParams(-1,-2);rowLp.setMargins(0,dp(8),0,0);card.addView(row,rowLp);
+   Button word=button("Save Word");LinearLayout.LayoutParams half1=new LinearLayout.LayoutParams(0,dp(44),1);half1.setMargins(0,0,dp(4),0);row.addView(word,half1);word.setOnClickListener(v->exportShortlistedWord(bid));
+   Button open=button("GeM document");LinearLayout.LayoutParams half2=new LinearLayout.LayoutParams(0,dp(44),1);half2.setMargins(dp(4),0,0,0);row.addView(open,half2);open.setOnClickListener(v->openBidPdf(bid));
+   Button restore=button("Remove from shortlist");restore.setTextColor(uiMuted());card.addView(restore,spacedAction(8));
    restore.setOnClickListener(v->{shortlisted.remove(id);persistShortlist();dialog.dismiss();renderDashboard();updateCollectedCount();showShortlist();});
   }
   dialog.setOnShowListener(x->styleDialog(dialog));dialog.show();styleDialog(dialog);
@@ -667,7 +667,7 @@ public class GemBrowserActivity extends Activity {
   TextView section=dashText("AI assessment",17,uiText());section.setTypeface(null,Typeface.BOLD);content.addView(section);
   if(review==null){
    content.addView(dashText("No completed AI review yet. The tender must be checked against its technical documents.",14,uiMuted()));
-   Button run=button(analyzingBids.contains(id)?"AI review in progress":"Run AI review");content.addView(run);
+   Button run=button(analyzingBids.contains(id)?"AI review in progress":"Run AI review");content.addView(run,spacedAction(10));
    run.setEnabled(!analyzingBids.contains(id));
    run.setOnClickListener(v->{failedAutoReviews.remove(id);apiFailedReviews.remove(id);aiConnectionPaused=false;analyzeInline(bid);});
   }else{
@@ -677,9 +677,9 @@ public class GemBrowserActivity extends Activity {
    addStructuredReview(content,review.optString("report","No summary provided"));
   }
   content.addView(dashText("Assessment is provisional. Confirm specifications, buyer requirements, eligibility and deadlines on GeM.",12,uiMuted()));
-  Button document=button("Open GeM document");content.addView(document);document.setOnClickListener(v->openBidPdf(bid));
+  Button document=button("Open GeM document");content.addView(document,spacedAction(12));document.setOnClickListener(v->openBidPdf(bid));
   if(!isPreviouslyShortlisted(id)){
-   Button save=button("Shortlist tender");save.setTextColor(uiAccent());content.addView(save);
+   Button save=button("Shortlist tender");save.setTextColor(uiAccent());content.addView(save,spacedAction(8));
    save.setOnClickListener(v->{shortlistTender(bid);save.setEnabled(false);save.setText("Saved to Tender management");});
   }else content.addView(dashText("Already saved in Tender management / history",13,uiAccent()));
   ScrollView scroll=new ScrollView(this);scroll.addView(content);
@@ -947,7 +947,7 @@ public class GemBrowserActivity extends Activity {
   EditText model=new EditText(this);model.setSingleLine(true);model.setHint("OmniRoute model ID");model.setText(omniModel());styleDialogField(model);content.addView(model);
   EditText apiKey=new EditText(this);apiKey.setSingleLine(true);apiKey.setHint("OmniRoute gateway API key");apiKey.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);apiKey.setText(OmniSecret.load(this));styleDialogField(apiKey);content.addView(apiKey);
   TextView result=new TextView(this);result.setTextColor(uiMuted());result.setText("Not tested");result.setPadding(0,dp(12),0,dp(12));content.addView(result);
-  Button test=button("Test local connection");content.addView(test);
+  Button test=button("Test local connection");content.addView(test,spacedAction(10));
   test.setOnClickListener(v->{
    String id=model.getText().toString().trim();if(id.isEmpty()){model.setError("Enter a model ID");return;}
    try{OmniSecret.save(this,apiKey.getText().toString().trim());}catch(Exception e){result.setText("Cannot save encrypted key: "+e.getMessage());return;}getPreferences(0).edit().putString("omni_model",id).apply();test.setEnabled(false);result.setText("Testing local OmniRoute…");
@@ -1056,7 +1056,7 @@ public class GemBrowserActivity extends Activity {
   }
  }
  private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
- private android.graphics.drawable.GradientDrawable glass(int color,int radius){android.graphics.drawable.GradientDrawable g=new android.graphics.drawable.GradientDrawable();g.setColor(color);g.setCornerRadius(dp(Math.min(radius,16)));g.setStroke(dp(1),themeColor(0xffdce7e9,0xff34505a));return g;}
+ private android.graphics.drawable.GradientDrawable glass(int color,int radius){android.graphics.drawable.GradientDrawable g=new android.graphics.drawable.GradientDrawable();g.setColor(color);g.setCornerRadius(dp(Math.min(radius,16)));g.setStroke(dp(1),systemTone(darkMode()?"neutral2_700":"neutral2_200",themeColor(0xffe2e2e5,0xff44444b)));return g;}
  private android.graphics.drawable.GradientDrawable rounded(int color,int radius,int border){android.graphics.drawable.GradientDrawable d=new android.graphics.drawable.GradientDrawable();d.setColor(color);d.setCornerRadius(dp(Math.min(radius,16)));d.setStroke(dp(1),border);return d;}
  private int adaptiveColor(int attr,int fallback){
   android.util.TypedValue value=new android.util.TypedValue();
@@ -1075,7 +1075,7 @@ public class GemBrowserActivity extends Activity {
  private void styleDialog(android.app.AlertDialog dialog){
   if(dialog.getWindow()==null)return;
   android.graphics.drawable.GradientDrawable background=new android.graphics.drawable.GradientDrawable();
-  background.setColor(uiSurface());background.setCornerRadius(dp(16));
+  background.setColor(uiSurface());background.setCornerRadius(dp(20));
   dialog.getWindow().setBackgroundDrawable(background);
   int titleId=getResources().getIdentifier("alertTitle","id","android");
   TextView title=dialog.findViewById(titleId);if(title!=null)title.setTextColor(uiText());
@@ -1090,7 +1090,8 @@ public class GemBrowserActivity extends Activity {
   e.setTextColor(uiText());e.setHintTextColor(uiMuted());
   e.setBackgroundTintList(android.content.res.ColorStateList.valueOf(uiAccent()));
  }
- private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(14);b.setTextColor(uiText());b.setBackground(glass(dynamicTonal(),18));b.setMinHeight(dp(48));b.setPadding(dp(4),0,dp(4),0);return b;}
+ private LinearLayout.LayoutParams spacedAction(int topDp){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(44));p.setMargins(0,dp(topDp),0,0);return p;}
+ private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(14);b.setTextColor(uiText());b.setBackground(glass(dynamicCard(),16));b.setMinHeight(dp(44));b.setPadding(dp(10),0,dp(10),0);return b;}
  @Override protected void onSaveInstanceState(Bundle out){out.putString("report_session_id",sessionReportId);super.onSaveInstanceState(out);}
  private long lastBackPressMs=0L;
  @Override public void onBackPressed(){
