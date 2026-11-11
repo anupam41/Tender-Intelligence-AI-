@@ -113,7 +113,7 @@ public class GemBrowserActivity extends Activity {
   scanProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);scanProgress.setMax(batchTerms.length);scanProgress.setProgress(0);scanProgress.setIndeterminate(false);scanProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.rgb(0,175,152)));scanProgress.setVisibility(View.GONE);LinearLayout.LayoutParams progressLp=new LinearLayout.LayoutParams(-1,dp(5));progressLp.setMargins(dp(24),0,dp(24),0);page.addView(scanProgress,progressLp);
   scanProgressLabel=new TextView(this);scanProgressLabel.setTextColor(Color.rgb(47,99,99));scanProgressLabel.setPadding(dp(24),dp(10),dp(24),dp(5));scanProgressLabel.setTextSize(13);scanProgressLabel.setText("Ready to scan • Results will appear below");page.addView(scanProgressLabel);
   collectedCount=new TextView(this);collectedCount.setTextColor(Color.rgb(0,129,115));collectedCount.setPadding(dp(24),dp(4),dp(24),dp(4));collectedCount.setTextSize(13);page.addView(collectedCount);
-  restoreCollected();restoreAiReviews();restoreShortlist();getPreferences(0).edit().remove("openrouter_key_iv").remove("openrouter_key_cipher").remove("gemini_iv").remove("gemini_encrypted").remove("groq_iv").remove("groq_encrypted").remove("remember_openrouter_key").remove("remember_provider_keys").apply();updateCollectedCount();
+  restoreAiReviews();restoreShortlist();if(bundle==null)clearPreviousSearchSession();getPreferences(0).edit().remove("openrouter_key_iv").remove("openrouter_key_cipher").remove("gemini_iv").remove("gemini_encrypted").remove("groq_iv").remove("groq_encrypted").remove("remember_openrouter_key").remove("remember_provider_keys").apply();updateCollectedCount();
   Button next=button("Next");findRow.addView(next);next.setOnClickListener(v->{
    state.setText("Looking for GeM next results page…");
    String js="(function(){"+
@@ -153,6 +153,11 @@ public class GemBrowserActivity extends Activity {
   browser.loadUrl(GEM);renderDashboard();scheduleAutoReview();
  }
  private void updateCollectedCount(){int matches=0;for(JSONObject j:collected.values())if(relevantTitle(j.optString("title")))matches++;if(bidTotalValue!=null)bidTotalValue.setText(String.valueOf(collected.size()));if(matchTotalValue!=null)matchTotalValue.setText(String.valueOf(matches));if(collectedCount!=null)collectedCount.setText("Collected: "+collected.size()+" • Title matches: "+matches+" • Review closing dates");}
+ // Search data is session-only; shortlist records and their saved reviews are permanent.
+ private void clearPreviousSearchSession(){
+  collected.clear();
+  getPreferences(0).edit().remove("gem_collected").apply();
+ }
  private void restoreCollected(){
   try{JSONArray a=new JSONArray(getPreferences(0).getString("gem_collected","[]"));for(int i=0;i<a.length();i++){JSONObject j=a.optJSONObject(i);if(j!=null&&!j.optString("bidId").isEmpty())collected.put(j.optString("bidId"),j);}}catch(Exception ignored){}
  }
@@ -770,5 +775,13 @@ public class GemBrowserActivity extends Activity {
   e.setBackgroundTintList(android.content.res.ColorStateList.valueOf(uiAccent()));
  }
  private Button button(String label){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(14);b.setTextColor(uiText());b.setBackground(glass(themeColor(0xffe7f5f1,0xff20383e),18));b.setMinHeight(dp(48));b.setPadding(dp(4),0,dp(4),0);return b;}
- @Override public void onBackPressed(){if(browser!=null&&browser.canGoBack())browser.goBack();else super.onBackPressed();}
+ private long lastBackPressMs=0L;
+ @Override public void onBackPressed(){
+  // A WebView's internal GeM page history must not intercept exit from the dashboard.
+  if(!showingDashboard&&browser!=null&&browser.canGoBack()){browser.goBack();return;}
+  long now=android.os.SystemClock.elapsedRealtime();
+  if(now-lastBackPressMs<2000L){super.onBackPressed();return;}
+  lastBackPressMs=now;
+  android.widget.Toast.makeText(this,"Back again to exit Tender Radar",android.widget.Toast.LENGTH_SHORT).show();
+ }
 }
