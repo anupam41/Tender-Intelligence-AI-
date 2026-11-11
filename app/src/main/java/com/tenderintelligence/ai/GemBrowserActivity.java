@@ -61,13 +61,13 @@ public class GemBrowserActivity extends Activity {
   if(bundle!=null)sessionReportId=bundle.getString("report_session_id");
   if(sessionReportId==null)sessionReportId=newSessionReportId();
   getWindow().setStatusBarColor(themeColor(0xfff4faf7,0xff0a121a));getWindow().setNavigationBarColor(themeColor(0xfff4faf7,0xff0a121a));getWindow().getDecorView().setSystemUiVisibility(darkMode()?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-  LinearLayout page=new LinearLayout(this);page.setOrientation(1);page.setBackgroundColor(themeColor(0xfff4faf7,0xff0a121a));setContentView(page);page.setOnApplyWindowInsetsListener((v,insets)->{int top=android.os.Build.VERSION.SDK_INT>=30?insets.getInsets(android.view.WindowInsets.Type.statusBars()).top:insets.getSystemWindowInsetTop();v.setPadding(0,top,0,0);return insets;});
-  LinearLayout header=new LinearLayout(this);header.setOrientation(0);header.setGravity(Gravity.CENTER_VERTICAL);header.setPadding(dp(20),dp(12),dp(20),0);page.addView(header);
+  LinearLayout page=new LinearLayout(this);page.setOrientation(1);page.setBackgroundColor(themeColor(0xfff1f7f8,0xff0b161d));setContentView(page);page.setOnApplyWindowInsetsListener((v,insets)->{int top=android.os.Build.VERSION.SDK_INT>=30?insets.getInsets(android.view.WindowInsets.Type.statusBars()).top:insets.getSystemWindowInsetTop();v.setPadding(0,top,0,0);return insets;});
+  LinearLayout header=new LinearLayout(this);header.setOrientation(0);header.setGravity(Gravity.CENTER_VERTICAL);header.setPadding(dp(20),dp(16),dp(20),dp(14));header.setBackground(glass(themeColor(0xfff9fefe,0xff172c34),26));LinearLayout.LayoutParams headerLp=new LinearLayout.LayoutParams(-1,-2);headerLp.setMargins(dp(12),dp(8),dp(12),0);page.addView(header,headerLp);
   LinearLayout brand=new LinearLayout(this);brand.setOrientation(1);header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
-  TextView heading=new TextView(this);heading.setText("Tender Radar");heading.setTextSize(30);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(themeColor(0xff16272b,0xffeaf8f5));brand.addView(heading);
-  TextView note=new TextView(this);note.setText("Discover industrial tenders • GeM");note.setTextSize(13);note.setTextColor(themeColor(0xff65787d,0xff9bb2b6));brand.addView(note);
+  TextView heading=new TextView(this);heading.setText("Tender Radar");heading.setTextSize(27);heading.setTypeface(null,Typeface.BOLD);heading.setTextColor(themeColor(0xff16272b,0xffeaf8f5));brand.addView(heading);
+  TextView note=new TextView(this);note.setText("Your industrial tender workspace");note.setTextSize(13);note.setTextColor(themeColor(0xff65787d,0xff9bb2b6));brand.addView(note);
   Button aiSettingsButton=button("⚙");aiSettingsButton.setContentDescription("AI settings");aiSettingsButton.setTextSize(23);aiSettingsButton.setTextColor(themeColor(0xff195d5c,0xffb7f1e8));aiSettingsButton.setBackground(glass(themeColor(0xffe8f7f5,0xff162a30),22));LinearLayout.LayoutParams settingsLp=new LinearLayout.LayoutParams(dp(52),dp(52));settingsLp.setMargins(dp(10),0,0,0);header.addView(aiSettingsButton,settingsLp);aiSettingsButton.setOnClickListener(v->showAiSettings());
-  View headerSpace=new View(this);page.addView(headerSpace,new LinearLayout.LayoutParams(1,dp(16)));
+  View headerSpace=new View(this);page.addView(headerSpace,new LinearLayout.LayoutParams(1,dp(8)));
   LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.HORIZONTAL);controls.setVisibility(View.GONE);page.addView(controls);
   Button back=button("Back");controls.addView(back,new LinearLayout.LayoutParams(0,40,1));back.setOnClickListener(v->{if(browser.canGoBack())browser.goBack();else finish();});
   Button home=button("GeM home");controls.addView(home,new LinearLayout.LayoutParams(0,40,1));home.setOnClickListener(v->browser.loadUrl(GEM));
@@ -376,11 +376,11 @@ public class GemBrowserActivity extends Activity {
  }
  private void addMetric(LinearLayout row,String value,String label,int color){
   LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);tile.setGravity(Gravity.CENTER);
-  tile.setPadding(dp(6),dp(10),dp(6),dp(10));
-  tile.setBackground(glass(themeColor(0xfff9fffd,0xff1a3036),20));
-  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(70),1);
+  tile.setPadding(dp(4),dp(13),dp(4),dp(13));
+  tile.setBackground(glass(themeColor(0xfff7fdfd,0xff1a3036),24));
+  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(82),1);
   lp.setMargins(0,0,dp(6),0);row.addView(tile,lp);
-  TextView count=new TextView(this);count.setText(value);count.setTextSize(21);count.setTypeface(null,Typeface.BOLD);count.setTextColor(darkMode()?0xff7de4d7:color);count.setGravity(Gravity.CENTER);tile.addView(count,new LinearLayout.LayoutParams(-1,-2));
+  TextView count=new TextView(this);count.setText(value);count.setTextSize(23);count.setTypeface(null,Typeface.BOLD);count.setTextColor(darkMode()?0xff7de4d7:color);count.setGravity(Gravity.CENTER);tile.addView(count,new LinearLayout.LayoutParams(-1,-2));
   TextView caption=new TextView(this);caption.setText(label);caption.setTextSize(12);caption.setTextColor(themeColor(0xff71858a,0xffa3bdc1));caption.setGravity(Gravity.CENTER);tile.addView(caption,new LinearLayout.LayoutParams(-1,-2));
  }
  private void restoreShortlist(){
@@ -653,7 +653,7 @@ public class GemBrowserActivity extends Activity {
   if(dashboardList==null)return;
   while(dashboardList.getChildCount()>1)dashboardList.removeViewAt(1);
   int white=themeColor(0xff1b2d31,0xffeff9f8),muted=themeColor(0xff67797d,0xff9fb4b7),teal=themeColor(0xff008b7e,0xff57d7c6);
-  Button shortlistLibrary=button("Tender management  •  "+shortlisted.size()+" saved");shortlistLibrary.setContentDescription("Open tender management, "+shortlisted.size()+" saved tenders");shortlistLibrary.setTextSize(14);shortlistLibrary.setTextColor(uiAccent());shortlistLibrary.setMinHeight(dp(52));dashboardList.addView(shortlistLibrary);shortlistLibrary.setOnClickListener(v->showShortlist());
+  Button shortlistLibrary=button("▣  Tender management     "+shortlisted.size()+" saved  ›");shortlistLibrary.setContentDescription("Open tender management, "+shortlisted.size()+" saved tenders");shortlistLibrary.setTextSize(15);shortlistLibrary.setTypeface(null,Typeface.BOLD);shortlistLibrary.setTextColor(themeColor(0xfff4fffd,0xfff4fffd));shortlistLibrary.setBackground(rounded(themeColor(0xff07596c,0xff12667a),24,themeColor(0xff07596c,0xff2d899a)));shortlistLibrary.setMinHeight(dp(60));LinearLayout.LayoutParams libraryLp=new LinearLayout.LayoutParams(-1,dp(60));libraryLp.setMargins(0,dp(6),0,dp(14));dashboardList.addView(shortlistLibrary,libraryLp);shortlistLibrary.setOnClickListener(v->showShortlist());
   TextView resultsHeading=dashText("Matching tenders",22,white);resultsHeading.setTypeface(null,Typeface.BOLD);dashboardList.addView(resultsHeading);
   ArrayList<JSONObject> open=new ArrayList<>();int expired=0,missing=0,analyzed=0;
   Date now=new Date();
@@ -689,10 +689,10 @@ public class GemBrowserActivity extends Activity {
   for(JSONObject bid:open){
    String id=bid.optString("bidId"),title=bid.optString("title"),due=bid.optString("deadlineText");
    JSONObject ai=aiReviews.get(id);
-   LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(16),dp(14),dp(16),dp(16));
+   LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(18),dp(17),dp(18),dp(18));
    android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();
-   bg.setColor(themeColor(0xfffbfffe,0xff14242c));bg.setCornerRadius(dp(22));bg.setStroke(dp(1),themeColor(0xffd9eae7,0xff29434a));card.setBackground(bg);card.setElevation(dp(1));
-   LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,dp(7),0,dp(10));dashboardList.addView(card,cp);
+   bg.setColor(themeColor(0xfffcffff,0xff172c34));bg.setCornerRadius(dp(26));bg.setStroke(dp(1),themeColor(0xffdcebee,0xff34525c));card.setBackground(bg);card.setElevation(dp(1));
+   LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,dp(9),0,dp(12));dashboardList.addView(card,cp);
    TextView cardTitle=dashText(title,18,white);cardTitle.setTypeface(null,Typeface.BOLD);cardTitle.setMaxLines(3);cardTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);cardTitle.setPadding(dp(2),dp(3),dp(2),dp(5));card.addView(cardTitle);
    cardTitle.setOnClickListener(v->showTenderDetails(bid));
    TextView bidId=dashText(id+"  •  "+workCategory(title),12,teal);bidId.setPadding(dp(2),dp(4),dp(2),dp(4));card.addView(bidId);
