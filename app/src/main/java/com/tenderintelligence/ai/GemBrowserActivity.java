@@ -590,18 +590,18 @@ public class GemBrowserActivity extends Activity {
   int[] counts=new int[TENDER_STAGES.length];for(JSONObject item:shortlisted.values())for(int i=0;i<TENDER_STAGES.length;i++)if(TENDER_STAGES[i].equals(tenderStage(item)))counts[i]++;
   StringBuilder overview=new StringBuilder();for(int i=0;i<TENDER_STAGES.length;i++){if(i>0)overview.append("  •  ");overview.append(TENDER_STAGES[i]).append(" ").append(counts[i]);}
   TextView pipeline=dashText(overview.toString(),13,uiAccent());pipeline.setPadding(dp(4),0,dp(4),dp(14));list.addView(pipeline);
-  LinearLayout reports=new LinearLayout(this);reports.setOrientation(1);reports.setPadding(dp(12),dp(12),dp(12),dp(12));reports.setBackground(glass(themeColor(0xffe4f3f0,0xff243d44),18));list.addView(reports);
+  LinearLayout reports=new LinearLayout(this);reports.setOrientation(1);reports.setPadding(dp(12),dp(12),dp(12),dp(12));reports.setBackground(glass(dynamicSurface(),16));list.addView(reports);
   TextView reportTitle=dashText("Word reports",17,uiText());reportTitle.setTypeface(null,Typeface.BOLD);reports.addView(reportTitle);
   if(!shortlisted.isEmpty()){
-   Button saved=button("Open saved report");reports.addView(saved,new LinearLayout.LayoutParams(-1,dp(46)));saved.setOnClickListener(v->openSavedShortlistWord());
-   Button all=button("Export all to Word");reports.addView(all,new LinearLayout.LayoutParams(-1,dp(46)));all.setOnClickListener(v->exportAllShortlistedWord());
+   Button saved=button("Open saved report");saved.setBackground(glass(dynamicCard(),12));reports.addView(saved,new LinearLayout.LayoutParams(-1,dp(46)));saved.setOnClickListener(v->openSavedShortlistWord());
+   Button all=button("Export all to Word");all.setBackground(glass(dynamicCard(),12));reports.addView(all,new LinearLayout.LayoutParams(-1,dp(46)));all.setOnClickListener(v->exportAllShortlistedWord());
   }
-  Button history=button("Report history");reports.addView(history,new LinearLayout.LayoutParams(-1,dp(46)));history.setOnClickListener(v->showWordHistory());
+  Button history=button("Report history");history.setTextColor(dynamicText());history.setBackground(glass(dynamicCard(),12));LinearLayout.LayoutParams historyLp=new LinearLayout.LayoutParams(-1,dp(46));historyLp.setMargins(0,dp(8),0,0);reports.addView(history,historyLp);history.setOnClickListener(v->showWordHistory());
   TextView section=dashText("Saved tenders",17,uiText());section.setTypeface(null,Typeface.BOLD);section.setPadding(dp(4),dp(18),0,dp(8));list.addView(section);
   if(shortlisted.isEmpty())list.addView(dashText("No shortlisted tenders yet.",15,uiMuted()));
   for(JSONObject bid:new ArrayList<>(shortlisted.values())){
    String id=bid.optString("bidId");
-   LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(12),dp(12),dp(12),dp(12));card.setBackground(glass(themeColor(0xffe4f3f0,0xff243d44),18));
+   LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(12),dp(12),dp(12),dp(12));card.setBackground(glass(dynamicSurface(),16));
    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,0,0,dp(12));list.addView(card,cp);
    TextView name=dashText(bid.optString("title","Untitled tender"),16,uiText());name.setTypeface(null,Typeface.BOLD);name.setMaxLines(3);name.setEllipsize(android.text.TextUtils.TruncateAt.END);card.addView(name);
    TextView meta=dashText(id+"  •  "+tenderStage(bid),13,uiAccent());meta.setPadding(0,dp(6),0,dp(8));card.addView(meta);
