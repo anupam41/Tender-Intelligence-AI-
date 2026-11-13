@@ -285,7 +285,10 @@ public class GemBrowserActivity extends Activity {
   });
  }
  private void stopAutoCollect(String message){
-  autoCollecting=false;autoHandler.removeCallbacksAndMessages(null);
+  autoCollecting=false;batchRunning=false;autoHandler.removeCallbacksAndMessages(null);
+  if(scanProgress!=null)scanProgress.setIndeterminate(false);
+  if(batchButton!=null)batchButton.setText("Find tenders");
+  if(scanProgressLabel!=null)scanProgressLabel.setText("Scan stopped • "+collected.size()+" unique bids retained");
   if(autoButton!=null)autoButton.setText("Auto collect all pages");
   state.setText(message+" Pages processed: "+autoPages+" • Total unique bids: "+collected.size());
  }
