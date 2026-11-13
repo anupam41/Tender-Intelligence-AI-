@@ -215,7 +215,7 @@ public class GemBrowserActivity extends Activity {
   browser.setDownloadListener((url,userAgent,disposition,mime,length)->{Uri uri=Uri.parse(url);if(safe(uri))startActivity(new Intent(Intent.ACTION_VIEW,uri));else state.setText("Download blocked: external URL");});
   browser.loadUrl(GEM);renderDashboard();scheduleAutoReview();
  }
- private void updateCollectedCount(){int matches=0;for(JSONObject j:collected.values())if(relevantTitle(j.optString("title")))matches++;if(bidTotalValue!=null)bidTotalValue.setText(String.valueOf(collected.size()));if(matchTotalValue!=null)matchTotalValue.setText(String.valueOf(matches));if(collectedCount!=null)collectedCount.setText(matches+" matching tenders • "+collected.size()+" bids collected");}
+ private void updateCollectedCount(){int matches=0;Date now=new Date();for(JSONObject j:collected.values()){if(isPreviouslyShortlisted(j.optString("bidId"))||!relevantTitle(j.optString("title")))continue;Date due=parsedDeadline(j.optString("deadlineText"));if(due!=null&&due.after(now))matches++;}if(bidTotalValue!=null)bidTotalValue.setText(String.valueOf(collected.size()));if(matchTotalValue!=null)matchTotalValue.setText(String.valueOf(matches));if(collectedCount!=null)collectedCount.setText(matches+" open matching tenders • "+collected.size()+" bids collected");}
  // Search data is session-only; shortlist records and their saved reviews are permanent.
  private void clearPreviousSearchSession(){
   collected.clear();
