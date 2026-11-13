@@ -32,7 +32,7 @@ public class GemBrowserActivity extends Activity {
  private boolean gemPageReady=false;
  private int searchRetries=0;
  private int batchIndex=0;
- private String[] batchTerms={"Heat exchanger","Tube bundle","Retubing","Condenser","Oil cooler","Sample cooler","SWAS cooler","Pressure vessel","Economizer","Air preheater","LP heater","HP heater"};
+ private String[] batchTerms={"Heat exchanger","Condenser","Vent condenser","Surface condenser","Gland steam condenser","AC condenser","Air fin fan cooler","MOT cooler","Turbine oil cooler","Turbine air cooler","Inter stage cooler","Inter cooler","After cooler","SWAS cooler","BFP lub oil cooler","Working oil cooler","Oil cooler","Stator water cooler","Generator air cooler","Stator air cooler","Seal oil cooler","Gas cooler","Guide bearing oil cooler","Thrust bearing oil cooler","Furnace oil cooler","Gland steam cooler","Sampling cooler","Voith cooler","Vacuum pump water cooler","Water cooler","Fan air oil cooler","Chiller","Radiator","Dryer","LP heater","HP heater","Air pre heater","Economizer","Ejector","Evaporator","U tube bundle","Cooling coil","Tank","Vessel","Retubing"};
  private Button batchButton;
  private ProgressBar scanProgress;
  private ScanRing scanRing;
@@ -332,7 +332,7 @@ public class GemBrowserActivity extends Activity {
  private boolean relevantTitle(String value){
   String t=value.toLowerCase(Locale.ROOT);
   if(t.matches(".*(foot massager|room heater|gas stove|hot plate|hair dryer|water heater|space heater|fan heater|electric heater|hand heater|heat shrink|heat gun|laboratory heater).*"))return false;
-  return t.matches(".*(heat exchanger|condenser|retub|re-tub|hydrojet|industrial cooler|oil cooler|sample cooler|sampling cooler|swas cooler|tube bundle|pressure vessel|evaporator|economi[sz]er|industrial chiller|industrial radiator|generator radiator|cooling coil|air preheater|air pre heater|shell and tube|shell & tube|tubesheet|tube sheet|reboiler|industrial heater|lp heater|hp heater|fin tube|finned tube|stator water cooler|generator air cooler|seal oil cooler|intercooler|inter cooler|aftercooler|after cooler|air fin fan|vaporizer|expansion bellow|frp cooling tower|air receiver|storage tank|process tank|industrial blender|industrial reactor|flue gas cooler|heat recovery).*");
+  return t.matches(".*(heat exchanger|condenser|retub|re-tub|hydrojet|industrial cooler|air.fin.fan cooler|mot cooler|turbine air cooler|inter.stage cooler|inter cooler|after cooler|bfp lub oil cooler|working oil cooler|stator air cooler|gas cooler|guide bearing|thrust bearing|furnace oil cooler|gland steam cooler|voith cooler|vacuum pump water cooler|fan air.*oil cooler|oil cooler|sample cooler|sampling cooler|swas cooler|tube bundle|pressure vessel|evaporator|economi[sz]er|industrial chiller|industrial radiator|generator radiator|ejector|industrial dryer|cooling coil|air preheater|air pre heater|shell and tube|shell & tube|tubesheet|tube sheet|reboiler|industrial heater|lp heater|hp heater|fin tube|finned tube|stator water cooler|generator air cooler|seal oil cooler|intercooler|inter cooler|aftercooler|after cooler|air fin fan|vaporizer|expansion bellow|frp cooling tower|air receiver|storage tank|process tank|industrial blender|industrial reactor|flue gas cooler|heat recovery).*");
  }
 
  private String workCategory(String title){
