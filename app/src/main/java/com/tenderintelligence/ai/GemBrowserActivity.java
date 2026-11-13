@@ -35,11 +35,11 @@ public class GemBrowserActivity extends Activity {
  private int resumeBatchIndex=0;
  private boolean resumeAfterForeground=false;
  private boolean activityVisible=false;
- private void checkpointScan(){getPreferences(0).edit().putInt("scan_resume_index",Math.max(0,batchIndex-1)).apply();}
+ private void checkpointScan(){ScanCheckpoint.save(this,Math.max(0,batchIndex-1),autoPages);}
  private void startScanForeground(){updateScanForeground(0,"");}
  private void updateScanForeground(int group,String keyword){try{Intent intent=new Intent(this,ScanForegroundService.class);intent.setAction(ScanForegroundService.ACTION_PROGRESS);intent.putExtra(ScanForegroundService.EXTRA_PROGRESS,group);intent.putExtra(ScanForegroundService.EXTRA_TOTAL,batchTerms.length);intent.putExtra(ScanForegroundService.EXTRA_KEYWORD,keyword);startForegroundService(intent);}catch(Exception e){android.util.Log.w("TenderRadar","Could not update foreground scan service",e);}}
  private void stopScanForeground(){try{stopService(new Intent(this,ScanForegroundService.class));}catch(Exception ignored){}}
- private void clearScanCheckpoint(){stopScanForeground();resumeBatchIndex=0;getPreferences(0).edit().remove("scan_resume_index").apply();}
+ private void clearScanCheckpoint(){stopScanForeground();resumeBatchIndex=0;ScanCheckpoint.clear(this);}
  private String[] batchTerms=ScanPlan.TERMS;
  private Button batchButton;
  private ProgressBar scanProgress;
@@ -143,7 +143,7 @@ public class GemBrowserActivity extends Activity {
   scanProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);scanProgress.setMax(batchTerms.length);scanProgress.setProgress(0);scanProgress.setIndeterminate(false);scanProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(dynamicPrimary()));scanProgress.setVisibility(View.GONE);LinearLayout.LayoutParams progressLp=new LinearLayout.LayoutParams(-1,dp(5));progressLp.setMargins(dp(24),0,dp(24),0);page.addView(scanProgress,progressLp);
   scanProgressLabel=new TextView(this);scanProgressLabel.setTextColor(dynamicMuted());scanProgressLabel.setPadding(dp(24),dp(10),dp(24),dp(5));scanProgressLabel.setTextSize(13);scanProgressLabel.setText("Ready to scan • Results will appear below");page.addView(scanProgressLabel);
   collectedCount=new TextView(this);collectedCount.setTextColor(dynamicPrimary());collectedCount.setPadding(dp(24),dp(4),dp(24),dp(4));collectedCount.setTextSize(13);page.addView(collectedCount);
-  restoreAiReviews();restoreShortlist();if(bundle==null){migratePreviousReports();}restoreCollected();resumeBatchIndex=getPreferences(0).getInt("scan_resume_index",0);if(getPreferences(0).contains("scan_resume_index")){resumeAfterForeground=true;batchButton.setText("Resume scanning");scanProgressLabel.setText("Scan interrupted • resume group "+(resumeBatchIndex+1)+"/"+batchTerms.length);scanRing.setValue(resumeBatchIndex);}getPreferences(0).edit().remove("openrouter_key_iv").remove("openrouter_key_cipher").remove("gemini_iv").remove("gemini_encrypted").remove("groq_iv").remove("groq_encrypted").remove("remember_openrouter_key").remove("remember_provider_keys").apply();updateCollectedCount();
+  restoreAiReviews();restoreShortlist();if(bundle==null){migratePreviousReports();}restoreCollected();resumeBatchIndex=ScanCheckpoint.keywordIndex(this);if(ScanCheckpoint.exists(this)){resumeAfterForeground=true;batchButton.setText("Resume scanning");scanProgressLabel.setText("Scan interrupted • resume group "+(resumeBatchIndex+1)+"/"+batchTerms.length);scanRing.setValue(resumeBatchIndex);}getPreferences(0).edit().remove("openrouter_key_iv").remove("openrouter_key_cipher").remove("gemini_iv").remove("gemini_encrypted").remove("groq_iv").remove("groq_encrypted").remove("remember_openrouter_key").remove("remember_provider_keys").apply();updateCollectedCount();
   Button next=button("Next");findRow.addView(next);next.setOnClickListener(v->{
    state.setText("Looking for GeM next results page…");
    String js="(function(){"+
@@ -281,7 +281,7 @@ public class GemBrowserActivity extends Activity {
  private void stopAutoCollect(String message){
   if(batchRunning)checkpointScan();stopScanForeground();resumeAfterForeground=false;autoCollecting=false;batchRunning=false;autoHandler.removeCallbacksAndMessages(null);
   if(scanProgress!=null)scanProgress.setIndeterminate(false);
-  if(batchButton!=null)batchButton.setText(getPreferences(0).contains("scan_resume_index")?"Resume scanning":"Find tenders");
+  if(batchButton!=null)batchButton.setText(ScanCheckpoint.exists(this)?"Resume scanning":"Find tenders");
   if(scanProgressLabel!=null)scanProgressLabel.setText("Scan stopped • "+collected.size()+" unique bids retained");
   if(autoButton!=null)autoButton.setText("Auto collect all pages");
   state.setText(message+" Pages processed: "+autoPages+" • Total unique bids: "+collected.size());
