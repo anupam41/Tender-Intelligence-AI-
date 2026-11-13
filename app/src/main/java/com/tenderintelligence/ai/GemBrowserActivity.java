@@ -139,7 +139,7 @@ public class GemBrowserActivity extends Activity {
   scanRing=new ScanRing();LinearLayout.LayoutParams ringLp=new LinearLayout.LayoutParams(dp(208),dp(208));ringLp.gravity=Gravity.CENTER_HORIZONTAL;ringLp.setMargins(0,dp(2),0,dp(12));page.addView(scanRing,ringLp);
   LinearLayout statsStrip=new LinearLayout(this);statsStrip.setOrientation(LinearLayout.HORIZONTAL);statsStrip.setPadding(dp(20),0,dp(20),dp(12));page.addView(statsStrip);bidTotalValue=addGlassStat(statsStrip,"Bids");matchTotalValue=addGlassStat(statsStrip,"Matches");
   batchButton=button("Find tenders");batchButton.setTextSize(17);batchButton.setTypeface(null,Typeface.BOLD);batchButton.setTextColor(dynamicOnPrimary());batchButton.setBackground(rounded(dynamicPrimary(),16,dynamicPrimary()));batchButton.setElevation(0);LinearLayout.LayoutParams heroLp=new LinearLayout.LayoutParams(-1,dp(60));heroLp.setMargins(dp(20),0,dp(20),dp(12));page.addView(batchButton,heroLp);
-  batchButton.setOnClickListener(v->{if(ScanForegroundService.isScanning(this)){Intent stop=new Intent(this,ScanForegroundService.class);stop.setAction(ScanForegroundService.ACTION_CANCEL);startService(stop);batchButton.setText("Find tenders");}else startBatch();});
+  batchButton.setOnClickListener(v->{if(batchRunning){stopScanForeground();checkpointScan();resumeAfterForeground=false;batchRunning=false;scanProgress.setIndeterminate(false);stopAutoCollect("Batch stopped.");batchButton.setText("Find tenders");}else startBatch();});
   scanProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);scanProgress.setMax(batchTerms.length);scanProgress.setProgress(0);scanProgress.setIndeterminate(false);scanProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(dynamicPrimary()));scanProgress.setVisibility(View.GONE);LinearLayout.LayoutParams progressLp=new LinearLayout.LayoutParams(-1,dp(5));progressLp.setMargins(dp(24),0,dp(24),0);page.addView(scanProgress,progressLp);
   scanProgressLabel=new TextView(this);scanProgressLabel.setTextColor(dynamicMuted());scanProgressLabel.setPadding(dp(24),dp(10),dp(24),dp(5));scanProgressLabel.setTextSize(13);scanProgressLabel.setText("Ready to scan • Results will appear below");page.addView(scanProgressLabel);
   collectedCount=new TextView(this);collectedCount.setTextColor(dynamicPrimary());collectedCount.setPadding(dp(24),dp(4),dp(24),dp(4));collectedCount.setTextSize(13);page.addView(collectedCount);
@@ -255,33 +255,9 @@ public class GemBrowserActivity extends Activity {
   });
  }
  private void startBatch(){
-  if(ScanForegroundService.isScanning(this))return;
-  resumeAfterForeground=false;
-  Intent start=new Intent(this,ScanForegroundService.class);
-  start.setAction(ScanForegroundService.ACTION_START);
-  try{startForegroundService(start);batchButton.setText("Stop scanning");scanProgressLabel.setText("Starting background scan…");}
-  catch(Exception ex){state.setText("Unable to start background scan: "+ex.getMessage());}
+  if(autoCollecting){state.setText("Stop the current collection first.");return;}
+  resumeAfterForeground=false;startScanForeground();batchRunning=true;batchIndex=Math.max(0,Math.min(resumeBatchIndex,batchTerms.length-1));searchRetries=0;scanProgress.setIndeterminate(true);scanProgress.setProgress(0);if(scanRing!=null)scanRing.setValue(0);scanProgressLabel.setText("Starting scan • group "+(batchIndex+1)+" / "+batchTerms.length);batchButton.setText("Stop scanning");nextBatch();
  }
- private final Runnable serviceUiPoll=new Runnable(){
-  @Override public void run(){
-   if(!activityVisible)return;
-   boolean active=ScanForegroundService.isScanning(GemBrowserActivity.this);
-   if(active){
-    int category=ScanForegroundService.scanCategory(GemBrowserActivity.this);
-    int bids=ScanForegroundService.scanBids(GemBrowserActivity.this);
-    int page=getSharedPreferences("service_scan_state",0).getInt("page",0);
-    batchButton.setText("Stop scanning");
-    scanRing.setValue(category+1);
-    scanProgressLabel.setText("Scanning "+(category+1)+"/"+ScanPlan.size()+" • page "+page+" • "+bids+" bids collected");
-    state.setText(ScanForegroundService.scanDetail(GemBrowserActivity.this));
-    restoreCollected();updateCollectedCount();if(showingDashboard)renderDashboard();
-   }else if(!batchRunning){
-    batchButton.setText(ScanCheckpoint.exists(GemBrowserActivity.this)?"Resume scanning":"Find tenders");
-   }
-   autoHandler.postDelayed(this,2500);
-  }
- };
-
  private void nextBatch(){
   if(!batchRunning)return;
   if(batchIndex>=batchTerms.length){
@@ -350,9 +326,9 @@ public class GemBrowserActivity extends Activity {
    }catch(Exception e){stopAutoCollect("Could not inspect GeM pagination.");}
   });
  }
- @Override protected void onStart(){super.onStart();activityVisible=true;resumeAfterForeground=false;autoHandler.removeCallbacksAndMessages(null);autoHandler.post(serviceUiPoll);}
- @Override protected void onStop(){activityVisible=false;autoHandler.removeCallbacksAndMessages(null);super.onStop();}
- @Override protected void onDestroy(){saveShortlistWordAutomatically();autoHandler.removeCallbacksAndMessages(null);if(browser!=null){browser.destroy();browser=null;}super.onDestroy();}
+ @Override protected void onStart(){super.onStart();activityVisible=true;if(autoCollecting){autoStalls=0;autoSignature="";autoHandler.removeCallbacksAndMessages(null);autoHandler.postDelayed(this::autoStep,1800);}if(resumeAfterForeground&&gemPageReady&&!batchRunning){resumeAfterForeground=false;autoHandler.postDelayed(()->GemBrowserActivity.this.startBatch(),700);}}
+ @Override protected void onStop(){activityVisible=false;if(batchRunning)checkpointScan();super.onStop();}
+ @Override protected void onDestroy(){if(batchRunning)checkpointScan();stopScanForeground();saveShortlistWordAutomatically();autoCollecting=false;autoHandler.removeCallbacksAndMessages(null);if(browser!=null){browser.destroy();browser=null;}super.onDestroy();}
  private Date parsedDeadline(String value){
   try{SimpleDateFormat format=new SimpleDateFormat("dd-MM-yyyy h:mm a",Locale.ENGLISH);format.setLenient(false);return format.parse(value.trim());}catch(Exception e){return null;}
  }
