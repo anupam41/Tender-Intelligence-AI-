@@ -35,7 +35,8 @@ jobs:
           name: TenderIntelligence-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
       - name: Prepare release signing
-        if: github.event_name == 'workflow_dispatch' && inputs.signed_release == true
+        # Explicit release requests only; ordinary pushes remain debug-only.
+        if: (github.event_name == 'workflow_dispatch' && inputs.signed_release == true) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[signed release]'))
         id: signing
         env:
           KEYSTORE_B64: ${{ secrets.TENDER_KEYSTORE_BASE64 }}
@@ -49,7 +50,8 @@ jobs:
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "Release signing not configured; debug APK is still available."
+            echo "::error::Signed release requested, but one or more TENDER_* signing secrets are missing. Debug APK is still available."
+            exit 1
           fi
       - name: Validate release signing credentials
         if: steps.signing.outputs.enabled == 'true'
@@ -79,6 +81,9 @@ jobs:
           TENDER_SIGNING_KEY_ALIAS: ${{ secrets.TENDER_KEY_ALIAS }}
           TENDER_SIGNING_KEY_PASSWORD: ${{ secrets.TENDER_KEY_PASSWORD }}
         run: gradle :app:assembleRelease --stacktrace
+      - name: Verify release APK signature
+        if: steps.signing.outputs.enabled == 'true' && success()
+        run: '"$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/build/outputs/apk/release/app-release.apk'
       - uses: actions/upload-artifact@v4
         if: steps.signing.outputs.enabled == 'true' && success()
         with:

@@ -184,6 +184,21 @@ public class GemBrowserActivity extends Activity {
   aiSettingsButton.setText("⚙");aiSettingsButton.setContentDescription("AI settings");
   aiSettingsButton.setTextColor(dynamicText());aiSettingsButton.setBackground(glass(dynamicSurface(),16));
   LinearLayout.LayoutParams compactSettings=new LinearLayout.LayoutParams(dp(44),dp(44));compactSettings.setMargins(dp(8),0,0,0);aiSettingsButton.setLayoutParams(compactSettings);
+  // Align the header with the dashboard cards and use a real vector bookmark.
+  headerLp.setMargins(dp(20),dp(8),dp(20),0);header.setLayoutParams(headerLp);
+  header.setPadding(dp(16),dp(16),dp(16),dp(14));
+  heading.setTextSize(24);heading.setMaxLines(1);heading.setEllipsize(android.text.TextUtils.TruncateAt.END);
+  heading.setAutoSizeTextTypeUniformWithConfiguration(18,24,1,android.util.TypedValue.COMPLEX_UNIT_SP);
+  note.setMaxLines(2);note.setEllipsize(android.text.TextUtils.TruncateAt.END);
+  android.graphics.drawable.Drawable savedIcon=getDrawable(R.drawable.ic_saved_tenders).mutate();
+  savedIcon.setTint(dynamicPrimary());savedIcon.setBounds(0,0,dp(20),dp(20));
+  managementHeaderButton.setCompoundDrawablesRelative(savedIcon,null,null,null);managementHeaderButton.setCompoundDrawablePadding(dp(6));
+  managementHeaderButton.setText(String.valueOf(shortlisted.size()));managementHeaderButton.setMinWidth(dp(64));managementHeaderButton.setMinimumWidth(dp(64));managementHeaderButton.setSingleLine(true);managementHeaderButton.setMaxWidth(dp(96));managementHeaderButton.setEllipsize(android.text.TextUtils.TruncateAt.END);
+  managementHeaderButton.setPadding(dp(10),0,dp(10),0);
+  LinearLayout.LayoutParams savedLp=new LinearLayout.LayoutParams(-2,dp(48));savedLp.setMargins(dp(8),0,0,0);managementHeaderButton.setLayoutParams(savedLp);
+  compactSettings.width=dp(48);compactSettings.height=dp(48);aiSettingsButton.setLayoutParams(compactSettings);
+  scanProgressLabel.setMinLines(2);scanProgressLabel.setMaxLines(2);scanProgressLabel.setEllipsize(android.text.TextUtils.TruncateAt.END);
+  collectedCount.setMinLines(2);collectedCount.setMaxLines(2);collectedCount.setEllipsize(android.text.TextUtils.TruncateAt.END);
   WebSettings settings=browser.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);settings.setSupportZoom(true);settings.setBuiltInZoomControls(true);settings.setDisplayZoomControls(false);
   browser.setWebViewClient(new WebViewClient(){
    @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){
@@ -418,7 +433,7 @@ public class GemBrowserActivity extends Activity {
   tile.setPadding(dp(14),dp(8),dp(14),dp(8));
   tile.setBackground(flatShape(dynamicCard(),24));
   LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(78),1);
-  lp.setMargins(0,0,dp(6),0);row.addView(tile,lp);
+  boolean firstTile=row.getChildCount()==0;lp.setMargins(firstTile?0:dp(4),0,firstTile?dp(4):0,0);row.addView(tile,lp);
   View symbolView=new View(this){
    private final android.graphics.Paint ink=new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
    @Override protected void onDraw(android.graphics.Canvas canvas){
@@ -728,7 +743,7 @@ public class GemBrowserActivity extends Activity {
   if(dashboardList==null)return;
   while(dashboardList.getChildCount()>1)dashboardList.removeViewAt(1);
   int white=dynamicText(),muted=dynamicMuted(),teal=dynamicPrimary();
-  if(managementHeaderButton!=null){managementHeaderButton.setText("▣ "+shortlisted.size());managementHeaderButton.setContentDescription("Tender management, "+shortlisted.size()+" saved");}
+  if(managementHeaderButton!=null){managementHeaderButton.setText(String.valueOf(shortlisted.size()));managementHeaderButton.setContentDescription("Tender management, "+shortlisted.size()+" saved");}
   LinearLayout resultsToolbar=new LinearLayout(this);resultsToolbar.setOrientation(0);resultsToolbar.setGravity(Gravity.CENTER_VERTICAL);dashboardList.addView(resultsToolbar,new LinearLayout.LayoutParams(-1,dp(48)));
   TextView resultsHeading=dashText("Matching tenders",22,white);resultsHeading.setTypeface(null,Typeface.BOLD);resultsToolbar.addView(resultsHeading,new LinearLayout.LayoutParams(0,-2,1));
   ArrayList<JSONObject> open=new ArrayList<>();int expired=0,missing=0,analyzed=0;
@@ -755,9 +770,7 @@ public class GemBrowserActivity extends Activity {
   String[] sortLabels={"Relevance","Closing soon","AI score"};
   Button sort=button("Sort: "+sortLabels[tenderSortMode]+"  ▾");sort.setTextSize(13);sort.setTextColor(uiAccent());sort.setBackgroundColor(Color.TRANSPARENT);sort.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
   LinearLayout.LayoutParams sortLp=new LinearLayout.LayoutParams(-2,dp(40));sortLp.setMargins(dp(8),0,0,0);resultsToolbar.addView(sort,sortLp);
-  sort.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Sort matching tenders")
-   .setSingleChoiceItems(sortLabels,tenderSortMode,(dialog,which)->{tenderSortMode=which;dialog.dismiss();renderDashboard();})
-   .setNegativeButton("Cancel",null).show());
+  sort.setOnClickListener(v->showSortDialog(sortLabels));
   LinearLayout metricsGrid=new LinearLayout(this);metricsGrid.setOrientation(1);dashboardList.addView(metricsGrid);
   LinearLayout metricsTop=new LinearLayout(this);metricsTop.setOrientation(0);metricsGrid.addView(metricsTop);
   addMetric(metricsTop,String.valueOf(open.size()),"Matches",teal);addMetric(metricsTop,String.valueOf(analyzed),"Reviewed",teal);
@@ -1082,16 +1095,16 @@ public class GemBrowserActivity extends Activity {
  private TextView addGlassStat(LinearLayout parent,String label){LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);tile.setGravity(Gravity.CENTER);tile.setPadding(dp(12),dp(8),dp(12),dp(8));tile.setBackground(glass(dynamicCard(),16));tile.setElevation(0);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(80),1);lp.setMargins(dp(5),0,dp(5),0);parent.addView(tile,lp);TextView value=new TextView(this);value.setText("0");value.setTextSize(27);value.setTypeface(null,Typeface.BOLD);value.setTextColor(dynamicText());value.setGravity(Gravity.CENTER);value.setIncludeFontPadding(false);tile.addView(value,new LinearLayout.LayoutParams(-1,-2));TextView caption=new TextView(this);caption.setText(label);caption.setTextSize(12);caption.setTextColor(dynamicMuted());caption.setGravity(Gravity.CENTER);tile.addView(caption,new LinearLayout.LayoutParams(-1,-2));return value;}
  private class ScanRing extends View {
   private int value=0;private final android.graphics.Paint paint=new android.graphics.Paint(3);
-  ScanRing(){super(GemBrowserActivity.this);}
-  void setValue(int v){value=Math.max(0,Math.min(batchTerms.length,v));invalidate();}
+  ScanRing(){super(GemBrowserActivity.this);setContentDescription("0 of "+batchTerms.length+" groups scanned");}
+  void setValue(int v){value=Math.max(0,Math.min(batchTerms.length,v));setContentDescription(value+" of "+batchTerms.length+" groups scanned");invalidate();}
   @Override protected void onDraw(android.graphics.Canvas c){
    super.onDraw(c);float w=getWidth(),h=getHeight(),cx=w/2,cy=h/2,r=Math.min(w,h)*.37f;
    paint.setShader(null);paint.setStyle(android.graphics.Paint.Style.STROKE);paint.setStrokeWidth(dp(7));paint.setStrokeCap(android.graphics.Paint.Cap.ROUND);
    paint.setColor(dynamicTonal());c.drawCircle(cx,cy,r,paint);
    paint.setColor(dynamicPrimary());c.drawArc(cx-r,cy-r,cx+r,cy+r,-90,360f*value/Math.max(1,batchTerms.length),false,paint);
    paint.setStyle(android.graphics.Paint.Style.FILL);paint.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));paint.setTextAlign(android.graphics.Paint.Align.CENTER);
-   paint.setColor(dynamicText());paint.setTextSize(dp(24));c.drawText(value+"/"+batchTerms.length,cx,cy+dp(2),paint);
-   paint.setTypeface(Typeface.create("sans-serif",Typeface.NORMAL));paint.setTextSize(dp(10));paint.setColor(dynamicMuted());c.drawText("Groups scanned",cx,cy+dp(19),paint);
+   paint.setColor(dynamicText());paint.setTextSize(dp(22));c.drawText(value+"/"+batchTerms.length,cx,cy+dp(1),paint);
+   paint.setTypeface(Typeface.create("sans-serif",Typeface.NORMAL));paint.setTextSize(dp(10));paint.setColor(dynamicMuted());c.drawText("Groups",cx,cy+dp(16),paint);
   }
  }
  private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
@@ -1133,6 +1146,16 @@ public class GemBrowserActivity extends Activity {
  private LinearLayout.LayoutParams spacedAction(int topDp){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(44));p.setMargins(0,dp(topDp),0,0);return p;}
  private Button button(String label){Button b=new SpringButton();b.setText(label);b.setAllCaps(false);b.setTextSize(14);b.setTextColor(uiText());b.setBackground(flatShape(dynamicCard(),12));b.setStateListAnimator(null);b.setElevation(0);b.setMinHeight(dp(44));b.setPadding(dp(12),0,dp(12),0);return b;}
  private boolean motionEnabled(){return android.animation.ValueAnimator.areAnimatorsEnabled();}
+ private void showSortDialog(String[] labels){
+  LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(20),dp(12),dp(20),dp(12));
+  RadioGroup choices=new RadioGroup(this);choices.setOrientation(1);content.addView(choices);
+  android.content.res.ColorStateList tint=new android.content.res.ColorStateList(new int[][]{new int[]{android.R.attr.state_checked},new int[]{}},new int[]{dynamicPrimary(),dynamicMuted()});
+  for(int i=0;i<labels.length;i++){RadioButton option=new RadioButton(this);option.setId(View.generateViewId());option.setText(labels[i]);option.setTextSize(16);option.setTextColor(dynamicText());option.setButtonTintList(tint);option.setPadding(dp(8),dp(8),dp(8),dp(8));option.setMinHeight(dp(56));choices.addView(option,new RadioGroup.LayoutParams(-1,-2));option.setChecked(i==tenderSortMode);}
+  ScrollView scroll=new ScrollView(this);scroll.addView(content);
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this,darkMode()?android.app.AlertDialog.THEME_MATERIAL_DARK:android.app.AlertDialog.THEME_MATERIAL_LIGHT).setTitle("Sort matching tenders").setView(scroll).setNegativeButton("Cancel",null).create();
+  choices.setOnCheckedChangeListener((group,id)->{for(int i=0;i<group.getChildCount();i++)if(group.getChildAt(i).getId()==id){tenderSortMode=i;dialog.dismiss();renderDashboard();break;}});
+  dialog.show();styleDialog(dialog);
+ }
  // Press feedback does not consume touch events or delay existing click actions.
  private class SpringButton extends Button {
   SpringButton(){super(GemBrowserActivity.this);}
