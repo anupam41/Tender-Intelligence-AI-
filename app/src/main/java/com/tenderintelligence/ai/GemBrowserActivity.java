@@ -331,7 +331,7 @@ public class GemBrowserActivity extends Activity {
   });
  }
  @Override protected void onStart(){super.onStart();activityVisible=true;if(resumeAfterForeground&&gemPageReady&&!batchRunning){resumeAfterForeground=false;autoHandler.postDelayed(this::startBatch,700);}}
- @Override protected void onStop(){activityVisible=false;if(batchRunning){checkpointScan();resumeAfterForeground=true;batchRunning=false;autoCollecting=false;autoHandler.removeCallbacks(this::autoStep);autoHandler.removeCallbacksAndMessages(null);if(batchButton!=null)batchButton.setText("Resume scanning");if(scanProgress!=null)scanProgress.setIndeterminate(false);if(scanProgressLabel!=null)scanProgressLabel.setText("Paused in background • resumes when app returns");}super.onStop();}
+ @Override protected void onStop(){activityVisible=false;if(batchRunning)checkpointScan();super.onStop();}
  @Override protected void onDestroy(){if(batchRunning)checkpointScan();saveShortlistWordAutomatically();autoCollecting=false;autoHandler.removeCallbacksAndMessages(null);if(browser!=null){browser.destroy();browser=null;}super.onDestroy();}
  private Date parsedDeadline(String value){
   try{SimpleDateFormat format=new SimpleDateFormat("dd-MM-yyyy h:mm a",Locale.ENGLISH);format.setLenient(false);return format.parse(value.trim());}catch(Exception e){return null;}
