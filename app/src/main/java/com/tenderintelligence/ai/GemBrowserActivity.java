@@ -295,6 +295,13 @@ public class GemBrowserActivity extends Activity {
  }
  private void autoStep(){
   if(!autoCollecting)return;
+  // WebView DOM inspection is unreliable after the Activity loses visibility.
+  // Do not interpret background throttling as an empty GeM result.
+  if(!activityVisible){
+   if(batchRunning)checkpointScan();
+   autoHandler.postDelayed(this::autoStep,2000);
+   return;
+  }
   String js="(function(){var cards=Array.from(document.querySelectorAll('a,span,strong,b,div')).filter(e=>e.children.length<3&&/GEM\\/20\\d{2}\\/B\\/\\d+/i.test(e.textContent||''));var ids=Array.from(new Set(cards.map(e=>(e.textContent||'').match(/GEM\\/20\\d{2}\\/B\\/\\d+/i)).filter(Boolean).map(m=>m[0])));var next=Array.from(document.querySelectorAll('a,button')).find(e=>{var t=(e.innerText||'').trim(),r=e.getBoundingClientRect();return r.width>0&&r.height>0&&!e.disabled&&e.getAttribute('aria-disabled')!=='true'&&!e.classList.contains('disabled')&&/^(next|next page|›|»|>)$/i.test(t)});return JSON.stringify({signature:ids.slice(0,4).join('|')+'#'+ids.length,count:ids.length,hasNext:!!next})})()";
   browser.evaluateJavascript(js,result->{
    if(!autoCollecting)return;
@@ -319,7 +326,7 @@ public class GemBrowserActivity extends Activity {
    }catch(Exception e){stopAutoCollect("Could not inspect GeM pagination.");}
   });
  }
- @Override protected void onStart(){super.onStart();activityVisible=true;if(resumeAfterForeground&&gemPageReady&&!batchRunning){resumeAfterForeground=false;autoHandler.postDelayed(()->GemBrowserActivity.this.startBatch(),700);}}
+ @Override protected void onStart(){super.onStart();activityVisible=true;if(autoCollecting){autoStalls=0;autoSignature="";autoHandler.removeCallbacksAndMessages(null);autoHandler.postDelayed(this::autoStep,1800);}if(resumeAfterForeground&&gemPageReady&&!batchRunning){resumeAfterForeground=false;autoHandler.postDelayed(()->GemBrowserActivity.this.startBatch(),700);}}
  @Override protected void onStop(){activityVisible=false;if(batchRunning)checkpointScan();super.onStop();}
  @Override protected void onDestroy(){if(batchRunning)checkpointScan();stopScanForeground();saveShortlistWordAutomatically();autoCollecting=false;autoHandler.removeCallbacksAndMessages(null);if(browser!=null){browser.destroy();browser=null;}super.onDestroy();}
  private Date parsedDeadline(String value){
