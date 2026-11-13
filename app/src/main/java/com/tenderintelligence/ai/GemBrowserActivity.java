@@ -40,7 +40,7 @@ public class GemBrowserActivity extends Activity {
  private void updateScanForeground(int group,String keyword){try{Intent intent=new Intent(this,ScanForegroundService.class);intent.setAction(ScanForegroundService.ACTION_PROGRESS);intent.putExtra(ScanForegroundService.EXTRA_PROGRESS,group);intent.putExtra(ScanForegroundService.EXTRA_TOTAL,batchTerms.length);intent.putExtra(ScanForegroundService.EXTRA_KEYWORD,keyword);startForegroundService(intent);}catch(Exception e){android.util.Log.w("TenderRadar","Could not update foreground scan service",e);}}
  private void stopScanForeground(){try{stopService(new Intent(this,ScanForegroundService.class));}catch(Exception ignored){}}
  private void clearScanCheckpoint(){stopScanForeground();resumeBatchIndex=0;getPreferences(0).edit().remove("scan_resume_index").apply();}
- private String[] batchTerms={"Heat exchanger","Condenser","Vent condenser","Surface condenser","Gland steam condenser","AC condenser","Air fin fan cooler","MOT cooler","Turbine oil cooler","Turbine air cooler","Inter stage cooler","Inter cooler","After cooler","SWAS cooler","BFP lub oil cooler","Working oil cooler","Oil cooler","Stator water cooler","Generator air cooler","Stator air cooler","Seal oil cooler","Gas cooler","Guide bearing oil cooler","Thrust bearing oil cooler","Furnace oil cooler","Gland steam cooler","Sampling cooler","Voith cooler","Vacuum pump water cooler","Water cooler","Fan air oil cooler","Chiller","Radiator","Dryer","LP heater","HP heater","Air pre heater","Economizer","Ejector","Evaporator","U tube bundle","Cooling coil","Tank","Vessel","Retubing"};
+ private String[] batchTerms=ScanPlan.TERMS;
  private Button batchButton;
  private ProgressBar scanProgress;
  private ScanRing scanRing;
