@@ -135,7 +135,7 @@ public class GemBrowserActivity extends Activity {
   scanProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);scanProgress.setMax(batchTerms.length);scanProgress.setProgress(0);scanProgress.setIndeterminate(false);scanProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(dynamicPrimary()));scanProgress.setVisibility(View.GONE);LinearLayout.LayoutParams progressLp=new LinearLayout.LayoutParams(-1,dp(5));progressLp.setMargins(dp(24),0,dp(24),0);page.addView(scanProgress,progressLp);
   scanProgressLabel=new TextView(this);scanProgressLabel.setTextColor(dynamicMuted());scanProgressLabel.setPadding(dp(24),dp(10),dp(24),dp(5));scanProgressLabel.setTextSize(13);scanProgressLabel.setText("Ready to scan • Results will appear below");page.addView(scanProgressLabel);
   collectedCount=new TextView(this);collectedCount.setTextColor(dynamicPrimary());collectedCount.setPadding(dp(24),dp(4),dp(24),dp(4));collectedCount.setTextSize(13);page.addView(collectedCount);
-  restoreAiReviews();restoreShortlist();if(bundle==null){migratePreviousReports();clearPreviousSearchSession();}getPreferences(0).edit().remove("openrouter_key_iv").remove("openrouter_key_cipher").remove("gemini_iv").remove("gemini_encrypted").remove("groq_iv").remove("groq_encrypted").remove("remember_openrouter_key").remove("remember_provider_keys").apply();updateCollectedCount();
+  restoreAiReviews();restoreShortlist();if(bundle==null){migratePreviousReports();shortlisted.clear();persistShortlist();clearPreviousSearchSession();}getPreferences(0).edit().remove("openrouter_key_iv").remove("openrouter_key_cipher").remove("gemini_iv").remove("gemini_encrypted").remove("groq_iv").remove("groq_encrypted").remove("remember_openrouter_key").remove("remember_provider_keys").apply();updateCollectedCount();
   Button next=button("Next");findRow.addView(next);next.setOnClickListener(v->{
    state.setText("Looking for GeM next results page…");
    String js="(function(){"+
@@ -310,7 +310,7 @@ public class GemBrowserActivity extends Activity {
     state.setText("Collecting page "+autoPages+"…");
     collectVisible(()->{
      if(!autoCollecting)return;
-     if(autoPages>=(batchRunning?25:100)){if(batchRunning){batchRunning=false;autoCollecting=false;scanProgress.setIndeterminate(false);batchButton.setText("Find tenders");scanProgressLabel.setText("Scan incomplete • page safety limit reached for "+batchTerms[Math.max(0,batchIndex-1)]);state.setText("Stopped at 25 pages for this category. Results collected so far are retained; scan was not complete.");}else stopAutoCollect("Reached page safety limit.");return;}
+     if(autoPages>=(batchRunning?25:100)){if(batchRunning){autoCollecting=false;autoHandler.postDelayed(this::nextBatch,600);}else stopAutoCollect("Reached page safety limit.");return;}
      String nextJs="(function(){var a=Array.from(document.querySelectorAll('a,button')).find(e=>{var r=e.getBoundingClientRect();return r.width>0&&r.height>0&&!e.disabled&&e.getAttribute('aria-disabled')!=='true'&&!e.classList.contains('disabled')&&/^(next|next page|›|»|>)$/i.test((e.innerText||'').trim())});if(!a)return 'END';a.click();return 'NEXT'})()";
      browser.evaluateJavascript(nextJs,out->{
       if(!autoCollecting)return;
