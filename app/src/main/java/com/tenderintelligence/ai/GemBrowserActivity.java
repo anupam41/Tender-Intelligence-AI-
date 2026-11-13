@@ -36,7 +36,9 @@ public class GemBrowserActivity extends Activity {
  private boolean resumeAfterForeground=false;
  private boolean activityVisible=false;
  private void checkpointScan(){getPreferences(0).edit().putInt("scan_resume_index",Math.max(0,batchIndex-1)).apply();}
- private void clearScanCheckpoint(){resumeBatchIndex=0;getPreferences(0).edit().remove("scan_resume_index").apply();}
+ private void startScanForeground(){try{startForegroundService(new Intent(this,ScanForegroundService.class));}catch(Exception e){android.util.Log.w("TenderRadar","Could not start foreground scan service",e);}}
+ private void stopScanForeground(){try{stopService(new Intent(this,ScanForegroundService.class));}catch(Exception ignored){}}
+ private void clearScanCheckpoint(){stopScanForeground();resumeBatchIndex=0;getPreferences(0).edit().remove("scan_resume_index").apply();}
  private String[] batchTerms={"Heat exchanger","Condenser","Vent condenser","Surface condenser","Gland steam condenser","AC condenser","Air fin fan cooler","MOT cooler","Turbine oil cooler","Turbine air cooler","Inter stage cooler","Inter cooler","After cooler","SWAS cooler","BFP lub oil cooler","Working oil cooler","Oil cooler","Stator water cooler","Generator air cooler","Stator air cooler","Seal oil cooler","Gas cooler","Guide bearing oil cooler","Thrust bearing oil cooler","Furnace oil cooler","Gland steam cooler","Sampling cooler","Voith cooler","Vacuum pump water cooler","Water cooler","Fan air oil cooler","Chiller","Radiator","Dryer","LP heater","HP heater","Air pre heater","Economizer","Ejector","Evaporator","U tube bundle","Cooling coil","Tank","Vessel","Retubing"};
  private Button batchButton;
  private ProgressBar scanProgress;
@@ -136,7 +138,7 @@ public class GemBrowserActivity extends Activity {
   scanRing=new ScanRing();LinearLayout.LayoutParams ringLp=new LinearLayout.LayoutParams(dp(208),dp(208));ringLp.gravity=Gravity.CENTER_HORIZONTAL;ringLp.setMargins(0,dp(2),0,dp(12));page.addView(scanRing,ringLp);
   LinearLayout statsStrip=new LinearLayout(this);statsStrip.setOrientation(LinearLayout.HORIZONTAL);statsStrip.setPadding(dp(20),0,dp(20),dp(12));page.addView(statsStrip);bidTotalValue=addGlassStat(statsStrip,"Bids");matchTotalValue=addGlassStat(statsStrip,"Matches");
   batchButton=button("Find tenders");batchButton.setTextSize(17);batchButton.setTypeface(null,Typeface.BOLD);batchButton.setTextColor(dynamicOnPrimary());batchButton.setBackground(rounded(dynamicPrimary(),16,dynamicPrimary()));batchButton.setElevation(0);LinearLayout.LayoutParams heroLp=new LinearLayout.LayoutParams(-1,dp(60));heroLp.setMargins(dp(20),0,dp(20),dp(12));page.addView(batchButton,heroLp);
-  batchButton.setOnClickListener(v->{if(batchRunning){checkpointScan();resumeAfterForeground=false;batchRunning=false;scanProgress.setIndeterminate(false);stopAutoCollect("Batch stopped.");batchButton.setText("Find tenders");}else startBatch();});
+  batchButton.setOnClickListener(v->{if(batchRunning){stopScanForeground();checkpointScan();resumeAfterForeground=false;batchRunning=false;scanProgress.setIndeterminate(false);stopAutoCollect("Batch stopped.");batchButton.setText("Find tenders");}else startBatch();});
   scanProgress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);scanProgress.setMax(batchTerms.length);scanProgress.setProgress(0);scanProgress.setIndeterminate(false);scanProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(dynamicPrimary()));scanProgress.setVisibility(View.GONE);LinearLayout.LayoutParams progressLp=new LinearLayout.LayoutParams(-1,dp(5));progressLp.setMargins(dp(24),0,dp(24),0);page.addView(scanProgress,progressLp);
   scanProgressLabel=new TextView(this);scanProgressLabel.setTextColor(dynamicMuted());scanProgressLabel.setPadding(dp(24),dp(10),dp(24),dp(5));scanProgressLabel.setTextSize(13);scanProgressLabel.setText("Ready to scan • Results will appear below");page.addView(scanProgressLabel);
   collectedCount=new TextView(this);collectedCount.setTextColor(dynamicPrimary());collectedCount.setPadding(dp(24),dp(4),dp(24),dp(4));collectedCount.setTextSize(13);page.addView(collectedCount);
@@ -263,7 +265,7 @@ public class GemBrowserActivity extends Activity {
  }
  private void startBatch(){
   if(autoCollecting){state.setText("Stop the current collection first.");return;}
-  resumeAfterForeground=false;batchRunning=true;batchIndex=Math.max(0,Math.min(resumeBatchIndex,batchTerms.length-1));searchRetries=0;scanProgress.setIndeterminate(true);scanProgress.setProgress(0);if(scanRing!=null)scanRing.setValue(0);scanProgressLabel.setText("Starting scan • group "+(batchIndex+1)+" / "+batchTerms.length);batchButton.setText("Stop scanning");nextBatch();
+  resumeAfterForeground=false;startScanForeground();batchRunning=true;batchIndex=Math.max(0,Math.min(resumeBatchIndex,batchTerms.length-1));searchRetries=0;scanProgress.setIndeterminate(true);scanProgress.setProgress(0);if(scanRing!=null)scanRing.setValue(0);scanProgressLabel.setText("Starting scan • group "+(batchIndex+1)+" / "+batchTerms.length);batchButton.setText("Stop scanning");nextBatch();
  }
  private void nextBatch(){
   if(!batchRunning)return;
@@ -290,7 +292,7 @@ public class GemBrowserActivity extends Activity {
   });
  }
  private void stopAutoCollect(String message){
-  if(batchRunning)checkpointScan();resumeAfterForeground=false;autoCollecting=false;batchRunning=false;autoHandler.removeCallbacksAndMessages(null);
+  if(batchRunning)checkpointScan();stopScanForeground();resumeAfterForeground=false;autoCollecting=false;batchRunning=false;autoHandler.removeCallbacksAndMessages(null);
   if(scanProgress!=null)scanProgress.setIndeterminate(false);
   if(batchButton!=null)batchButton.setText(getPreferences(0).contains("scan_resume_index")?"Resume scanning":"Find tenders");
   if(scanProgressLabel!=null)scanProgressLabel.setText("Scan stopped • "+collected.size()+" unique bids retained");
@@ -332,7 +334,7 @@ public class GemBrowserActivity extends Activity {
  }
  @Override protected void onStart(){super.onStart();activityVisible=true;if(resumeAfterForeground&&gemPageReady&&!batchRunning){resumeAfterForeground=false;autoHandler.postDelayed(this::startBatch,700);}}
  @Override protected void onStop(){activityVisible=false;if(batchRunning)checkpointScan();super.onStop();}
- @Override protected void onDestroy(){if(batchRunning)checkpointScan();saveShortlistWordAutomatically();autoCollecting=false;autoHandler.removeCallbacksAndMessages(null);if(browser!=null){browser.destroy();browser=null;}super.onDestroy();}
+ @Override protected void onDestroy(){if(batchRunning)checkpointScan();else stopScanForeground();saveShortlistWordAutomatically();autoCollecting=false;autoHandler.removeCallbacksAndMessages(null);if(browser!=null){browser.destroy();browser=null;}super.onDestroy();}
  private Date parsedDeadline(String value){
   try{SimpleDateFormat format=new SimpleDateFormat("dd-MM-yyyy h:mm a",Locale.ENGLISH);format.setLenient(false);return format.parse(value.trim());}catch(Exception e){return null;}
  }
