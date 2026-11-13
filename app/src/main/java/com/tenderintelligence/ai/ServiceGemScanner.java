@@ -21,7 +21,7 @@ final class ServiceGemScanner {
  private WebView web;
  private int category,page,stalls,retries;
  private String signature="";
- private boolean running,ready;
+ private boolean running,ready,initialSearchStarted;
  ServiceGemScanner(Context context,Listener listener){this.context=context;this.listener=listener;}
  void start(){
   if(running)return;
@@ -33,14 +33,14 @@ final class ServiceGemScanner {
   }catch(Exception ignored){}
   web=new WebView(context);
   WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);
-  web.setWebViewClient(new WebViewClient(){@Override public void onPageFinished(WebView view,String url){ready=true;handler.postDelayed(()->search(),1000);}});
+  web.setWebViewClient(new WebViewClient(){@Override public void onPageFinished(WebView view,String url){ready=true;if(!initialSearchStarted){initialSearchStarted=true;handler.postDelayed(()->search(),1000);}}});
   web.loadUrl(GEM);
   listener.progress(category,0,bids.size(),"Loading GeM");
  }
  private void search(){
   if(!running||!ready)return;
   if(category>=ScanPlan.size()){finish(true,"Scan complete");return;}
-  page=0;stalls=0;retries=0;signature="";
+  page=0;stalls=0;signature="";
   ScanCheckpoint.save(context,category,0);
   String keyword=ScanPlan.TERMS[category];
   listener.progress(category,0,bids.size(),"Searching "+keyword);
@@ -75,14 +75,14 @@ final class ServiceGemScanner {
      if(++stalls<10){handler.postDelayed(this::step,2000);return;}
      finish(false,"GeM pagination stalled; checkpoint retained");return;
     }
-    signature=fingerprint.toString();stalls=0;page++;
+    signature=fingerprint.toString();stalls=0;retries=0;page++;
     JSONArray saved=new JSONArray();for(JSONObject j:bids.values())saved.put(j);
     context.getSharedPreferences("GemBrowserActivity",0).edit().putString("gem_collected",saved.toString()).apply();
     ScanCheckpoint.save(context,category,page);
     listener.progress(category,page,bids.size(),"Scanning "+ScanPlan.TERMS[category]);
     if(page>=25){finish(false,"25-page safety limit reached");return;}
     String next="(function(){var a=Array.from(document.querySelectorAll('a,button')).find(e=>!e.disabled&&e.getAttribute('aria-disabled')!=='true'&&!e.classList.contains('disabled')&&/^(next|next page|›|»|>)$/i.test((e.innerText||'').trim()));if(!a)return 'END';a.click();return 'NEXT'})()";
-    web.evaluateJavascript(next,out->{if(!running)return;if(out.contains("NEXT"))handler.postDelayed(this::step,2000);else{category++;search();}});
+    web.evaluateJavascript(next,out->{if(!running)return;if(out.contains("NEXT"))handler.postDelayed(this::step,2000);else{category++;retries=0;search();}});
    }catch(Exception e){finish(false,"GeM collection failed: "+e.getMessage());}
   });
  }
