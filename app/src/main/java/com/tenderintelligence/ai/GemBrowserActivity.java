@@ -271,7 +271,7 @@ public class GemBrowserActivity extends Activity {
    updateCollectedCount();if(scanProgress!=null){scanProgress.setProgress(batchTerms.length);if(scanRing!=null)scanRing.setValue(batchTerms.length);scanProgressLabel.setText("Scan complete • "+collected.size()+" unique bids collected");}if(showingDashboard)renderDashboard();state.setText("Scan complete. Review matching tenders below.");return;
   }
   if(!gemPageReady){state.setText("Waiting for GeM listing page to load…");autoHandler.postDelayed(this::nextBatch,1200);return;}
-  String keyword=batchTerms[batchIndex++];checkpointScan();term.setText(keyword);if(scanProgress!=null){scanProgress.setProgress(batchIndex-1);if(scanRing!=null)scanRing.setValue(batchIndex-1);scanProgressLabel.setText("Scanning "+batchIndex+" / "+batchTerms.length+" • "+keyword+" • "+collected.size()+" bids collected");}
+  String keyword=batchTerms[batchIndex++];checkpointScan();term.setText(keyword);if(scanProgress!=null){scanProgress.setProgress(batchIndex);if(scanRing!=null)scanRing.setValue(batchIndex);scanProgressLabel.setText("Scanning "+batchIndex+" / "+batchTerms.length+" • "+keyword+" • "+collected.size()+" bids collected");}
   state.setText("Searching "+batchIndex+"/"+batchTerms.length+": "+keyword);
   String js="(function(){try{var inputs=Array.from(document.querySelectorAll('input')).filter(e=>{var r=e.getBoundingClientRect();return r.width>100&&r.height>0&&!e.disabled});"+
    "var el=inputs.find(e=>/searchBid|search_bid|bid_search/i.test((e.id||'')+' '+(e.name||'')))||inputs.find(e=>{var p=e.parentElement;return p&&/contains/i.test((p.parentElement&&p.parentElement.innerText||'').slice(0,90))})||inputs.filter(e=>/text|search/i.test(e.type||'text')).slice(-1)[0];"+
@@ -312,7 +312,7 @@ public class GemBrowserActivity extends Activity {
     String signature=data.optString("signature");int count=data.optInt("count");
     if(count==0){if(++autoStalls>=8){autoCollecting=false;batchRunning=false;if(batchButton!=null)batchButton.setText("Find tenders • Scan equipment categories");if(scanProgressLabel!=null)scanProgressLabel.setText("Scan paused • GeM returned no detectable bid cards for "+batchTerms[Math.max(0,batchIndex-1)]);state.setText("No GeM bid cards detected. Check that the GeM listing loaded and displays results. Scan stopped instead of skipping categories.");return;}autoHandler.postDelayed(this::autoStep,1500);return;}
     if(signature.equals(autoSignature)){if(++autoStalls>=8){autoCollecting=false;batchRunning=false;if(batchButton!=null)batchButton.setText("Find tenders • Scan equipment categories");state.setText("GeM results did not change. Scan stopped to avoid silently skipping bids. Open the GeM listing and check search or pagination.");return;}autoHandler.postDelayed(this::autoStep,1500);return;}
-    autoSignature=signature;autoStalls=0;autoPages++;if(scanProgressLabel!=null&&batchRunning)scanProgressLabel.setText("Scanning "+batchIndex+"/"+batchTerms.length+" • page "+autoPages+" • "+collected.size()+" collected");
+    autoSignature=signature;autoStalls=0;autoPages++;if(scanProgressLabel!=null&&batchRunning)scanProgressLabel.setText("Scanning "+batchIndex+"/"+batchTerms.length+" • page "+autoPages+" • "+collected.size()+" bids collected");
     state.setText("Collecting page "+autoPages+"…");
     collectVisible(()->{
      if(!autoCollecting)return;
@@ -1102,7 +1102,7 @@ public class GemBrowserActivity extends Activity {
  private class ScanRing extends View {
   private int value=0;private final android.graphics.Paint paint=new android.graphics.Paint(3);
   ScanRing(){super(GemBrowserActivity.this);setContentDescription("0 of "+batchTerms.length+" groups scanned");}
-  void setValue(int v){value=Math.max(0,Math.min(batchTerms.length,v));setContentDescription(value+" of "+batchTerms.length+" groups scanned");invalidate();}
+  void setValue(int v){value=Math.max(0,Math.min(batchTerms.length,v));setContentDescription(value+" of "+batchTerms.length+" groups reached (current group may still be scanning)");invalidate();}
   @Override protected void onDraw(android.graphics.Canvas c){
    super.onDraw(c);float w=getWidth(),h=getHeight(),cx=w/2,cy=h/2,r=Math.min(w,h)*.37f;
    paint.setShader(null);paint.setStyle(android.graphics.Paint.Style.STROKE);paint.setStrokeWidth(dp(7));paint.setStrokeCap(android.graphics.Paint.Cap.ROUND);
