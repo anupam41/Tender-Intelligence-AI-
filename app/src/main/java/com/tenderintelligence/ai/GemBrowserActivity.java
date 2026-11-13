@@ -278,11 +278,7 @@ public class GemBrowserActivity extends Activity {
   if(!gemPageReady){state.setText("Waiting for GeM listing page to load…");autoHandler.postDelayed(this::nextBatch,1200);return;}
   String keyword=batchTerms[batchIndex++];resumeBatchIndex=batchIndex-1;checkpointScan();updateScanForeground(batchIndex,keyword);term.setText(keyword);if(scanProgress!=null){scanProgress.setProgress(batchIndex);if(scanRing!=null)scanRing.setValue(batchIndex);scanProgressLabel.setText("Scanning "+batchIndex+" / "+batchTerms.length+" • "+keyword+" • "+collected.size()+" bids collected");}
   state.setText("Searching "+batchIndex+"/"+batchTerms.length+": "+keyword);
-  String js="(function(){try{var inputs=Array.from(document.querySelectorAll('input')).filter(e=>{var r=e.getBoundingClientRect();return r.width>100&&r.height>0&&!e.disabled});"+
-   "var el=inputs.find(e=>/searchBid|search_bid|bid_search/i.test((e.id||'')+' '+(e.name||'')))||inputs.find(e=>{var p=e.parentElement;return p&&/contains/i.test((p.parentElement&&p.parentElement.innerText||'').slice(0,90))})||inputs.filter(e=>/text|search/i.test(e.type||'text')).slice(-1)[0];"+
-   "if(!el)return 'NO_INPUT';var setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(el,"+JSONObject.quote(keyword)+");el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));"+
-   "var r=el.getBoundingClientRect();var buttons=Array.from(document.querySelectorAll('button,input[type=submit],a,[role=button]')).filter(e=>{var b=e.getBoundingClientRect();return b.width>18&&b.height>18&&b.left>=r.right-12&&b.left<r.right+145&&Math.abs(b.top-r.top)<38&&!e.disabled});"+
-   "buttons.sort((a,b)=>Math.abs(a.getBoundingClientRect().left-r.right)-Math.abs(b.getBoundingClientRect().left-r.right));if(!buttons.length)return 'NO_BUTTON';el.blur();buttons[0].click();return 'OK';}catch(e){return 'ERROR'}})()";
+  String js=GemScanScripts.search(keyword);
   browser.evaluateJavascript(js,result->{
    if(!batchRunning)return;
    if(!result.contains("OK")){if(searchRetries++<4){batchIndex--;state.setText("Waiting for GeM search controls… retry "+searchRetries+"/4");autoHandler.postDelayed(this::nextBatch,1800);return;}state.setText("GeM search controls unavailable for "+keyword+". Portal may have changed or blocked loading.");batchRunning=false;stopScanForeground();batchButton.setText("Resume scanning");return;}
@@ -322,7 +318,7 @@ public class GemBrowserActivity extends Activity {
     collectVisible(()->{
      if(!autoCollecting)return;
      if(autoPages>=(batchRunning?25:100)){if(batchRunning){checkpointScan();stopScanForeground();batchRunning=false;autoCollecting=false;scanProgress.setIndeterminate(false);batchButton.setText("Resume scanning");scanProgressLabel.setText("Scan incomplete • page safety limit reached for "+batchTerms[Math.max(0,batchIndex-1)]);state.setText("Stopped at 25 pages for this category. Results collected so far are retained; scan was not complete.");}else stopAutoCollect("Reached page safety limit.");return;}
-     String nextJs="(function(){var a=Array.from(document.querySelectorAll('a,button')).find(e=>{var r=e.getBoundingClientRect();return r.width>0&&r.height>0&&!e.disabled&&e.getAttribute('aria-disabled')!=='true'&&!e.classList.contains('disabled')&&/^(next|next page|›|»|>)$/i.test((e.innerText||'').trim())});if(!a)return 'END';a.click();return 'NEXT'})()";
+     String nextJs=GemScanScripts.nextPage();
      browser.evaluateJavascript(nextJs,out->{
       if(!autoCollecting)return;
       if(!out.contains("NEXT")){if(batchRunning){autoCollecting=false;autoHandler.postDelayed(this::nextBatch,800);}else stopAutoCollect("Reached the last available page.");return;}
