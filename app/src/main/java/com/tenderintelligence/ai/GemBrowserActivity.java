@@ -285,7 +285,7 @@ public class GemBrowserActivity extends Activity {
    "buttons.sort((a,b)=>Math.abs(a.getBoundingClientRect().left-r.right)-Math.abs(b.getBoundingClientRect().left-r.right));if(!buttons.length)return 'NO_BUTTON';el.blur();buttons[0].click();return 'OK';}catch(e){return 'ERROR'}})()";
   browser.evaluateJavascript(js,result->{
    if(!batchRunning)return;
-   if(!result.contains("OK")){if(searchRetries++<4){batchIndex--;state.setText("Waiting for GeM search controls… retry "+searchRetries+"/4");autoHandler.postDelayed(this::nextBatch,1800);return;}state.setText("GeM search controls unavailable for "+keyword+". Portal may have changed or blocked loading.");batchRunning=false;batchButton.setText("Find tenders • Scan equipment categories");return;}
+   if(!result.contains("OK")){if(searchRetries++<4){batchIndex--;state.setText("Waiting for GeM search controls… retry "+searchRetries+"/4");autoHandler.postDelayed(this::nextBatch,1800);return;}state.setText("GeM search controls unavailable for "+keyword+". Portal may have changed or blocked loading.");batchRunning=false;stopScanForeground();batchButton.setText("Resume scanning");return;}
    searchRetries=0;
    autoCollecting=true;autoPages=0;autoStalls=0;autoSignature="";
    autoButton.setText("Stop auto collection");
@@ -315,13 +315,13 @@ public class GemBrowserActivity extends Activity {
    try{
     JSONObject data=new JSONObject(new JSONArray("["+result+"]").getString(0));
     String signature=data.optString("signature");int count=data.optInt("count");
-    if(count==0){if(++autoStalls>=8){autoCollecting=false;batchRunning=false;if(batchButton!=null)batchButton.setText("Find tenders • Scan equipment categories");if(scanProgressLabel!=null)scanProgressLabel.setText("Scan paused • GeM returned no detectable bid cards for "+batchTerms[Math.max(0,batchIndex-1)]);state.setText("No GeM bid cards detected. Check that the GeM listing loaded and displays results. Scan stopped instead of skipping categories.");return;}autoHandler.postDelayed(this::autoStep,1500);return;}
-    if(signature.equals(autoSignature)){if(++autoStalls>=8){autoCollecting=false;batchRunning=false;if(batchButton!=null)batchButton.setText("Find tenders • Scan equipment categories");state.setText("GeM results did not change. Scan stopped to avoid silently skipping bids. Open the GeM listing and check search or pagination.");return;}autoHandler.postDelayed(this::autoStep,1500);return;}
+    if(count==0){if(++autoStalls>=8){checkpointScan();stopScanForeground();autoCollecting=false;batchRunning=false;if(batchButton!=null)batchButton.setText("Find tenders • Scan equipment categories");if(scanProgressLabel!=null)scanProgressLabel.setText("Scan paused • GeM returned no detectable bid cards for "+batchTerms[Math.max(0,batchIndex-1)]);state.setText("No GeM bid cards detected. Check that the GeM listing loaded and displays results. Scan stopped instead of skipping categories.");return;}autoHandler.postDelayed(this::autoStep,1500);return;}
+    if(signature.equals(autoSignature)){if(++autoStalls>=8){checkpointScan();stopScanForeground();autoCollecting=false;batchRunning=false;if(batchButton!=null)batchButton.setText("Find tenders • Scan equipment categories");state.setText("GeM results did not change. Scan stopped to avoid silently skipping bids. Open the GeM listing and check search or pagination.");return;}autoHandler.postDelayed(this::autoStep,1500);return;}
     autoSignature=signature;autoStalls=0;autoPages++;if(scanProgressLabel!=null&&batchRunning)scanProgressLabel.setText("Scanning "+batchIndex+"/"+batchTerms.length+" • page "+autoPages+" • "+collected.size()+" bids collected");
     state.setText("Collecting page "+autoPages+"…");
     collectVisible(()->{
      if(!autoCollecting)return;
-     if(autoPages>=(batchRunning?25:100)){if(batchRunning){batchRunning=false;autoCollecting=false;scanProgress.setIndeterminate(false);batchButton.setText("Find tenders");scanProgressLabel.setText("Scan incomplete • page safety limit reached for "+batchTerms[Math.max(0,batchIndex-1)]);state.setText("Stopped at 25 pages for this category. Results collected so far are retained; scan was not complete.");}else stopAutoCollect("Reached page safety limit.");return;}
+     if(autoPages>=(batchRunning?25:100)){if(batchRunning){checkpointScan();stopScanForeground();batchRunning=false;autoCollecting=false;scanProgress.setIndeterminate(false);batchButton.setText("Resume scanning");scanProgressLabel.setText("Scan incomplete • page safety limit reached for "+batchTerms[Math.max(0,batchIndex-1)]);state.setText("Stopped at 25 pages for this category. Results collected so far are retained; scan was not complete.");}else stopAutoCollect("Reached page safety limit.");return;}
      String nextJs="(function(){var a=Array.from(document.querySelectorAll('a,button')).find(e=>{var r=e.getBoundingClientRect();return r.width>0&&r.height>0&&!e.disabled&&e.getAttribute('aria-disabled')!=='true'&&!e.classList.contains('disabled')&&/^(next|next page|›|»|>)$/i.test((e.innerText||'').trim())});if(!a)return 'END';a.click();return 'NEXT'})()";
      browser.evaluateJavascript(nextJs,out->{
       if(!autoCollecting)return;
@@ -335,7 +335,7 @@ public class GemBrowserActivity extends Activity {
  }
  @Override protected void onStart(){super.onStart();activityVisible=true;if(resumeAfterForeground&&gemPageReady&&!batchRunning){resumeAfterForeground=false;autoHandler.postDelayed(()->GemBrowserActivity.this.startBatch(),700);}}
  @Override protected void onStop(){activityVisible=false;if(batchRunning)checkpointScan();super.onStop();}
- @Override protected void onDestroy(){if(batchRunning)checkpointScan();else stopScanForeground();saveShortlistWordAutomatically();autoCollecting=false;autoHandler.removeCallbacksAndMessages(null);if(browser!=null){browser.destroy();browser=null;}super.onDestroy();}
+ @Override protected void onDestroy(){if(batchRunning)checkpointScan();stopScanForeground();saveShortlistWordAutomatically();autoCollecting=false;autoHandler.removeCallbacksAndMessages(null);if(browser!=null){browser.destroy();browser=null;}super.onDestroy();}
  private Date parsedDeadline(String value){
   try{SimpleDateFormat format=new SimpleDateFormat("dd-MM-yyyy h:mm a",Locale.ENGLISH);format.setLenient(false);return format.parse(value.trim());}catch(Exception e){return null;}
  }
