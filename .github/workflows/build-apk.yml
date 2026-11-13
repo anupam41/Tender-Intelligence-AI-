@@ -8,7 +8,7 @@ on:
         required: false
         default: false
   push:
-    branches: [main]
+    branches: [main, tender-radar/audit-fixes]
 jobs:
   build:
     runs-on: ubuntu-latest
