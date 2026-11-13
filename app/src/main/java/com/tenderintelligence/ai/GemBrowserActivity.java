@@ -213,7 +213,7 @@ public class GemBrowserActivity extends Activity {
     if("https".equalsIgnoreCase(url.getScheme())){startActivity(new Intent(Intent.ACTION_VIEW,url));return true;}
     return true;
    }
-   @Override public void onPageFinished(WebView view,String url){gemPageReady=true;if(!batchRunning&&!resumeAfterForeground)state.setText("GeM loaded. Tap Find tenders to scan.");if(activityVisible&&resumeAfterForeground&&!batchRunning){resumeAfterForeground=false;autoHandler.postDelayed(this::startBatch,700);}}
+   @Override public void onPageFinished(WebView view,String url){gemPageReady=true;if(!batchRunning&&!resumeAfterForeground)state.setText("GeM loaded. Tap Find tenders to scan.");if(activityVisible&&resumeAfterForeground&&!batchRunning){resumeAfterForeground=false;autoHandler.postDelayed(()->GemBrowserActivity.this.startBatch(),700);}}
    @Override public void onReceivedError(WebView view,WebResourceRequest req,WebResourceError error){if(req.isForMainFrame())state.setText("Unable to load GeM in WebView. Try opening in your browser.");}
   });
   browser.setDownloadListener((url,userAgent,disposition,mime,length)->{Uri uri=Uri.parse(url);if(safe(uri))startActivity(new Intent(Intent.ACTION_VIEW,uri));else state.setText("Download blocked: external URL");});
@@ -332,7 +332,7 @@ public class GemBrowserActivity extends Activity {
    }catch(Exception e){stopAutoCollect("Could not inspect GeM pagination.");}
   });
  }
- @Override protected void onStart(){super.onStart();activityVisible=true;if(resumeAfterForeground&&gemPageReady&&!batchRunning){resumeAfterForeground=false;autoHandler.postDelayed(this::startBatch,700);}}
+ @Override protected void onStart(){super.onStart();activityVisible=true;if(resumeAfterForeground&&gemPageReady&&!batchRunning){resumeAfterForeground=false;autoHandler.postDelayed(()->GemBrowserActivity.this.startBatch(),700);}}
  @Override protected void onStop(){activityVisible=false;if(batchRunning)checkpointScan();super.onStop();}
  @Override protected void onDestroy(){if(batchRunning)checkpointScan();else stopScanForeground();saveShortlistWordAutomatically();autoCollecting=false;autoHandler.removeCallbacksAndMessages(null);if(browser!=null){browser.destroy();browser=null;}super.onDestroy();}
  private Date parsedDeadline(String value){
