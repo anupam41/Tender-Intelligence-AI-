@@ -1152,7 +1152,7 @@ public class GemBrowserActivity extends Activity {
   android.content.res.ColorStateList tint=new android.content.res.ColorStateList(new int[][]{new int[]{android.R.attr.state_checked},new int[]{}},new int[]{dynamicPrimary(),dynamicMuted()});
   for(int i=0;i<labels.length;i++){RadioButton option=new RadioButton(this);option.setId(View.generateViewId());option.setText(labels[i]);option.setTextSize(16);option.setTextColor(dynamicText());option.setButtonTintList(tint);option.setPadding(dp(8),dp(8),dp(8),dp(8));option.setMinHeight(dp(56));choices.addView(option,new RadioGroup.LayoutParams(-1,-2));option.setChecked(i==tenderSortMode);}
   ScrollView scroll=new ScrollView(this);scroll.addView(content);
-  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this,darkMode()?android.app.AlertDialog.THEME_MATERIAL_DARK:android.app.AlertDialog.THEME_MATERIAL_LIGHT).setTitle("Sort matching tenders").setView(scroll).setNegativeButton("Cancel",null).create();
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this,darkMode()?android.R.style.Theme_Material_Dialog_Alert:android.R.style.Theme_Material_Light_Dialog_Alert).setTitle("Sort matching tenders").setView(scroll).setNegativeButton("Cancel",null).create();
   choices.setOnCheckedChangeListener((group,id)->{for(int i=0;i<group.getChildCount();i++)if(group.getChildAt(i).getId()==id){tenderSortMode=i;dialog.dismiss();renderDashboard();break;}});
   dialog.show();styleDialog(dialog);
  }
