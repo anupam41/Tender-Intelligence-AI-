@@ -242,12 +242,29 @@ public class GemBrowserActivity extends Activity {
     String decoded=new JSONArray("["+result+"]").getString(0);
     JSONObject payload=new JSONObject(decoded);if(payload.has("error")){state.setText("GeM collection error: "+payload.optString("error"));return;}
     JSONArray items=payload.optJSONArray("items");if(items==null)throw new Exception("Missing items");int added=0;
+    boolean shortlistChanged=false;
     for(int i=0;i<items.length();i++){
      JSONObject j=items.optJSONObject(i);if(j==null)continue;String id=j.optString("bidId");
      if(!id.matches("GEM/20\\d{2}/B/\\d+"))continue;
      String url=j.optString("url");if(!safe(Uri.parse(url)))j.put("url",GEM);
-     if(!collected.containsKey(id)){collected.put(id,j);added++;}else{JSONObject old=collected.get(id);if(old!=null){if(old.optString("buyer").isEmpty()&&!j.optString("buyer").isEmpty())old.put("buyer",j.optString("buyer"));if(old.optJSONArray("documentLinks")==null&&j.optJSONArray("documentLinks")!=null)old.put("documentLinks",j.optJSONArray("documentLinks"));}}
+     JSONObject saved = shortlisted.get(id);
+     String deadline = j.optString("deadlineText").trim();
+     boolean validDeadline = parsedDeadline(deadline) != null;
+     if (saved != null && validDeadline && !deadline.equals(saved.optString("deadlineText"))) {
+      saved.put("deadlineText", deadline);
+      shortlistChanged = true;
+     }
+     JSONObject old = collected.get(id);
+     if (old == null) {
+      collected.put(id, j);
+      added++;
+     } else {
+      if (validDeadline) old.put("deadlineText", deadline);
+      if (old.optString("buyer").isEmpty() && !j.optString("buyer").isEmpty()) old.put("buyer", j.optString("buyer"));
+      if (old.optJSONArray("documentLinks") == null && j.optJSONArray("documentLinks") != null) old.put("documentLinks", j.optJSONArray("documentLinks"));
+     }
     }
+    if (shortlistChanged) persistShortlist();
     persistCollected();updateCollectedCount();if(showingDashboard)renderDashboard();scheduleAutoReview();
     state.setText("Detected "+items.length()+" GeM bid IDs; saved "+added+" new bids.");
     if (batchRunning) {
@@ -332,7 +349,7 @@ public class GemBrowserActivity extends Activity {
  @Override protected void onStop(){activityVisible=false;if(batchRunning)checkpointScan();super.onStop();}
  @Override protected void onDestroy(){if(batchRunning)checkpointScan();stopScanForeground();saveShortlistWordAutomatically();autoCollecting=false;autoHandler.removeCallbacksAndMessages(null);if(browser!=null){browser.destroy();browser=null;}super.onDestroy();}
  private Date parsedDeadline(String value){
-  try{SimpleDateFormat format=new SimpleDateFormat("dd-MM-yyyy h:mm a",Locale.ENGLISH);format.setLenient(false);return format.parse(value.trim());}catch(Exception e){return null;}
+  try{SimpleDateFormat format=new SimpleDateFormat("dd-MM-yyyy h:mm a",Locale.ENGLISH);format.setTimeZone(java.util.TimeZone.getTimeZone("Asia/Kolkata"));format.setLenient(false);java.text.ParsePosition position=new java.text.ParsePosition(0);String input=value.trim();Date date=format.parse(input,position);return position.getIndex()==input.length()?date:null;}catch(Exception e){return null;}
  }
  private boolean relevantTitle(String value){
   String t=value.toLowerCase(Locale.ROOT);
