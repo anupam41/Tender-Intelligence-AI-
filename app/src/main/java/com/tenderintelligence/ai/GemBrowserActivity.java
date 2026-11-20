@@ -792,13 +792,13 @@ public class GemBrowserActivity extends Activity {
     String label=heading.group(1).toLowerCase(java.util.Locale.ROOT);
     for(int i=0;i<patterns.length;i++)if(label.matches(".*("+patterns[i]+").*")){
      active=i;sections.putIfAbsent(i,new StringBuilder());
-     if(!heading.group(2).isEmpty())sections.get(i).append(heading.group(2)).append("\\n");
+     if(!heading.group(2).isEmpty())sections.get(i).append(heading.group(2)).append('\n');
      matched=true;break;
     }
    }
    if(!matched){
-    if(active>=0)sections.get(active).append(clean).append("\\n");
-    else other.append(clean).append("\\n");
+    if(active>=0)sections.get(active).append(clean).append('\n');
+    else other.append(clean).append('\n');
    }
   }
   if(sections.isEmpty()){addReviewSection(parent,"AI summary",raw.replace("**","").replace("__",""));return;}
