@@ -240,7 +240,7 @@ public class GemBrowserActivity extends Activity {
   browser.evaluateJavascript(js,result->{
    try{
     String decoded=new JSONArray("["+result+"]").getString(0);
-    JSONObject payload=new JSONObject(decoded);if(payload.has("error")){state.setText("GeM collection error: "+payload.optString("error"));return;}
+    JSONObject payload=new JSONObject(decoded);if(payload.has("error"))throw new org.json.JSONException("GeM listing could not be read");
     JSONArray items=payload.optJSONArray("items");if(items==null)throw new Exception("Missing items");int added=0;
     boolean shortlistChanged=false;
     for(int i=0;i<items.length();i++){
@@ -272,7 +272,13 @@ public class GemBrowserActivity extends Activity {
      updateScanForeground(batchIndex, batchTerms[batchIndex - 1] + " • page " + autoPages + " • " + collected.size() + " bids");
     }
     if(done!=null)done.run();
-   }catch(Exception e){state.setText("Could not parse bid cards. GeM page format may have changed.");}
+   }catch(Exception e){
+    if (done != null && autoCollecting) {
+     stopAutoCollect("Could not read GeM bid cards. Check the listing and retry.");
+    } else {
+     state.setText("Could not read GeM bid cards. Check the listing and retry.");
+    }
+   }
   });
  }
  private void startBatch(){
