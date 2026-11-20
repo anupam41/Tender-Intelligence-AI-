@@ -351,10 +351,35 @@ public class GemBrowserActivity extends Activity {
  private Date parsedDeadline(String value){
   try{SimpleDateFormat format=new SimpleDateFormat("dd-MM-yyyy h:mm a",Locale.ENGLISH);format.setTimeZone(java.util.TimeZone.getTimeZone("Asia/Kolkata"));format.setLenient(false);java.text.ParsePosition position=new java.text.ParsePosition(0);String input=value.trim();Date date=format.parse(input,position);return position.getIndex()==input.length()?date:null;}catch(Exception e){return null;}
  }
+ private static String normalizeEquipmentTitle(String value) {
+  return value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", " ").trim()
+    .replaceAll("\\blub(?:e|ricating)? oil\\b", "lub oil");
+ }
+
+ private static final java.util.Set<String> BROAD_EQUIPMENT_TERMS =
+   new java.util.HashSet<>(java.util.Arrays.asList("cooler", "heater", "tank", "vessel", "vessels", "dryer", "chiller", "radiator"));
+
+ private static final java.util.List<String> TITLE_ALIASES = equipmentTitleAliases();
+
+ private static java.util.List<String> equipmentTitleAliases() {
+  java.util.List<String> aliases = new java.util.ArrayList<>();
+  for (String[] group : EquipmentKeywords.GROUPS) {
+   for (int i = 1; i < group.length; i++) {
+    String alias = normalizeEquipmentTitle(group[i]);
+    if (!BROAD_EQUIPMENT_TERMS.contains(alias)) aliases.add(" " + alias + " ");
+   }
+  }
+  return aliases;
+ }
+
  private boolean relevantTitle(String value){
-  String t=value.toLowerCase(Locale.ROOT);
-  if(t.matches(".*(foot massager|room heater|gas stove|hot plate|hair dryer|water heater|space heater|fan heater|electric heater|hand heater|heat shrink|heat gun|laboratory heater).*"))return false;
-  return t.matches(".*(heat exchanger|condenser|retub|re-tub|hydrojet|industrial cooler|air.fin.fan cooler|mot cooler|turbine air cooler|inter.stage cooler|inter cooler|after cooler|bfp lub oil cooler|working oil cooler|stator air cooler|gas cooler|guide bearing|thrust bearing|furnace oil cooler|gland steam cooler|voith cooler|vacuum pump water cooler|fan air.*oil cooler|oil cooler|sample cooler|sampling cooler|swas cooler|tube bundle|pressure vessel|evaporator|economi[sz]er|industrial chiller|industrial radiator|generator radiator|ejector|industrial dryer|cooling coil|air preheater|air pre heater|shell and tube|shell & tube|tubesheet|tube sheet|reboiler|industrial heater|lp heater|hp heater|fin tube|finned tube|stator water cooler|generator air cooler|seal oil cooler|intercooler|inter cooler|aftercooler|after cooler|air fin fan|vaporizer|expansion bellow|frp cooling tower|air receiver|storage tank|process tank|industrial blender|industrial reactor|flue gas cooler|heat recovery).*");
+  String t = normalizeEquipmentTitle(value.replace("&", " and "));
+  if(t.matches(".*(foot massager|room heater|gas stove|hot plate|hair drye?r|drinking water cooler|domestic water cooler|water heater|space heater|fan heater|electric heater|hand heater|heat shrink|heat gun|laboratory heater).*"))return false;
+  String words = " " + t + " ";
+  for (String alias : TITLE_ALIASES) {
+   if (words.contains(alias)) return true;
+  }
+  return t.matches(".*(heat exchanger|condenser|retub|re tub|hydrojet|industrial cooler|air.fin.fan cooler|mot cooler|turbine air cooler|inter.stage cooler|inter cooler|after cooler|bfp lub oil cooler|working oil cooler|stator air cooler|gas cooler|guide bearing|thrust bearing|furnace oil cooler|gland steam cooler|voith cooler|vacuum pump water cooler|fan air.*oil cooler|oil cooler|sample cooler|sampling cooler|swas cooler|tube bundle|pressure vessel|evaporator|economi[sz]er|industrial chiller|industrial radiator|generator radiator|ejector|industrial dryer|cooling coil|air preheater|air pre heater|shell and tube|shell & tube|tubesheet|tube sheet|reboiler|industrial heater|lp heater|hp heater|fin tube|finned tube|stator water cooler|generator air cooler|seal oil cooler|intercooler|inter cooler|aftercooler|after cooler|air fin fan|vaporizer|expansion bellow|frp cooling tower|air receiver|storage tank|process tank|industrial blender|industrial reactor|flue gas cooler|heat recovery).*");
  }
 
  private String workCategory(String title){
