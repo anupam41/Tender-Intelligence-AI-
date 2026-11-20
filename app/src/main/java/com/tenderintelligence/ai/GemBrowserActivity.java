@@ -220,7 +220,7 @@ public class GemBrowserActivity extends Activity {
   browser.setDownloadListener((url,userAgent,disposition,mime,length)->{Uri uri=Uri.parse(url);if(safe(uri))startActivity(new Intent(Intent.ACTION_VIEW,uri));else state.setText("Download blocked: external URL");});
   browser.loadUrl(GEM);renderDashboard();scheduleAutoReview();
  }
- private void updateCollectedCount(){int matches=0;Date now=new Date();for(JSONObject j:collected.values()){if(isPreviouslyShortlisted(j.optString("bidId"))||!relevantTitle(j.optString("title")))continue;Date due=parsedDeadline(j.optString("deadlineText"));if(due!=null&&due.after(now))matches++;}if(bidTotalValue!=null)bidTotalValue.setText(String.valueOf(collected.size()));if(matchTotalValue!=null)matchTotalValue.setText(String.valueOf(matches));if(collectedCount!=null)collectedCount.setText(matches+" open matching tenders • "+collected.size()+" bids collected");}
+ private void updateCollectedCount(){int matches=0;Date now=new Date();for(JSONObject j:collected.values()){if(shortlisted.containsKey(j.optString("bidId"))||!relevantTitle(j.optString("title")))continue;Date due=parsedDeadline(j.optString("deadlineText"));if(due!=null&&due.after(now))matches++;}if(bidTotalValue!=null)bidTotalValue.setText(String.valueOf(collected.size()));if(matchTotalValue!=null)matchTotalValue.setText(String.valueOf(matches));if(collectedCount!=null)collectedCount.setText(matches+" open matching tenders • "+collected.size()+" bids collected");}
  // Search data is session-only; shortlist records and their saved reviews are permanent.
  private void clearPreviousSearchSession(){
   collected.clear();
@@ -520,12 +520,6 @@ public class GemBrowserActivity extends Activity {
   if(changed)getPreferences(0).edit().putString("shortlist_history_v1",records.toString()).apply();
   saveHistoryReports();
  }
- private boolean isPreviouslyShortlisted(String id){
-  if(shortlisted.containsKey(id))return true;
-  JSONArray records=historyRecords();
-  for(int i=0;i<records.length();i++){JSONObject rec=records.optJSONObject(i);JSONObject bid=rec==null?null:rec.optJSONObject("bid");if(bid!=null&&id.equals(bid.optString("bidId")))return true;}
-  return false;
- }
  private JSONArray historyRecords(){
   try{return new JSONArray(getPreferences(0).getString("shortlist_history_v1","[]"));}
   catch(Exception e){return new JSONArray();}
@@ -537,7 +531,17 @@ public class GemBrowserActivity extends Activity {
    record.put("session",sessionReportId);
    record.put("savedAt",System.currentTimeMillis());
    record.put("bid",new JSONObject(bid.toString()));
-   records.put(record);
+   int index = records.length();
+   for (int i = 0; i < records.length(); i++) {
+    JSONObject existing = records.optJSONObject(i);
+    if (existing == null || !sessionReportId.equals(existing.optString("session"))) continue;
+    JSONObject savedBid = existing.optJSONObject("bid");
+    if (savedBid != null && bid.optString("bidId").equals(savedBid.optString("bidId"))) {
+     index = i;
+     break;
+    }
+   }
+   records.put(index, record);
    getPreferences(0).edit().putString("shortlist_history_v1",records.toString()).apply();
   }catch(Exception e){android.util.Log.e("TenderRadar","Could not store session history",e);}
   saveHistoryReports();
@@ -596,7 +600,7 @@ public class GemBrowserActivity extends Activity {
  }
  private void shortlistTender(JSONObject bid){
   String id=bid.optString("bidId");
-  if(id.isEmpty()||isPreviouslyShortlisted(id))return;
+  if(id.isEmpty()||shortlisted.containsKey(id))return;
   shortlisted.put(id,bid);
   persistShortlist();saveHistoryRecord(bid);
   renderDashboard();updateCollectedCount();scheduleAutoReview();
@@ -740,7 +744,7 @@ public class GemBrowserActivity extends Activity {
   }
   content.addView(dashText("Assessment is provisional. Confirm specifications, buyer requirements, eligibility and deadlines on GeM.",12,uiMuted()));
   Button document=button("Open GeM document");document.setBackground(flatShape(dynamicSurface(),12));content.addView(document,spacedAction(12));document.setOnClickListener(v->openBidPdf(bid));
-  if(!isPreviouslyShortlisted(id)){
+  if(!shortlisted.containsKey(id)){
    Button save=button("Shortlist tender");save.setTextColor(uiAccent());save.setBackground(flatShape(dynamicSurface(),12));content.addView(save,spacedAction(10));
    save.setOnClickListener(v->{shortlistTender(bid);save.setEnabled(false);save.setText("Saved to Tender management");});
   }else content.addView(dashText("Already saved in Tender management / history",13,uiAccent()));
@@ -758,7 +762,7 @@ public class GemBrowserActivity extends Activity {
   ArrayList<JSONObject> open=new ArrayList<>();int expired=0,missing=0,analyzed=0;
   Date now=new Date();
   for(JSONObject j:collected.values()){
-   if(isPreviouslyShortlisted(j.optString("bidId"))||!relevantTitle(j.optString("title")))continue;
+   if(shortlisted.containsKey(j.optString("bidId"))||!relevantTitle(j.optString("title")))continue;
    Date due=parsedDeadline(j.optString("deadlineText"));
    if(due==null){missing++;continue;}
    if(!due.after(now)){expired++;continue;}
