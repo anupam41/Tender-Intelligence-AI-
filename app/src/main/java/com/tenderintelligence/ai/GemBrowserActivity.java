@@ -375,6 +375,8 @@ public class GemBrowserActivity extends Activity {
  private boolean relevantTitle(String value){
   String t = normalizeEquipmentTitle(value.replace("&", " and "));
   if(t.matches(".*(foot massager|room heater|gas stove|hot plate|hair drye?r|drinking water cooler|domestic water cooler|water heater|space heater|fan heater|electric heater|hand heater|heat shrink|heat gun|laboratory heater).*"))return false;
+  t = t.trim();
+  if (BROAD_EQUIPMENT_TERMS.contains(t)) return true;
   String words = " " + t + " ";
   for (String alias : TITLE_ALIASES) {
    if (words.contains(alias)) return true;

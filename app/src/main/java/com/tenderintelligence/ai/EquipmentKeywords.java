@@ -3,8 +3,8 @@ import java.util.*;
 public final class EquipmentKeywords {
  public static final String[][] GROUPS={
  {"Heat Exchanger","heat exchanger","heatExchanger"},
- {"Condenser","condenser","vent condenser","AC condenser","surface condenser","gland steam condenser"},
- {"Cooler","cooler","air fin fan cooler","MOT cooler","turbine oil cooler","turbine air cooler","inter stage cooler","inter cooler","after cooler","SWAS cooler","BFP lub oil cooler","working oil cooler","oil cooler","stator water cooler","generator air cooler","stator air cooler","seal oil cooler","gas cooler","guide bearing thrust bearing oil cooler","furnace oil cooler","gland steam cooler","sampling cooler","Voith cooler","vacuum pump water cooler","water cooler","ID FD PA FA fan air oil cooler"},
+ {"Condenser","condenser","vent condenser","ventcondenser","AC condensers","AC condenser","surface condenser","gland steam condenser"},
+ {"Cooler","cooler","air fin fan cooler","MOT cooler","turbine oil cooler","turbine air cooler","inter stage cooler","inter cooler","after cooler","SWAS cooler","BFP lub oil cooler","working oil cooler","oil cooler","stator water cooler","generator air cooler","generator aircooler","stator air cooler","seal oil cooler","gas cooler","guide bearing thrust bearing oil cooler","guide bearing and thrust bearing oil cooler","furnace oil cooler","gland steam cooler","sampling cooler","Voith cooler","vacuum pump water cooler","water cooler","ID FD PA FA fan air oil cooler","ID FD PA FAFan air and oil cooler"},
  {"Chiller","chiller"},{"Radiator","radiator"},{"Dryer","dryer"},
  {"Heater","heater","LP heater","HP heater","air pre heater"},
  {"Economizer","economizer"},{"Ejector","ejector"},{"Evaporator","evaporator"},
