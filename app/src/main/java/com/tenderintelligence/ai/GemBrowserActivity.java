@@ -352,7 +352,17 @@ public class GemBrowserActivity extends Activity {
     state.setText("Collecting page "+autoPages+"…");
     collectVisible(()->{
      if(!autoCollecting)return;
-     if(autoPages>=(batchRunning?25:100)){if(batchRunning){checkpointScan();stopScanForeground();batchRunning=false;autoCollecting=false;scanProgress.setIndeterminate(false);batchButton.setText("Resume scanning");scanProgressLabel.setText("Scan incomplete • page safety limit reached for "+batchTerms[Math.max(0,batchIndex-1)]);state.setText("Stopped at 25 pages for this category. Results collected so far are retained; scan was not complete.");}else stopAutoCollect("Reached page safety limit.");return;}
+     if (autoPages >= (batchRunning ? 25 : 100)) {
+      if (!data.optBoolean("hasNext", true)) {
+       if (batchRunning) {
+        autoCollecting = false;
+        autoHandler.postDelayed(this::nextBatch, 800);
+       } else {
+        stopAutoCollect("Reached the last available page.");
+       }
+       return;
+      }
+      if(batchRunning){checkpointScan();stopScanForeground();batchRunning=false;autoCollecting=false;scanProgress.setIndeterminate(false);batchButton.setText("Resume scanning");scanProgressLabel.setText("Scan incomplete • page safety limit reached for "+batchTerms[Math.max(0,batchIndex-1)]);state.setText("Stopped at 25 pages for this category. Results collected so far are retained; scan was not complete.");}else stopAutoCollect("Reached page safety limit.");return;}
      String nextJs=GemScanScripts.nextPage();
      browser.evaluateJavascript(nextJs,out->{
       if(!autoCollecting)return;
