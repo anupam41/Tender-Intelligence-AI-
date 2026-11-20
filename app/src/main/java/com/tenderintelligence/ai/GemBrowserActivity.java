@@ -748,7 +748,8 @@ public class GemBrowserActivity extends Activity {
   TextView identifier=dashText(id+"  •  "+workCategory(title),13,uiAccent());identifier.setTextIsSelectable(true);content.addView(identifier);
   String buyer=bid.optString("buyer",bid.optString("buyerName",""));
   if(!buyer.isEmpty())content.addView(dashText("Buyer: "+buyer,14,uiText()));
-  content.addView(dashText("Closing date: "+bid.optString("deadlineText","Not provided"),14,uiText()));
+  String closing = bid.optString("deadlineText").trim();
+  content.addView(dashText("Closing date: "+(closing.isEmpty() ? "Check on GeM" : closing),14,uiText()));
   TextView section=dashText("AI assessment",17,uiText());section.setTypeface(null,Typeface.BOLD);content.addView(section);
   if(review==null){
    content.addView(dashText("No completed AI review yet. The tender must be checked against its technical documents.",14,uiMuted()));
@@ -778,12 +779,13 @@ public class GemBrowserActivity extends Activity {
   if(managementHeaderButton!=null){managementHeaderButton.setText(String.valueOf(shortlisted.size()));managementHeaderButton.setContentDescription("Tender management, "+shortlisted.size()+" saved");}
   LinearLayout resultsToolbar=new LinearLayout(this);resultsToolbar.setOrientation(0);resultsToolbar.setGravity(Gravity.CENTER_VERTICAL);dashboardList.addView(resultsToolbar,new LinearLayout.LayoutParams(-1,dp(48)));
   TextView resultsHeading=dashText("Matching tenders",22,white);resultsHeading.setTypeface(null,Typeface.BOLD);resultsToolbar.addView(resultsHeading,new LinearLayout.LayoutParams(0,-2,1));
-  ArrayList<JSONObject> open=new ArrayList<>();int expired=0,missing=0,analyzed=0;
+  ArrayList<JSONObject> open=new ArrayList<>();int expired=0,analyzed=0;
+  ArrayList<JSONObject> unknownDeadlines = new ArrayList<>();
   Date now=new Date();
   for(JSONObject j:collected.values()){
    if(shortlisted.containsKey(j.optString("bidId"))||!relevantTitle(j.optString("title")))continue;
    Date due=parsedDeadline(j.optString("deadlineText"));
-   if(due==null){missing++;continue;}
+   if(due==null){unknownDeadlines.add(j);continue;}
    if(!due.after(now)){expired++;continue;}
    open.add(j);if(aiReviews.containsKey(j.optString("bidId")))analyzed++;
   }
@@ -810,7 +812,22 @@ public class GemBrowserActivity extends Activity {
   LinearLayout.LayoutParams bottomLp=new LinearLayout.LayoutParams(-1,-2);bottomLp.setMargins(0,dp(8),0,dp(8));metricsGrid.addView(metricsBottom,bottomLp);
   addMetric(metricsBottom,String.valueOf(analyzingBids.size()),"Analyzing",teal);
   addMetric(metricsBottom,String.valueOf(Math.max(0,open.size()-analyzed-analyzingBids.size()-failedAutoReviews.size()-apiFailedReviews.size())),"Waiting",teal);
-  TextView caution=dashText(expired+" expired hidden • "+missing+" missing dates hidden\nAI scores are indicative; verify GeM documents and deadlines.",12,muted);caution.setPadding(0,dp(4),0,dp(12));dashboardList.addView(caution);
+  TextView caution=dashText(expired+" expired hidden\nAI scores are indicative; verify GeM documents and deadlines.",12,muted);caution.setPadding(0,dp(4),0,dp(12));dashboardList.addView(caution);
+  if (!unknownDeadlines.isEmpty()) {
+   Button checkDates = button("Check closing dates (" + unknownDeadlines.size() + ")");
+   dashboardList.addView(checkDates, spacedAction(4));
+   checkDates.setOnClickListener(v -> {
+    String[] labels = new String[unknownDeadlines.size()];
+    for (int i = 0; i < labels.length; i++) {
+     JSONObject bid = unknownDeadlines.get(i);
+     labels[i] = bid.optString("title") + "\n" + bid.optString("bidId");
+    }
+    showStyledDialog(new android.app.AlertDialog.Builder(this)
+      .setTitle("Closing date needs checking")
+      .setItems(labels, (dialog, index) -> showTenderDetails(unknownDeadlines.get(index)))
+      .setNegativeButton("Close", null));
+   });
+  }
 
   if(open.isEmpty())dashboardList.addView(dashText("No open matching tenders found. Run a GeM search and collect results.",15,white));
   for(JSONObject bid:open){
