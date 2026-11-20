@@ -496,6 +496,9 @@ public class GemBrowserActivity extends Activity {
   java.io.File file=historyFile(session);
   if(!file.exists()){saveHistoryReports();file=historyFile(session);}
   if(!file.exists()){android.widget.Toast.makeText(this,"Report unavailable",android.widget.Toast.LENGTH_SHORT).show();return;}
+  openWordReport(file);
+ }
+ private void openWordReport(java.io.File file){
   try{
    android.net.Uri uri=androidx.core.content.FileProvider.getUriForFile(this,getPackageName()+".fileprovider",file);
    Intent view=new Intent(Intent.ACTION_VIEW);
@@ -608,7 +611,7 @@ public class GemBrowserActivity extends Activity {
  private void openSavedShortlistWord(){
   java.io.File file=shortlistWordFile();
   if(!file.exists()){android.widget.Toast.makeText(this,"No saved Word report yet",android.widget.Toast.LENGTH_SHORT).show();return;}
-  exportAllShortlistedWord();
+  openWordReport(file);
  }
  private void exportAllShortlistedWord(){
   if(shortlisted.isEmpty())return;
