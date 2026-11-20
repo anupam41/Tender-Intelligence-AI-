@@ -33,10 +33,7 @@ public final class TenderWordExport {
   body.append(para("AI assessment",true));
   if(review==null){body.append(para("No AI summary saved for this tender.",false));}
   else{
-   body.append(para("Verdict: "+review.optString("verdict","Needs review"),false));
-   body.append(para("Indicative relevance score: "+review.optInt("score",0)+"/100",false));
-   body.append(para("Evidence: "+review.optString("source","Document source not recorded"),false));
-   for(String line:review.optString("report","").split("\\r?\\n"))body.append(para(line,false));
+   appendAssessment(body, review);
   }
   body.append(para("Note: AI results are provisional. Verify full buyer technical specifications, drawings, eligibility and closing dates on GeM before quotation.",false));
   String xml="<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body>"+body+"<w:sectPr/></w:body></w:document>";
@@ -50,6 +47,16 @@ public final class TenderWordExport {
   }
  }
 
+ private static void appendAssessment(StringBuilder body, JSONObject review) {
+  body.append(para("Quotation decision: " + review.optString("quotation", "Manual review"), false));
+  body.append(para("Evidence: " + review.optString("source", "Document source not recorded"), false));
+  String passage = review.optString("passage", "").trim();
+  if (!passage.isEmpty()) {
+   body.append(para("Supporting passage", true));
+   body.append(para(passage, false));
+  }
+  for (String line : review.optString("report", "").split("\\r?\\n")) body.append(para(line, false));
+ }
  private static String combinedXml(java.util.Collection<JSONObject> bids,java.util.Map<String,JSONObject> reviews){
   StringBuilder body=new StringBuilder();
   body.append(para("Tender Radar - Shortlisted Tenders",true));
@@ -69,8 +76,7 @@ public final class TenderWordExport {
    body.append(para("GeM document: "+(url.isEmpty()?"Not available":url),false));
    if(review==null)body.append(para("AI summary: Not yet reviewed.",false));
    else{
-    body.append(para("Verdict: "+review.optString("verdict","Needs review")+"; score: "+review.optInt("score",0)+"/100",false));
-    for(String line:review.optString("report","").split("\\r?\\n"))body.append(para(line,false));
+    appendAssessment(body, review);
    }
   }
   body.append(para("AI assessments are provisional. Verify specifications and deadlines on GeM.",false));
