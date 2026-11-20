@@ -35,6 +35,7 @@ public class GemBrowserActivity extends Activity {
  private int resumeBatchIndex=0;
  private boolean resumeAfterForeground=false;
  private boolean activityVisible=false;
+ private boolean dashboardRefreshPending;
  private static final String LAST_COMPLETE_SCAN = "last_complete_gem_scan";
  private TextView lastScanLabel;
 
@@ -363,7 +364,9 @@ public class GemBrowserActivity extends Activity {
    }catch(Exception e){stopAutoCollect("Could not inspect GeM pagination.");}
   });
  }
- @Override protected void onStart(){super.onStart();activityVisible=true;if(autoCollecting)autoStalls=0;if(resumeAfterForeground&&gemPageReady&&!batchRunning){resumeAfterForeground=false;autoHandler.postDelayed(()->GemBrowserActivity.this.startBatch(),700);}}
+ @Override protected void onStart(){super.onStart();activityVisible=true;
+  if (dashboardRefreshPending && showingDashboard) renderDashboard();
+  if(autoCollecting)autoStalls=0;if(resumeAfterForeground&&gemPageReady&&!batchRunning){resumeAfterForeground=false;autoHandler.postDelayed(()->GemBrowserActivity.this.startBatch(),700);}}
  @Override protected void onStop(){activityVisible=false;if(batchRunning)checkpointScan();super.onStop();}
  @Override protected void onDestroy(){if(batchRunning)checkpointScan();stopScanForeground();saveShortlistWordAutomatically();autoCollecting=false;autoHandler.removeCallbacksAndMessages(null);if(browser!=null){browser.destroy();browser=null;}super.onDestroy();}
  private Date parsedDeadline(String value){
@@ -829,6 +832,11 @@ public class GemBrowserActivity extends Activity {
  }
  private void renderDashboard(){
   if(dashboardList==null)return;
+  if (!activityVisible || !showingDashboard) {
+   dashboardRefreshPending = true;
+   return;
+  }
+  dashboardRefreshPending = false;
   while(dashboardList.getChildCount()>1)dashboardList.removeViewAt(1);
   int white=dynamicText(),muted=dynamicMuted(),teal=dynamicPrimary();
   if(managementHeaderButton!=null){managementHeaderButton.setText(String.valueOf(shortlisted.size()));managementHeaderButton.setContentDescription("Tender management, "+shortlisted.size()+" saved");}
