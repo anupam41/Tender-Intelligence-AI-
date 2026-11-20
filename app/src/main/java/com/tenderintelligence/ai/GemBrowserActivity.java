@@ -35,6 +35,18 @@ public class GemBrowserActivity extends Activity {
  private int resumeBatchIndex=0;
  private boolean resumeAfterForeground=false;
  private boolean activityVisible=false;
+ private static final String LAST_COMPLETE_SCAN = "last_complete_gem_scan";
+ private TextView lastScanLabel;
+
+ private void showLastScan(long timestamp) {
+  if (timestamp <= 0) {
+   lastScanLabel.setText("Last completed scan: none recorded");
+   return;
+  }
+  SimpleDateFormat format = new SimpleDateFormat("dd MMM yyyy, h:mm a", Locale.ENGLISH);
+  format.setTimeZone(java.util.TimeZone.getTimeZone("Asia/Kolkata"));
+  lastScanLabel.setText("Last completed scan: " + format.format(new Date(timestamp)) + " IST");
+ }
  private void checkpointScan(){ScanCheckpoint.save(this,Math.max(0,batchIndex-1),autoPages);}
  private void startScanForeground(){updateScanForeground(0,"");}
  private void updateScanForeground(int group,String keyword){try{Intent intent=new Intent(this,ScanForegroundService.class);intent.setAction(ScanForegroundService.ACTION_PROGRESS);intent.putExtra(ScanForegroundService.EXTRA_PROGRESS,group);intent.putExtra(ScanForegroundService.EXTRA_TOTAL,batchTerms.length);intent.putExtra(ScanForegroundService.EXTRA_KEYWORD,keyword);startForegroundService(intent);}catch(Exception e){android.util.Log.w("TenderRadar","Could not update foreground scan service",e);}}
@@ -184,6 +196,9 @@ public class GemBrowserActivity extends Activity {
   LinearLayout.LayoutParams scanLp=new LinearLayout.LayoutParams(-1,dp(50));scanLp.setMargins(0,dp(12),0,0);scanCard.addView(batchButton,scanLp);
   ((android.view.ViewGroup)scanProgress.getParent()).removeView(scanProgress);scanCard.addView(scanProgress,new LinearLayout.LayoutParams(-1,dp(4)));
   ((android.view.ViewGroup)state.getParent()).removeView(state);state.setTextSize(12);state.setTextColor(dynamicMuted());state.setPadding(dp(3),dp(8),dp(3),0);state.setMinLines(2);state.setMaxLines(2);state.setEllipsize(android.text.TextUtils.TruncateAt.END);scanCard.addView(state);
+  lastScanLabel = dashText("", 12, dynamicMuted());
+  scanCard.addView(lastScanLabel);
+  showLastScan(getPreferences(0).getLong(LAST_COMPLETE_SCAN, 0L));
   // Hidden counters still receive scan updates, while the summary displays live totals.
   statsStrip.setVisibility(View.GONE);
   heading.setPadding(0,0,0,dp(2));note.setPadding(0,0,0,0);
@@ -282,6 +297,9 @@ public class GemBrowserActivity extends Activity {
  private void nextBatch(){
   if(!batchRunning)return;
   if(batchIndex>=batchTerms.length){
+   long finishedAt = System.currentTimeMillis();
+   getPreferences(0).edit().putLong(LAST_COMPLETE_SCAN, finishedAt).apply();
+   showLastScan(finishedAt);
    batchRunning=false;autoCollecting=false;clearScanCheckpoint();scanProgress.setIndeterminate(false);autoButton.setText("Auto collect all pages");
    batchButton.setText("Find tenders • Scan equipment categories");
    updateCollectedCount();if(scanProgress!=null){scanProgress.setProgress(batchTerms.length);if(scanRing!=null)scanRing.setValue(batchTerms.length);scanProgressLabel.setText("Scan complete • "+collected.size()+" unique bids collected");}if(showingDashboard)renderDashboard();state.setText("Scan complete. Review matching tenders below.");return;
