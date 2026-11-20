@@ -692,15 +692,29 @@ public class GemBrowserActivity extends Activity {
   android.widget.Toast.makeText(this,"Saved to Tender management",android.widget.Toast.LENGTH_SHORT).show();
  }
  private java.io.File shortlistWordFile(){return new java.io.File(getFilesDir(),"Tender_Radar_Shortlisted.docx");}
- private void saveShortlistWordAutomatically(){
-  if(shortlisted.isEmpty())return;
-  try{TenderWordExport.writeAll(shortlistWordFile(),shortlisted.values(),aiReviews);}
-  catch(Exception e){android.util.Log.e("TenderRadar","Cannot save shortlist report",e);}
+ private boolean saveShortlistWordAutomatically(){
+  if (shortlisted.isEmpty()) return false;
+  java.io.File report = shortlistWordFile();
+  java.nio.file.Path temporary = null;
+  try {
+   temporary = java.nio.file.Files.createTempFile(report.getParentFile().toPath(), "shortlist-", ".tmp");
+   TenderWordExport.writeAll(temporary.toFile(), shortlisted.values(), aiReviews);
+   java.nio.file.Files.move(temporary, report.toPath(), java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+     java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+   return true;
+  } catch (Exception e) {
+   android.util.Log.e("TenderRadar", "Cannot refresh shortlist report", e);
+   return false;
+  } finally {
+   if (temporary != null) temporary.toFile().delete();
+  }
  }
  private void openSavedShortlistWord(){
-  java.io.File file=shortlistWordFile();
-  if(!file.exists()){android.widget.Toast.makeText(this,"No saved Word report yet",android.widget.Toast.LENGTH_SHORT).show();return;}
-  openWordReport(file);
+  if (saveShortlistWordAutomatically()) {
+   openWordReport(shortlistWordFile());
+  } else {
+   android.widget.Toast.makeText(this, "Could not prepare the current shortlist report.", android.widget.Toast.LENGTH_SHORT).show();
+  }
  }
  private void exportAllShortlistedWord(){
   if(shortlisted.isEmpty())return;
