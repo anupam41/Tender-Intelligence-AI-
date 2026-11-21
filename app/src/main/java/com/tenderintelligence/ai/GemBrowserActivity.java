@@ -26,6 +26,7 @@ public class GemBrowserActivity extends Activity {
  private boolean autoCollecting=false;
  private int autoPages=0,autoStalls=0;
  private String autoSignature="";
+ private final java.util.Set<String> collectedPageSignatures = new java.util.HashSet<>();
  private final android.os.Handler autoHandler=new android.os.Handler(android.os.Looper.getMainLooper());
  private Button autoButton;
  private boolean batchRunning=false;
@@ -313,7 +314,7 @@ public class GemBrowserActivity extends Activity {
    if(!batchRunning)return;
    if(!result.contains("OK")){if(searchRetries++<4){batchIndex--;state.setText("Waiting for GeM search controls… retry "+searchRetries+"/4");autoHandler.postDelayed(this::nextBatch,1800);return;}state.setText("GeM search controls unavailable for "+keyword+". Portal may have changed or blocked loading.");batchRunning=false;stopScanForeground();batchButton.setText("Resume scanning");return;}
    searchRetries=0;
-   autoCollecting=true;autoPages=0;autoStalls=0;autoSignature="";
+   autoCollecting=true;autoPages=0;autoStalls=0;autoSignature="";collectedPageSignatures.clear();
    autoButton.setText("Stop auto collection");
    autoHandler.postDelayed(this::autoStep,2600);
   });
@@ -328,14 +329,14 @@ public class GemBrowserActivity extends Activity {
  }
  private void startAutoCollect(){
   if(browser==null)return;
-  autoCollecting=true;autoPages=0;autoStalls=0;autoSignature="";
+  autoCollecting=true;autoPages=0;autoStalls=0;autoSignature="";collectedPageSignatures.clear();
   autoButton.setText("Stop auto collection");
   state.setText("Auto collection started. Keep the app open.");
   autoHandler.postDelayed(this::autoStep,600);
  }
  private void autoStep(){
   if(!autoCollecting)return;
-  String js="(function(){var cards=Array.from(document.querySelectorAll('a,span,strong,b,div')).filter(e=>e.children.length<3&&/GEM\\/20\\d{2}\\/B\\/\\d+/i.test(e.textContent||''));var ids=Array.from(new Set(cards.map(e=>(e.textContent||'').match(/GEM\\/20\\d{2}\\/B\\/\\d+/i)).filter(Boolean).map(m=>m[0])));var next=Array.from(document.querySelectorAll('a,button')).find(e=>{var t=(e.innerText||'').trim(),r=e.getBoundingClientRect();return r.width>0&&r.height>0&&!e.disabled&&e.getAttribute('aria-disabled')!=='true'&&!e.classList.contains('disabled')&&/^(next|next page|›|»|>)$/i.test(t)});return JSON.stringify({signature:ids.slice(0,4).join('|')+'#'+ids.length,count:ids.length,hasNext:!!next})})()";
+  String js="(function(){var cards=Array.from(document.querySelectorAll('a,span,strong,b,div')).filter(e=>e.children.length<3&&/GEM\\/20\\d{2}\\/B\\/\\d+/i.test(e.textContent||''));var ids=Array.from(new Set(cards.map(e=>(e.textContent||'').match(/GEM\\/20\\d{2}\\/B\\/\\d+/i)).filter(Boolean).map(m=>m[0])));var next=Array.from(document.querySelectorAll('a,button')).find(e=>{var t=(e.innerText||'').trim(),r=e.getBoundingClientRect();return r.width>0&&r.height>0&&!e.disabled&&e.getAttribute('aria-disabled')!=='true'&&!e.classList.contains('disabled')&&/^(next|next page|›|»|>)$/i.test(t)});return JSON.stringify({signature:ids.sort().join('|'),count:ids.length,hasNext:!!next})})()";
   browser.evaluateJavascript(js,result->{
    if(!autoCollecting)return;
    try{
@@ -348,21 +349,18 @@ public class GemBrowserActivity extends Activity {
     }
     if(count==0){if(++autoStalls>=8){checkpointScan();stopScanForeground();autoCollecting=false;batchRunning=false;if(batchButton!=null)batchButton.setText("Find tenders • Scan equipment categories");if(scanProgressLabel!=null)scanProgressLabel.setText("Scan paused • GeM returned no detectable bid cards for "+batchTerms[Math.max(0,batchIndex-1)]);state.setText("No GeM bid cards detected. Check that the GeM listing loaded and displays results. Scan stopped instead of skipping categories.");return;}autoHandler.postDelayed(this::autoStep,1500);return;}
     if(signature.equals(autoSignature)){if(++autoStalls>=8){checkpointScan();stopScanForeground();autoCollecting=false;batchRunning=false;if(batchButton!=null)batchButton.setText("Find tenders • Scan equipment categories");state.setText("GeM results did not change. Scan stopped to avoid silently skipping bids. Open the GeM listing and check search or pagination.");return;}autoHandler.postDelayed(this::autoStep,1500);return;}
+    if (!collectedPageSignatures.add(signature)) {
+     stopAutoCollect("GeM returned a previously collected page for this keyword.");
+     return;
+    }
     autoSignature=signature;autoStalls=0;autoPages++;if(scanProgressLabel!=null&&batchRunning)scanProgressLabel.setText("Scanning "+batchIndex+"/"+batchTerms.length+" • page "+autoPages+" • "+collected.size()+" bids collected");
     state.setText("Collecting page "+autoPages+"…");
     collectVisible(()->{
      if(!autoCollecting)return;
-     if (autoPages >= (batchRunning ? 25 : 100)) {
-      if (!data.optBoolean("hasNext", true)) {
-       if (batchRunning) {
-        autoCollecting = false;
-        autoHandler.postDelayed(this::nextBatch, 800);
-       } else {
-        stopAutoCollect("Reached the last available page.");
-       }
-       return;
-      }
-      if(batchRunning){checkpointScan();stopScanForeground();batchRunning=false;autoCollecting=false;scanProgress.setIndeterminate(false);batchButton.setText("Resume scanning");scanProgressLabel.setText("Scan incomplete • page safety limit reached for "+batchTerms[Math.max(0,batchIndex-1)]);state.setText("Stopped at 25 pages for this category. Results collected so far are retained; scan was not complete.");}else stopAutoCollect("Reached page safety limit.");return;}
+     if (!batchRunning && autoPages >= 100) {
+      stopAutoCollect(data.optBoolean("hasNext", true) ? "Reached page safety limit." : "Reached the last available page.");
+      return;
+     }
      String nextJs=GemScanScripts.nextPage();
      browser.evaluateJavascript(nextJs,out->{
       if(!autoCollecting)return;
