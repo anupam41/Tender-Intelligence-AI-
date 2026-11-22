@@ -85,7 +85,31 @@ public class GemBrowserActivity extends Activity {
  private final LinkedHashMap<String,JSONObject> matchingBids = new LinkedHashMap<>();
  private long lastDashboardMinute = -1;
 
+ private static final int BID_BUCKETS = 32;
+ private final java.util.HashMap<String,Integer> bidPositions = new java.util.HashMap<>();
+
+ private android.content.SharedPreferences bidBucket(int number) {
+  return getSharedPreferences("gem_bid_changes_" + number, MODE_PRIVATE);
+ }
+
+ private void saveChangedBids(java.util.List<JSONObject> changed) {
+  java.util.HashMap<Integer,android.content.SharedPreferences.Editor> edits = new java.util.HashMap<>();
+  for (JSONObject bid : changed) {
+   int position = bidPositions.get(bid.optString("bidId"));
+   int bucket = (position / 128) % BID_BUCKETS;
+   android.content.SharedPreferences.Editor edit = edits.get(bucket);
+   if (edit == null) {
+    edit = bidBucket(bucket).edit();
+    edits.put(bucket, edit);
+   }
+   edit.putString(Integer.toString(position), bid.toString());
+  }
+  for (android.content.SharedPreferences.Editor edit : edits.values()) edit.apply();
+ }
+
  private void indexCollectedBid(String id, JSONObject bid) {
+  if (!collected.containsKey(id)) bidPositions.put(id, collected.size());
+  matchingBids.remove(id);
   collected.put(id, bid);
   if (relevantTitle(bid.optString("title"))) matchingBids.put(id, bid);
  }
@@ -248,15 +272,26 @@ public class GemBrowserActivity extends Activity {
  private void updateCollectedCount(){int matches=0;Date now=new Date();for(JSONObject j:matchingBids.values()){if(shortlisted.containsKey(j.optString("bidId")))continue;Date due=parsedDeadline(j.optString("deadlineText"));if(due!=null&&due.after(now))matches++;}if(bidTotalValue!=null)bidTotalValue.setText(String.valueOf(collected.size()));if(matchTotalValue!=null)matchTotalValue.setText(String.valueOf(matches));if(collectedCount!=null)collectedCount.setText(matches+" open matching tenders • "+collected.size()+" bids collected");}
  // Search data is session-only; shortlist records and their saved reviews are permanent.
  private void clearPreviousSearchSession(){
-  collected.clear();matchingBids.clear();
+  collected.clear();matchingBids.clear();bidPositions.clear();
+  for (int i = 0; i < BID_BUCKETS; i++) bidBucket(i).edit().clear().apply();
   getPreferences(0).edit().remove("gem_collected").apply();
  }
  private void restoreCollected(){
   try{JSONArray a=new JSONArray(getPreferences(0).getString("gem_collected","[]"));for(int i=0;i<a.length();i++){JSONObject j=a.optJSONObject(i);if(j!=null&&!j.optString("bidId").isEmpty())indexCollectedBid(j.optString("bidId"),j);}}catch(Exception ignored){}
- }
- private void persistCollected(){
-  JSONArray a=new JSONArray();for(JSONObject j:collected.values())a.put(j);
-  getPreferences(0).edit().putString("gem_collected",a.toString()).apply();
+  java.util.TreeMap<Integer,String> changes = new java.util.TreeMap<>();
+  for (int i = 0; i < BID_BUCKETS; i++) {
+   for (java.util.Map.Entry<String,?> entry : bidBucket(i).getAll().entrySet()) {
+    changes.put(Integer.parseInt(entry.getKey()), (String)entry.getValue());
+   }
+  }
+  for (String record : changes.values()) {
+   try {
+    JSONObject bid = new JSONObject(record);
+    indexCollectedBid(bid.getString("bidId"), bid);
+   } catch (org.json.JSONException e) {
+    android.util.Log.w("TenderRadar", "Could not restore collected bid", e);
+   }
+  }
  }
  private void collectVisible(){collectVisible(null);}
  private void collectVisible(Runnable done){
@@ -268,7 +303,8 @@ public class GemBrowserActivity extends Activity {
     JSONObject payload=new JSONObject(decoded);if(payload.has("error")){state.setText("GeM collection error: "+payload.optString("error"));return;}
     JSONArray items=payload.optJSONArray("items");if(items==null)throw new Exception("Missing items");int added=0;
     boolean shortlistChanged=false;
-    boolean resultsChanged=false, detailsChanged=false;
+    boolean resultsChanged=false;
+    java.util.ArrayList<JSONObject> changed = new java.util.ArrayList<>();
     for(int i=0;i<items.length();i++){
      JSONObject j=items.optJSONObject(i);if(j==null)continue;String id=j.optString("bidId");
      if(!id.matches("GEM/20\\d{2}/B/\\d+"))continue;
@@ -276,13 +312,15 @@ public class GemBrowserActivity extends Activity {
      JSONObject saved = shortlisted.get(id);
      String deadline = j.optString("deadlineText").trim();
      boolean validDeadline = parsedDeadline(deadline) != null;
-     if (saved != null && validDeadline && !deadline.equals(saved.optString("deadlineText"))) {
+     boolean savedDeadlineChanged = saved != null && validDeadline && !deadline.equals(saved.optString("deadlineText"));
+     if (savedDeadlineChanged) {
       saved.put("deadlineText", deadline);
       shortlistChanged = true;
      }
      JSONObject old = collected.get(id);
      if (old == null) {
       indexCollectedBid(id, j);
+      changed.add(j);
       resultsChanged |= matchingBids.containsKey(id);
       added++;
      } else {
@@ -299,12 +337,12 @@ public class GemBrowserActivity extends Activity {
        old.put("documentLinks", j.optJSONArray("documentLinks"));
        updated = true;
       }
-      detailsChanged |= updated;
+      if (updated || (saved == old && savedDeadlineChanged)) changed.add(old);
       resultsChanged |= updated && matchingBids.containsKey(id);
      }
     }
     if (shortlistChanged) persistShortlist();
-    if (added > 0 || detailsChanged || shortlistChanged) persistCollected();
+    saveChangedBids(changed);
     updateCollectedCount();
     long minute = System.currentTimeMillis() / 60000;
     if (showingDashboard && (resultsChanged || minute != lastDashboardMinute)) renderDashboard();
@@ -1017,7 +1055,7 @@ public class GemBrowserActivity extends Activity {
   ScrollView scroll=new ScrollView(this);scroll.addView(content);
   new android.app.AlertDialog.Builder(this).setTitle("Qualified GeM candidates").setView(scroll)
    .setPositiveButton("Close",null)
-   .setNeutralButton("Clear collected bids",(d,w)->new android.app.AlertDialog.Builder(this).setTitle("Clear collected bids?").setNegativeButton("Cancel",null).setPositiveButton("Clear",(x,y)->{collected.clear();matchingBids.clear();persistCollected();updateCollectedCount();}).show()).show();
+   .setNeutralButton("Clear collected bids",(d,w)->new android.app.AlertDialog.Builder(this).setTitle("Clear collected bids?").setNegativeButton("Cancel",null).setPositiveButton("Clear",(x,y)->{clearPreviousSearchSession();updateCollectedCount();renderDashboard();}).show()).show();
  }
  private void openBidPdf(JSONObject bid){
   String id=bid.optString("bidId","");
