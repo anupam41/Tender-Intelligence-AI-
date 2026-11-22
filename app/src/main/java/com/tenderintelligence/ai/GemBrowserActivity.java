@@ -82,6 +82,14 @@ public class GemBrowserActivity extends Activity {
  private EditText term;
  private TextView state;
  private final LinkedHashMap<String,JSONObject> collected=new LinkedHashMap<>();
+ private final LinkedHashMap<String,JSONObject> matchingBids = new LinkedHashMap<>();
+ private long lastDashboardMinute = -1;
+
+ private void indexCollectedBid(String id, JSONObject bid) {
+  collected.put(id, bid);
+  if (relevantTitle(bid.optString("title"))) matchingBids.put(id, bid);
+ }
+
  private TextView collectedCount;
  private static final String OMNI_URL="http://127.0.0.1:20128/v1/chat/completions";
  private EditText pendingPdfScope;
@@ -237,14 +245,14 @@ public class GemBrowserActivity extends Activity {
   browser.setDownloadListener((url,userAgent,disposition,mime,length)->{Uri uri=Uri.parse(url);if(safe(uri))startActivity(new Intent(Intent.ACTION_VIEW,uri));else state.setText("Download blocked: external URL");});
   browser.loadUrl(GEM);renderDashboard();scheduleAutoReview();
  }
- private void updateCollectedCount(){int matches=0;Date now=new Date();for(JSONObject j:collected.values()){if(shortlisted.containsKey(j.optString("bidId"))||!relevantTitle(j.optString("title")))continue;Date due=parsedDeadline(j.optString("deadlineText"));if(due!=null&&due.after(now))matches++;}if(bidTotalValue!=null)bidTotalValue.setText(String.valueOf(collected.size()));if(matchTotalValue!=null)matchTotalValue.setText(String.valueOf(matches));if(collectedCount!=null)collectedCount.setText(matches+" open matching tenders • "+collected.size()+" bids collected");}
+ private void updateCollectedCount(){int matches=0;Date now=new Date();for(JSONObject j:matchingBids.values()){if(shortlisted.containsKey(j.optString("bidId")))continue;Date due=parsedDeadline(j.optString("deadlineText"));if(due!=null&&due.after(now))matches++;}if(bidTotalValue!=null)bidTotalValue.setText(String.valueOf(collected.size()));if(matchTotalValue!=null)matchTotalValue.setText(String.valueOf(matches));if(collectedCount!=null)collectedCount.setText(matches+" open matching tenders • "+collected.size()+" bids collected");}
  // Search data is session-only; shortlist records and their saved reviews are permanent.
  private void clearPreviousSearchSession(){
-  collected.clear();
+  collected.clear();matchingBids.clear();
   getPreferences(0).edit().remove("gem_collected").apply();
  }
  private void restoreCollected(){
-  try{JSONArray a=new JSONArray(getPreferences(0).getString("gem_collected","[]"));for(int i=0;i<a.length();i++){JSONObject j=a.optJSONObject(i);if(j!=null&&!j.optString("bidId").isEmpty())collected.put(j.optString("bidId"),j);}}catch(Exception ignored){}
+  try{JSONArray a=new JSONArray(getPreferences(0).getString("gem_collected","[]"));for(int i=0;i<a.length();i++){JSONObject j=a.optJSONObject(i);if(j!=null&&!j.optString("bidId").isEmpty())indexCollectedBid(j.optString("bidId"),j);}}catch(Exception ignored){}
  }
  private void persistCollected(){
   JSONArray a=new JSONArray();for(JSONObject j:collected.values())a.put(j);
@@ -260,6 +268,7 @@ public class GemBrowserActivity extends Activity {
     JSONObject payload=new JSONObject(decoded);if(payload.has("error")){state.setText("GeM collection error: "+payload.optString("error"));return;}
     JSONArray items=payload.optJSONArray("items");if(items==null)throw new Exception("Missing items");int added=0;
     boolean shortlistChanged=false;
+    boolean resultsChanged=false, detailsChanged=false;
     for(int i=0;i<items.length();i++){
      JSONObject j=items.optJSONObject(i);if(j==null)continue;String id=j.optString("bidId");
      if(!id.matches("GEM/20\\d{2}/B/\\d+"))continue;
@@ -273,16 +282,33 @@ public class GemBrowserActivity extends Activity {
      }
      JSONObject old = collected.get(id);
      if (old == null) {
-      collected.put(id, j);
+      indexCollectedBid(id, j);
+      resultsChanged |= matchingBids.containsKey(id);
       added++;
      } else {
-      if (validDeadline) old.put("deadlineText", deadline);
-      if (old.optString("buyer").isEmpty() && !j.optString("buyer").isEmpty()) old.put("buyer", j.optString("buyer"));
-      if (old.optJSONArray("documentLinks") == null && j.optJSONArray("documentLinks") != null) old.put("documentLinks", j.optJSONArray("documentLinks"));
+      boolean updated = false;
+      if (validDeadline && !deadline.equals(old.optString("deadlineText"))) {
+       old.put("deadlineText", deadline);
+       updated = true;
+      }
+      if (old.optString("buyer").isEmpty() && !j.optString("buyer").isEmpty()) {
+       old.put("buyer", j.optString("buyer"));
+       updated = true;
+      }
+      if (old.optJSONArray("documentLinks") == null && j.optJSONArray("documentLinks") != null) {
+       old.put("documentLinks", j.optJSONArray("documentLinks"));
+       updated = true;
+      }
+      detailsChanged |= updated;
+      resultsChanged |= updated && matchingBids.containsKey(id);
      }
     }
     if (shortlistChanged) persistShortlist();
-    persistCollected();updateCollectedCount();if(showingDashboard)renderDashboard();scheduleAutoReview();
+    if (added > 0 || detailsChanged || shortlistChanged) persistCollected();
+    updateCollectedCount();
+    long minute = System.currentTimeMillis() / 60000;
+    if (showingDashboard && (resultsChanged || minute != lastDashboardMinute)) renderDashboard();
+    scheduleAutoReview();
     state.setText("Detected "+items.length()+" GeM bid IDs; saved "+added+" new bids.");
     if (batchRunning) {
      checkpointScan();
@@ -463,9 +489,9 @@ public class GemBrowserActivity extends Activity {
  private String currentReviewId="";
  private final Runnable autoReviewTask=()->{
   if(autoReviewActive||aiConnectionPaused||!showingDashboard)return;
-  for(JSONObject bid:collected.values()){
+  for(JSONObject bid:matchingBids.values()){
    String id=bid.optString("bidId");
-   if(shortlisted.containsKey(id)||!relevantTitle(bid.optString("title"))||aiReviews.containsKey(id)||analyzingBids.contains(id)||failedAutoReviews.contains(id)||apiFailedReviews.contains(id))continue;
+   if(shortlisted.containsKey(id)||aiReviews.containsKey(id)||analyzingBids.contains(id)||failedAutoReviews.contains(id)||apiFailedReviews.contains(id))continue;
    Date due=parsedDeadline(bid.optString("deadlineText"));
    if(due==null||!due.after(new Date()))continue;
    autoReviewActive=true;currentReviewId=id;analyzeInline(bid);return;
@@ -859,6 +885,7 @@ public class GemBrowserActivity extends Activity {
    return;
   }
   dashboardRefreshPending = false;
+  lastDashboardMinute = System.currentTimeMillis() / 60000;
   while(dashboardList.getChildCount()>1)dashboardList.removeViewAt(1);
   int white=dynamicText(),muted=dynamicMuted(),teal=dynamicPrimary();
   if(managementHeaderButton!=null){managementHeaderButton.setText(String.valueOf(shortlisted.size()));managementHeaderButton.setContentDescription("Tender management, "+shortlisted.size()+" saved");}
@@ -867,8 +894,8 @@ public class GemBrowserActivity extends Activity {
   ArrayList<JSONObject> open=new ArrayList<>();int expired=0,analyzed=0;
   ArrayList<JSONObject> unknownDeadlines = new ArrayList<>();
   Date now=new Date();
-  for(JSONObject j:collected.values()){
-   if(shortlisted.containsKey(j.optString("bidId"))||!relevantTitle(j.optString("title")))continue;
+  for(JSONObject j:matchingBids.values()){
+   if(shortlisted.containsKey(j.optString("bidId")))continue;
    Date due=parsedDeadline(j.optString("deadlineText"));
    if(due==null){unknownDeadlines.add(j);continue;}
    if(!due.after(now)){expired++;continue;}
@@ -970,8 +997,7 @@ public class GemBrowserActivity extends Activity {
   if(collected.isEmpty()){state.setText("No bids collected. Search GeM, then tap Collect visible bids.");return;}
   ArrayList<JSONObject> matches=new ArrayList<>();int expired=0,unverified=0;
   Date now=new Date();
-  for(JSONObject j:collected.values()){
-   if(!relevantTitle(j.optString("title")))continue;
+  for(JSONObject j:matchingBids.values()){
    Date due=parsedDeadline(j.optString("deadlineText"));
    if(due==null){unverified++;continue;}
    if(!due.after(now)){expired++;continue;}
@@ -991,7 +1017,7 @@ public class GemBrowserActivity extends Activity {
   ScrollView scroll=new ScrollView(this);scroll.addView(content);
   new android.app.AlertDialog.Builder(this).setTitle("Qualified GeM candidates").setView(scroll)
    .setPositiveButton("Close",null)
-   .setNeutralButton("Clear collected bids",(d,w)->new android.app.AlertDialog.Builder(this).setTitle("Clear collected bids?").setNegativeButton("Cancel",null).setPositiveButton("Clear",(x,y)->{collected.clear();persistCollected();updateCollectedCount();}).show()).show();
+   .setNeutralButton("Clear collected bids",(d,w)->new android.app.AlertDialog.Builder(this).setTitle("Clear collected bids?").setNegativeButton("Cancel",null).setPositiveButton("Clear",(x,y)->{collected.clear();matchingBids.clear();persistCollected();updateCollectedCount();}).show()).show();
  }
  private void openBidPdf(JSONObject bid){
   String id=bid.optString("bidId","");
