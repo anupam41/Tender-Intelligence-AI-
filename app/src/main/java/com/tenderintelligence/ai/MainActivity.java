@@ -20,9 +20,16 @@ public class MainActivity extends Activity {
  final ExecutorService pool=Executors.newSingleThreadExecutor();
  LinearLayout root; EditText key, model, title, deadline, body; TextView status, saved; LinearLayout resultCards, shortlistCards; TextView kpiFound,kpiFiltered,kpiSaved; EditText resultFilter; Button scanButton; LinearLayout manualTools; volatile boolean scanRunning=false; final ArrayList<JSONObject> lastResults=new ArrayList<>();
  final ArrayList<String> records=new ArrayList<>();
- final String[] keywords={"heat exchanger","shell and tube","tube bundle","condenser","surface condenser","cooler","oil cooler","air cooler","water cooler","intercooler","aftercooler","pressure vessel","storage vessel","storage tank","receiver","reactor","column","tower","separator","scrubber","demister","evaporator","reboiler","heater","feedwater heater","air preheater","economizer","radiator","chiller","heat recovery","waste heat","steam generator","boiler","tube sheet","tubesheet","baffle","tube expansion","tube replacement","retubing","tube insertion","fabrication","mechanical equipment","process equipment","piping","shell","fin tube"};
+ final String[] keywords = EquipmentKeywords.ALL_KEYWORDS;
  static final int OPEN_TXT=8, SAVE_CSV=9, OPEN_PDF=10;
- @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(themeColor(0xfff4faf7,0xff0a121a));getWindow().setNavigationBarColor(themeColor(0xfff4faf7,0xff0a121a));loadRecords();draw();}
+ @Override public void onCreate(Bundle b){
+  super.onCreate(b);
+  getWindow().setStatusBarColor(themeColor(0xfff4faf7,0xff0a121a));
+  getWindow().setNavigationBarColor(themeColor(0xfff4faf7,0xff0a121a));
+  loadRecords();
+  draw();
+  checkUpcomingDeadlines();
+ }
  void showApiSettings(){
   LinearLayout layout=new LinearLayout(this);layout.setOrientation(1);layout.setPadding(dp(18),dp(8),dp(18),dp(8));
   TextView info=text("Keys are held in memory only and are not saved. GeM public bid search needs no search API key. OpenRouter is optional for AI document analysis.",13);info.setTextColor(themeColor(0xff61777b,0xffb4c9cd));layout.addView(info);
@@ -36,7 +43,18 @@ public class MainActivity extends Activity {
    .setPositiveButton("Save for this session",(d,w)->{key.setText(router.getText());status.setText("API settings updated for this session.");}).show();
  }
  void officialPortals(){startActivity(new Intent(this,GemBrowserActivity.class));}
- void showKeywords(){TextView info=text(EquipmentKeywords.list(),14);info.setTextColor(themeColor(0xff1b2d31,0xffeff9f8));info.setPadding(dp(16),dp(12),dp(16),dp(12));ScrollView scroll=new ScrollView(this);scroll.addView(info);new AlertDialog.Builder(this).setTitle("Equipment keywords — GeM only").setView(scroll).setPositiveButton("Done",null).show();}
+ void showKeywords(){
+  TextView info = text(EquipmentKeywords.list(), 13);
+  info.setTextColor(themeColor(0xff1b2d31, 0xffeff9f8));
+  info.setPadding(dp(16), dp(12), dp(16), dp(12));
+  ScrollView scroll = new ScrollView(this);
+  scroll.addView(info);
+  new AlertDialog.Builder(this)
+   .setTitle("Target Keywords (" + EquipmentKeywords.ALL_KEYWORDS.length + ")")
+   .setView(scroll)
+   .setPositiveButton("Done", null)
+   .show();
+ }
  void searchTenders(){
   if(scanRunning){status.setText("A GeM scan is already running. Please wait.");return;}
   scanRunning=true;if(scanButton!=null){scanButton.setEnabled(false);scanButton.setText("SEARCHING GEM — PLEASE WAIT");}
@@ -152,17 +170,115 @@ public class MainActivity extends Activity {
  saved=text("",14);saved.setTextColor(themeColor(0xff1b2d31,0xffeff9f8));manualTools.addView(saved);refresh();
  }
  void refresh(){renderShortlist();if(kpiSaved!=null)kpiSaved.setText(String.valueOf(records.size()));StringBuilder s=new StringBuilder("Saved tenders: "+records.size()+"\n");for(int i=records.size()-1;i>=0&&i>=records.size()-20;i--){try{JSONObject j=new JSONObject(records.get(i));s.append("\n").append(j.optString("title")).append(" • ").append(j.optString("verdict")).append(" • ").append(j.optString("deadline")).append("\n");}catch(Exception ignored){}}saved.setText(s.toString());}
- void loadRecords(){String raw=getPreferences(0).getString("records","[]");try{JSONArray a=new JSONArray(raw);for(int i=0;i<a.length();i++)records.add(a.getString(i));}catch(Exception ignored){}}
- void persist(){getPreferences(0).edit().putString("records",new JSONArray(records).toString()).apply();}
- int score(String value){int score=0;String t=value.toLowerCase(Locale.ROOT);for(String k:keywords)if(t.contains(k))score+=20;return Math.min(100,score);}
+ void loadRecords(){
+  records.clear();
+  String raw=getPreferences(0).getString("records","");
+  if(!raw.isEmpty() && !raw.equals("[]")){
+   try{
+    JSONArray a=new JSONArray(raw);
+    for(int i=0;i<a.length();i++){
+     JSONObject j=new JSONObject(a.getString(i));
+     TenderDatabase.getInstance(this).insertOrUpdate(
+      j.optString("bidId"), j.optString("title"), j.optString("deadline"), j.optInt("score"), j.optString("verdict"), j.optString("text")
+     );
+    }
+    getPreferences(0).edit().remove("records").apply();
+   }catch(Exception ignored){}
+  }
+  ArrayList<JSONObject> dbList = TenderDatabase.getInstance(this).getAllTenders();
+  for(JSONObject j : dbList) records.add(j.toString());
+ }
+ void persist(){}
+ int score(String value){
+  ArrayList<String> matched = EquipmentKeywords.getMatchedKeywords(value);
+  return Math.min(100, matched.size() * 25);
+ }
  boolean expired(String d){return d.matches("\\d{4}-\\d{2}-\\d{2}")&&d.compareTo(new java.text.SimpleDateFormat("yyyy-MM-dd",Locale.US).format(new Date()))<0;}
- void save(){try{String t=title.getText().toString().trim(),d=deadline.getText().toString().trim(),b=body.getText().toString();if(t.isEmpty()){status.setText("Enter tender title.");return;}int sc=score(t+" "+b);String verdict=expired(d)?"EXPIRED":sc>=40?"SHORTLIST":sc>0?"REVIEW":"NO MATCH";JSONObject j=new JSONObject();j.put("title",t);j.put("deadline",d);j.put("score",sc);j.put("verdict",verdict);j.put("text",b);records.add(j.toString());persist();status.setText("Saved • "+verdict+" • score "+sc);refresh();}catch(Exception e){status.setText(e.toString());}}
+ void save(){
+  try{
+   String t=title.getText().toString().trim(),d=deadline.getText().toString().trim(),b=body.getText().toString();
+   if(t.isEmpty()){status.setText("Enter tender title.");return;}
+   int sc=score(t+" "+b);
+   String verdict=expired(d)?"EXPIRED":sc>=40?"SHORTLIST":sc>0?"REVIEW":"NO MATCH";
+   TenderDatabase.getInstance(this).insertOrUpdate(null, t, d, sc, verdict, b);
+   loadRecords();
+   status.setText("Saved to SQLite DB • "+verdict+" • score "+sc);
+   refresh();
+  }catch(Exception e){
+   status.setText(e.toString());
+  }
+ }
+ void checkUpcomingDeadlines(){
+  ArrayList<JSONObject> upcoming = TenderDatabase.getInstance(this).getUpcomingDeadlines(3);
+  if(!upcoming.isEmpty()){
+   StringBuilder sb=new StringBuilder("⚠️ Attention: "+upcoming.size()+" tender(s) closing within 72h:\n");
+   for(JSONObject j:upcoming){
+    sb.append("• ").append(j.optString("title")).append(" (Due: ").append(j.optString("deadline")).append(")\n");
+   }
+   status.setText(sb.toString().trim());
+  }
+ }
  String request(String url,String method,String token,String payload)throws Exception{HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection();c.setRequestMethod(method);c.setConnectTimeout(20000);c.setReadTimeout(40000);c.setRequestProperty("Accept","application/json");if(token!=null)c.setRequestProperty("Authorization","Bearer "+token);if(payload!=null){c.setDoOutput(true);c.setRequestProperty("Content-Type","application/json");try(OutputStream out=c.getOutputStream()){out.write(payload.getBytes(StandardCharsets.UTF_8));}}int code=c.getResponseCode();InputStream in=code<400?c.getInputStream():c.getErrorStream();String data=new String(readBytes(in,4000000),StandardCharsets.UTF_8);c.disconnect();if(code>=400)throw new IOException("HTTP "+code+": "+data.substring(0,Math.min(300,data.length())));return data;}
  byte[] readBytes(InputStream in,int limit)throws IOException {ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] buf=new byte[8192];int n;while((n=in.read(buf))!=-1){if(out.size()+n>limit)throw new IOException("File or response exceeds "+limit+" bytes");out.write(buf,0,n);}return out.toByteArray();}
  void background(Callable<String> task){status.setText("Working...");pool.execute(()->{try{String result=task.call();runOnUiThread(()->status.setText(result));}catch(Exception e){runOnUiThread(()->status.setText("Error: "+e.getMessage()));}});}
  void chooseModel(){String token=key.getText().toString().trim();background(()->{JSONObject json=new JSONObject(request("https://openrouter.ai/api/v1/models","GET",token.isEmpty()?null:token,null));JSONArray arr=json.getJSONArray("data");ArrayList<String> ids=new ArrayList<>();for(int i=0;i<arr.length();i++)ids.add(arr.getJSONObject(i).getString("id"));Collections.sort(ids);runOnUiThread(()->{EditText filter=new EditText(this);filter.setSingleLine(true);filter.setHint("Search model name...");LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(dp(16),0,dp(16),0);panel.addView(filter);ListView list=new ListView(this);panel.addView(list,new LinearLayout.LayoutParams(-1,dp(380)));ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_list_item_1,new ArrayList<>(ids));list.setAdapter(adapter);AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Choose OpenRouter model").setView(panel).setNegativeButton("Cancel",null).create();filter.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){adapter.getFilter().filter(s);}public void afterTextChanged(android.text.Editable e){}});list.setOnItemClickListener((parent,v,pos,id)->{model.setText(adapter.getItem(pos));dialog.dismiss();});dialog.show();});return "Loaded "+ids.size()+" models. Search and select one.";});}
- void analyze(){String token=key.getText().toString().trim(),m=model.getText().toString().trim(),t=title.getText().toString(),b=body.getText().toString();if(token.isEmpty()||m.isEmpty()||b.isEmpty()){status.setText("Enter API key, model and tender text.");return;}background(()->{JSONObject payload=new JSONObject();payload.put("model",m);JSONArray msgs=new JSONArray();msgs.put(new JSONObject().put("role","system").put("content","You analyze Indian industrial equipment tenders. Summarize equipment, quantities, eligibility, risks and relevance. Do not invent missing details. Flag expired dates."));msgs.put(new JSONObject().put("role","user").put("content","Tender: "+t+"\n"+b.substring(0,Math.min(b.length(),20000))));payload.put("messages",msgs);JSONObject response=new JSONObject(request("https://openrouter.ai/api/v1/chat/completions","POST",token,payload.toString()));return response.getJSONArray("choices").getJSONObject(0).getJSONObject("message").optString("content","No response");});}
+ void analyze(){
+  String token=key.getText().toString().trim(),m=model.getText().toString().trim(),t=title.getText().toString(),b=body.getText().toString();
+  if(token.isEmpty()||m.isEmpty()||b.isEmpty()){status.setText("Enter API key, model and tender text.");return;}
+  status.setText("Analyzing tender with "+m+"...");
+  pool.execute(()->{
+   try{
+    JSONObject payload=new JSONObject();
+    payload.put("model",m);
+    JSONArray msgs=new JSONArray();
+    msgs.put(new JSONObject().put("role","system").put("content",
+     "You are an expert Indian Government Tender Intelligence AI (GeM, CPPP, IREPS).\n"
+     + "Analyze this tender and provide a structured intelligence report:\n"
+     + "🎯 SCOPE & BUYER: Authority/Buyer name, work summary, required quantities.\n"
+     + "💰 FINANCIALS: Estimated value, EMD amount, PBG %, Annual Turnover requirement.\n"
+     + "📅 DATES: Bid submission deadline (format: YYYY-MM-DD), Pre-bid meeting date.\n"
+     + "✅ ELIGIBILITY: Past experience years, required certifications/licenses, Make-in-India preference.\n"
+     + "⚠️ RISKS & CLAUSES: Liquidated damages (LD), delivery schedule, payment milestones.\n"
+     + "⚖️ VERDICT: [GO / NO-GO / REVIEW] with 1-sentence rationale.\n\n"
+     + "State 'Not specified' if missing. Do not invent facts."
+    ));
+    msgs.put(new JSONObject().put("role","user").put("content","Tender Title: "+t+"\nDocument:\n"+b.substring(0,Math.min(b.length(),25000))));
+    payload.put("messages",msgs);
+    JSONObject response=new JSONObject(request("https://openrouter.ai/api/v1/chat/completions","POST",token,payload.toString()));
+    String report=response.getJSONArray("choices").getJSONObject(0).getJSONObject("message").optString("content","No response received from AI model.");
+
+    java.util.regex.Matcher dm=java.util.regex.Pattern.compile("\\b(202[4-9]-\\d{2}-\\d{2})\\b").matcher(report);
+    String extractedDate = dm.find() ? dm.group(1) : "";
+
+    runOnUiThread(()->{
+     status.setText("Tender analysis ready.");
+     if(!extractedDate.isEmpty() && deadline.getText().toString().trim().isEmpty()){
+      deadline.setText(extractedDate);
+     }
+     showAnalysisDialog(t, report);
+    });
+   }catch(Exception e){
+    runOnUiThread(()->status.setText("AI Error: "+e.getMessage()));
+   }
+  });
+ }
+ void showAnalysisDialog(String titleText, String report){
+  LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(dp(18),dp(12),dp(18),dp(12));
+  TextView content=text(report,14);content.setTextIsSelectable(true);content.setTextColor(themeColor(0xff1b2d31,0xffeff9f8));panel.addView(content);
+  ScrollView scroll=new ScrollView(this);scroll.addView(panel);
+  new AlertDialog.Builder(this)
+   .setTitle("AI Tender Intelligence Report")
+   .setView(scroll)
+   .setNeutralButton("Copy Report",(d,w)->{
+    android.content.ClipboardManager cm=(android.content.ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
+    cm.setPrimaryClip(android.content.ClipData.newPlainText("Tender Report",report));
+    Toast.makeText(this,"Report copied to clipboard",Toast.LENGTH_SHORT).show();
+   })
+   .setPositiveButton("Save Tender",(d,w)->save())
+   .setNegativeButton("Close",null)
+   .show();
+ }
  String csv(String s){return "\""+s.replace("\"","\"\"").replace("\n"," ")+"\"";}
- @Override protected void onActivityResult(int req,int result,Intent data){super.onActivityResult(req,result,data);if(result!=RESULT_OK||data==null)return;try{if(req==OPEN_PDF){android.net.Uri uri=data.getData();status.setText("Extracting PDF text...");pool.execute(()->{try{PdfTenderReader.Result r=PdfTenderReader.read(this,uri);runOnUiThread(()->{body.setText(r.text);if(!r.bidId.isEmpty())title.setText("GeM Tender "+r.bidId);if(!r.deadline.isEmpty())deadline.setText(r.deadline);status.setText("PDF imported: "+r.pages+" pages\nBid: "+(r.bidId.isEmpty()?"Unknown":r.bidId)+"\nDeadline: "+(r.deadline.isEmpty()?"Unknown":r.deadline)+" ("+r.deadlineStatus+")\nEquipment: "+(r.keywords.isEmpty()?"No equipment keywords matched":r.keywords)+"\nImported document is NOT independently verified.");});}catch(Exception e){runOnUiThread(()->status.setText("PDF error: "+e.getMessage()));}});}else if(req==OPEN_TXT){try(InputStream in=getContentResolver().openInputStream(data.getData())){byte[] bytes=readBytes(in,1000000);if(bytes.length>1000000){status.setText("TXT too large (max 1 MB).");return;}body.setText(new String(bytes,StandardCharsets.UTF_8));status.setText("TXT imported.");}}else if(req==SAVE_CSV){StringBuilder s=new StringBuilder("Title,Deadline,Score,Verdict\n");for(String r:records){JSONObject j=new JSONObject(r);s.append(csv(j.optString("title"))).append(",").append(csv(j.optString("deadline"))).append(",").append(j.optInt("score")).append(",").append(csv(j.optString("verdict"))).append("\n");}try(OutputStream out=getContentResolver().openOutputStream(data.getData())){out.write(s.toString().getBytes(StandardCharsets.UTF_8));}status.setText("CSV exported.");}}catch(Exception e){status.setText("File error: "+e.getMessage());}}
+ @Override protected void onActivityResult(int req,int result,Intent data){super.onActivityResult(req,result,data);if(result!=RESULT_OK||data==null)return;try{if(req==OPEN_PDF){android.net.Uri uri=data.getData();status.setText("Extracting PDF text...");pool.execute(()->{try{PdfTenderReader.Result r=PdfTenderReader.read(this,uri);runOnUiThread(()->{body.setText(r.text);if(!r.bidId.isEmpty())title.setText("GeM Tender "+r.bidId);if(!r.deadline.isEmpty())deadline.setText(r.deadline);status.setText((r.isOcr ? "Scanned PDF imported (via ML Kit OCR): " : "PDF imported: ")+r.pages+" pages\nBid: "+(r.bidId.isEmpty()?"Unknown":r.bidId)+"\nDeadline: "+(r.deadline.isEmpty()?"Unknown":r.deadline)+" ("+r.deadlineStatus+")\nEquipment: "+(r.keywords.isEmpty()?"No equipment keywords matched":r.keywords)+"\nImported document is NOT independently verified.");});}catch(Exception e){runOnUiThread(()->status.setText("PDF error: "+e.getMessage()));}});}else if(req==OPEN_TXT){try(InputStream in=getContentResolver().openInputStream(data.getData())){byte[] bytes=readBytes(in,1000000);if(bytes.length>1000000){status.setText("TXT too large (max 1 MB).");return;}body.setText(new String(bytes,StandardCharsets.UTF_8));status.setText("TXT imported.");}}else if(req==SAVE_CSV){StringBuilder s=new StringBuilder("Title,Deadline,Score,Verdict\n");for(String r:records){JSONObject j=new JSONObject(r);s.append(csv(j.optString("title"))).append(",").append(csv(j.optString("deadline"))).append(",").append(j.optInt("score")).append(",").append(csv(j.optString("verdict"))).append("\n");}try(OutputStream out=getContentResolver().openOutputStream(data.getData())){out.write(s.toString().getBytes(StandardCharsets.UTF_8));}status.setText("CSV exported.");}}catch(Exception e){status.setText("File error: "+e.getMessage());}}
  @Override protected void onDestroy(){pool.shutdownNow();super.onDestroy();}
 }

@@ -62,7 +62,8 @@ public final class TenderSearch {
   Stats stats=new Stats();LinkedHashMap<String,JSONObject> found=new LinkedHashMap<>();
   progress.update("Opening GeM public bid listings and starting a session…");
   String token=startSession();
-  for(String query:QUERIES){
+  String[] activeQueries = EquipmentKeywords.getActiveQueries();
+  for(String query : (activeQueries != null && activeQueries.length > 0 ? activeQueries : QUERIES)){
    progress.update("Searching GeM for: "+query+" • "+found.size()+" matching bids collected");
    for(int p=1;p<=MAX_PAGES_PER_QUERY;p++){
     progress.update("GeM: "+query+" • page "+p+"/"+MAX_PAGES_PER_QUERY+" • "+found.size()+" candidates");
