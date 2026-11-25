@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tender Intelligence AI - Windows 11</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M12 3v9l5 5"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h2>Tender Radar</h2>
+          <span>Windows 11 Edition</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-item active" data-tab="tab-gem">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/><path d="M12 6v6l4 2"/></svg>
+          Live GeM Radar
+        </button>
+        <button class="nav-item" data-tab="tab-pdf">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Document & PDF Review
+        </button>
+        <button class="nav-item" data-tab="tab-saved">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          Saved Shortlist
+          <span class="badge" id="badge-saved-count">0</span>
+        </button>
+        <button class="nav-item" data-tab="tab-keywords">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Target Keywords
+        </button>
+        <button class="nav-item" data-tab="tab-settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          AI Settings
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <span class="status-indicator"></span>
+        <span>Windows 11 Online</span>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Top Alert Banner -->
+      <div id="deadline-banner" class="alert-banner hidden">
+        <div class="alert-icon">⚠️</div>
+        <div class="alert-text" id="deadline-banner-text">Loading deadline status...</div>
+      </div>
+
+      <!-- Tab 1: Live GeM Radar -->
+      <section id="tab-gem" class="tab-pane active">
+        <header class="pane-header">
+          <div>
+            <h1>GeM Public Tender Radar</h1>
+            <p>Live automated scanning of open Indian government bids for industrial equipment.</p>
+          </div>
+          <button id="btn-scan-gem" class="btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            Scan GeM Portal Now
+          </button>
+        </header>
+
+        <div class="filter-bar">
+          <input type="text" id="gem-filter" placeholder="Filter by bid ID, title, or department...">
+          <span id="gem-scan-status" class="scan-status-text">Ready to scan.</span>
+        </div>
+
+        <div id="gem-results-list" class="cards-grid">
+          <div class="empty-state">
+            <h3>No Tenders Scanned Yet</h3>
+            <p>Click "Scan GeM Portal Now" to fetch live tenders matching your equipment keywords.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 2: Document & PDF Review -->
+      <section id="tab-pdf" class="tab-pane">
+        <header class="pane-header">
+          <div>
+            <h1>Tender Document & PDF Inspector</h1>
+            <p>Drag and drop a tender PDF or TXT document to inspect equipment terms and run AI evaluation.</p>
+          </div>
+          <button id="btn-open-file" class="btn-secondary">
+            Browse Document...
+          </button>
+        </header>
+
+        <!-- Drag & Drop Zone -->
+        <div id="drop-zone" class="drop-zone">
+          <div class="drop-icon">📂</div>
+          <h3>Drag and drop tender PDF file here</h3>
+          <p>Supports .pdf and .txt Notice Inviting Tender (NIT) documents up to 50MB</p>
+        </div>
+
+        <!-- Split Screen View (Hidden until document opened) -->
+        <div id="doc-inspector" class="split-view hidden">
+          <!-- Left: Document Text & Matched Terms -->
+          <div class="split-pane">
+            <div class="pane-titlebar">
+              <span id="doc-file-name" class="doc-badge">document.pdf</span>
+              <span id="doc-page-count" class="meta-tag">0 pages</span>
+              <span id="doc-score-tag" class="score-tag">Score: 0</span>
+            </div>
+
+            <div class="doc-meta-fields">
+              <input type="text" id="doc-title-input" placeholder="Tender Title">
+              <input type="text" id="doc-deadline-input" placeholder="Deadline (YYYY-MM-DD)">
+            </div>
+
+            <div class="keywords-matched-box">
+              <strong>Detected Keywords:</strong>
+              <div id="doc-matched-chips" class="chip-container">None</div>
+            </div>
+
+            <div class="doc-text-container">
+              <textarea id="doc-text-area" readonly placeholder="Extracted text will appear here..."></textarea>
+            </div>
+          </div>
+
+          <!-- Right: AI Intelligence Report -->
+          <div class="split-pane">
+            <div class="pane-titlebar">
+              <h3>AI Tender Intelligence Report</h3>
+              <div class="action-buttons">
+                <button id="btn-run-ai" class="btn-primary-sm">Analyze with AI</button>
+                <button id="btn-save-doc" class="btn-secondary-sm">Save to Shortlist</button>
+              </div>
+            </div>
+
+            <div id="ai-loading" class="ai-loading hidden">
+              <div class="spinner"></div>
+              <span>Analyzing tender requirements, EMD, and risk clauses...</span>
+            </div>
+
+            <div id="ai-report-view" class="report-box">
+              <p class="placeholder-text">Click "Analyze with AI" to extract scope, financials, deadlines, and a Go/No-Go verdict.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 3: Saved Shortlist -->
+      <section id="tab-saved" class="tab-pane">
+        <header class="pane-header">
+          <div>
+            <h1>Saved Tender Shortlist</h1>
+            <p>Offline persistent database of your shortlisted bids and intelligence reviews.</p>
+          </div>
+          <button id="btn-export-csv" class="btn-secondary">
+            Export to CSV
+          </button>
+        </header>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Verdict</th>
+                <th>Tender Title & Bid ID</th>
+                <th>Deadline</th>
+                <th>Relevance Score</th>
+                <th>Matched Keywords</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="saved-table-body">
+              <tr>
+                <td colspan="6" class="empty-cell">No tenders shortlisted yet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Tab 4: Target Keywords -->
+      <section id="tab-keywords" class="tab-pane">
+        <header class="pane-header">
+          <div>
+            <h1>Target Equipment Keywords</h1>
+            <p>The exact equipment keywords monitored across GeM public portals and PDF tender documents.</p>
+          </div>
+        </header>
+
+        <div id="keywords-grouped-view" class="keywords-grid">
+          <!-- Injected via renderer.js -->
+        </div>
+      </section>
+
+      <!-- Tab 5: Settings -->
+      <section id="tab-settings" class="tab-pane">
+        <header class="pane-header">
+          <div>
+            <h1>AI & Application Settings</h1>
+            <p>Configure OpenRouter API credentials and default LLM models.</p>
+          </div>
+          <button id="btn-save-settings" class="btn-primary">Save Settings</button>
+        </header>
+
+        <div class="settings-form">
+          <div class="form-group">
+            <label for="setting-openrouter-key">OpenRouter API Key</label>
+            <input type="password" id="setting-openrouter-key" placeholder="sk-or-v1-...">
+            <small>Keys are stored securely in your local user profile (`~/.tender_intelligence`).</small>
+          </div>
+
+          <div class="form-group">
+            <label for="setting-model-id">AI Model ID</label>
+            <input type="text" id="setting-model-id" value="openai/gpt-4o-mini" placeholder="e.g. anthropic/claude-3.5-sonnet or openai/gpt-4o-mini">
+            <small>Supports any OpenRouter model (GPT-4o, Claude 3.5 Sonnet, Gemini 1.5 Pro, Llama 3).</small>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

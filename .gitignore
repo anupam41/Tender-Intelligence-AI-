@@ -6,3 +6,7 @@ local.properties
 *.keystore
 *.apk
 .idea/
+node_modules/
+desktop/node_modules/
+desktop/dist/
+*.log
