@@ -93,8 +93,9 @@ const SEARCH_QUERIES = [
 ];
 
 function normalize(text) {
-  if (!text) return "";
-  return text.toLowerCase().replace(/[-_]/g, " ").replace(/[“”"]/g, "").replace(/\s+/g, " ").trim();
+  if (text === null || text === undefined) return "";
+  let str = (typeof text === 'string') ? text : (Array.isArray(text) ? text.join(' ') : String(text));
+  return str.toLowerCase().replace(/[-_]/g, " ").replace(/[“”"]/g, "").replace(/\s+/g, " ").trim();
 }
 
 function matches(text) {

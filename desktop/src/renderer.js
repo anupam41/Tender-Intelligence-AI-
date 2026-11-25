@@ -92,7 +92,10 @@ function setupGeMScanner() {
   });
 }
 
+let currentRenderedGeMItems = [];
+
 function renderGeMCards(items) {
+  currentRenderedGeMItems = items || [];
   const list = document.getElementById('gem-results-list');
   if (!items || items.length === 0) {
     list.innerHTML = `
@@ -103,52 +106,59 @@ function renderGeMCards(items) {
     return;
   }
 
-  list.innerHTML = items.map(item => `
+  list.innerHTML = items.map((item, idx) => `
     <div class="tender-card">
       <div class="card-top">
-        <span class="bid-badge">${item.bidId || 'BID ID PENDING'}</span>
-        ${item.deadline ? `<span class="deadline-badge">Due: ${item.deadline}</span>` : ''}
+        <span class="bid-badge">${escapeHtml(item.bidId || 'BID ID PENDING')}</span>
+        ${item.deadline ? `<span class="deadline-badge">Due: ${escapeHtml(item.deadline)}</span>` : ''}
       </div>
-      <h3>${item.title || 'Untitled Tender'}</h3>
-      <p>${item.snippet || ''}</p>
+      <h3>${escapeHtml(item.title || 'Untitled Tender')}</h3>
+      <p>${escapeHtml(item.snippet || '')}</p>
       <div class="card-actions">
-        <button class="btn-primary-sm" onclick="openTenderURL('${item.url}')">Open GeM Bid</button>
-        <button class="btn-secondary-sm" onclick="inspectGeMBid('${item.bidId}', '${escapeHtml(item.title)}', '${item.deadline || ''}')">Analyze with AI</button>
+        <button class="btn-primary-sm" onclick="openTenderByIndex(${idx})">Open GeM Bid</button>
+        <button class="btn-secondary-sm" onclick="inspectByIndex(${idx})">Analyze with AI</button>
       </div>
     </div>
   `).join('');
 }
 
-window.openTenderURL = (url) => {
-  window.open(url, '_blank');
+window.openTenderByIndex = (idx) => {
+  const item = currentRenderedGeMItems[idx];
+  if (item && item.url) {
+    window.open(item.url, '_blank');
+  }
 };
 
-window.inspectGeMBid = (bidId, title, deadline) => {
+window.inspectByIndex = (idx) => {
+  const item = currentRenderedGeMItems[idx];
+  if (!item) return;
+
   // Switch to PDF tab with prefilled info
   const navPdf = document.querySelector('[data-tab="tab-pdf"]');
   navPdf.click();
 
   document.getElementById('doc-inspector').classList.remove('hidden');
-  document.getElementById('doc-title-input').value = `GeM: ${title}`;
-  document.getElementById('doc-deadline-input').value = deadline || '';
-  document.getElementById('doc-file-name').textContent = bidId || "GeM Bid Document";
+  document.getElementById('doc-title-input').value = `GeM: ${item.title}`;
+  document.getElementById('doc-deadline-input').value = item.deadline || '';
+  document.getElementById('doc-file-name').textContent = item.bidId || "GeM Bid Document";
   document.getElementById('doc-page-count').textContent = "Portal Listing";
   document.getElementById('doc-score-tag').textContent = "Score: 80";
-  document.getElementById('doc-text-area').value = `Bid Number: ${bidId}\nTitle: ${title}\nDeadline: ${deadline}\nSource: GeM Official Portal`;
+  document.getElementById('doc-text-area').value = `Bid Number: ${item.bidId}\nTitle: ${item.title}\nDepartment: ${item.department || ''}\nMinistry: ${item.ministry || ''}\nDeadline: ${item.deadline}\nSource: GeM Official Portal\nURL: ${item.url}`;
 
   currentDoc = {
-    title,
-    bidId,
-    deadline,
-    text: `Bid Number: ${bidId}\nTitle: ${title}\nDeadline: ${deadline}`,
+    title: item.title,
+    bidId: item.bidId,
+    deadline: item.deadline,
+    text: `Bid Number: ${item.bidId}\nTitle: ${item.title}\nDeadline: ${item.deadline}\nDepartment: ${item.department || ''}\nMinistry: ${item.ministry || ''}`,
     score: 80,
     matchedKeywords: ["GeM Portal Bid"]
   };
 };
 
 function escapeHtml(text) {
-  if (!text) return "";
-  return text.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+  if (text === null || text === undefined) return "";
+  let str = (typeof text === 'string') ? text : (Array.isArray(text) ? text.join(' ') : String(text));
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
 // --- Document & PDF Inspector Tab ---

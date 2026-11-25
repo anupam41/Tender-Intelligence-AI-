@@ -102,17 +102,24 @@ function saveSettings(settings) {
   return merged;
 }
 
+function safeStr(val) {
+  if (val === null || val === undefined) return "";
+  if (typeof val === 'string') return val;
+  if (Array.isArray(val)) return val.join(', ');
+  return String(val);
+}
+
 function exportShortlistCSV() {
   const list = loadDB();
   const headers = ["Title", "Bid ID", "Deadline", "Score", "Verdict", "Matched Keywords", "URL"];
   const rows = list.map(item => [
-    `"${(item.title || '').replace(/"/g, '""')}"`,
-    `"${(item.bidId || '').replace(/"/g, '""')}"`,
-    `"${(item.deadline || '').replace(/"/g, '""')}"`,
+    `"${safeStr(item.title).replace(/"/g, '""')}"`,
+    `"${safeStr(item.bidId).replace(/"/g, '""')}"`,
+    `"${safeStr(item.deadline).replace(/"/g, '""')}"`,
     item.score || 0,
-    `"${(item.verdict || '').replace(/"/g, '""')}"`,
-    `"${(Array.isArray(item.keywords) ? item.keywords.join(', ') : (item.keywords || '')).replace(/"/g, '""')}"`,
-    `"${(item.url || '').replace(/"/g, '""')}"`
+    `"${safeStr(item.verdict).replace(/"/g, '""')}"`,
+    `"${safeStr(item.keywords).replace(/"/g, '""')}"`,
+    `"${safeStr(item.url).replace(/"/g, '""')}"`
   ]);
 
   return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');

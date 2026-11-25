@@ -55,20 +55,29 @@ async function getSession() {
   return { token: match[1], cookie };
 }
 
+function first(doc, field) {
+  if (!doc) return "";
+  const v = doc[field];
+  if (Array.isArray(v)) return String(v[0] || "");
+  if (v === null || v === undefined) return "";
+  return String(v);
+}
+
 function parseDeadline(raw) {
   if (!raw) return "";
-  const m = /(20\d{2}-\d{2}-\d{2})/.exec(raw);
+  const m = /(20\d{2}-\d{2}-\d{2})/.exec(String(raw));
   return m ? m[1] : "";
 }
 
 function normalizeDoc(doc) {
-  const id = doc.b_id || "";
-  const bidId = Array.isArray(doc.b_bid_number) ? doc.b_bid_number[0] : (doc.b_bid_number || "");
-  const category = doc.b_category_name || "";
-  const title = doc.bbt_title || category;
-  const dept = doc.ba_official_details_deptName || "";
-  const ministry = doc.ba_official_details_minName || "";
-  const endDate = parseDeadline(doc.final_end_date_sort || doc.b_bid_end_date);
+  const id = first(doc, "b_id");
+  const bidId = first(doc, "b_bid_number");
+  const category = first(doc, "b_category_name");
+  const name = first(doc, "bbt_title");
+  const title = name || category || "Untitled Tender";
+  const dept = first(doc, "ba_official_details_deptName");
+  const ministry = first(doc, "ba_official_details_minName");
+  const endDate = parseDeadline(first(doc, "final_end_date_sort") || first(doc, "b_bid_end_date"));
   const snippet = `${category} • ${dept} • ${ministry} • ${bidId}`;
 
   return {
