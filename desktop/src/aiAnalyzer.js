@@ -1,17 +1,24 @@
-// AI Tender Analysis - OpenRouter Integration
+// AI Tender Analysis - OmniRoute / OpenRouter Gateway Integration
 
 const https = require('https');
+const http = require('http');
+const { URL } = require('url');
 
-async function analyzeTender(apiKey, modelId, title, text) {
+async function analyzeTender(apiKey, modelId, title, text, customBaseUrl) {
   if (!apiKey || !apiKey.trim()) {
-    throw new Error("OpenRouter API key is required. Enter it in Settings.");
+    throw new Error("OmniRoute API key is required. Enter it in Settings.");
   }
   if (!text || text.trim().length < 20) {
     throw new Error("Tender document text is too short to analyze.");
   }
 
   const model = modelId || "openai/gpt-4o-mini";
-  const truncatedText = text.substring(0, 35000); // 35k chars safe context
+  const truncatedText = text.substring(0, 35000);
+
+  const rawUrl = customBaseUrl && customBaseUrl.trim() ? customBaseUrl.trim().replace(/\/+$/, '') : "https://openrouter.ai/api/v1";
+  const endpoint = rawUrl.endsWith('/chat/completions') ? rawUrl : `${rawUrl}/chat/completions`;
+  const urlObj = new URL(endpoint);
+  const client = urlObj.protocol === 'http:' ? http : https;
 
   const systemPrompt = `You are an expert Indian Government Tender Intelligence AI (specializing in GeM, CPPP, and IREPS tenders for industrial equipment like heat exchangers, coolers, boilers, and pressure vessels).
 Analyze this tender and provide a structured intelligence report strictly adhering to this format:
@@ -58,13 +65,13 @@ State 'Not specified' if a detail is absent. Do not invent missing facts.`;
   });
 
   return new Promise((resolve, reject) => {
-    const req = https.request('https://openrouter.ai/api/v1/chat/completions', {
+    const req = client.request(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey.trim()}`,
         'HTTP-Referer': 'https://github.com/anupam41/Tender-Intelligence-AI-',
-        'X-Title': 'Tender Intelligence AI Windows'
+        'X-Title': 'Tender Intelligence AI - OmniRoute Gateway'
       }
     }, (res) => {
       let body = '';
@@ -73,16 +80,14 @@ State 'Not specified' if a detail is absent. Do not invent missing facts.`;
         try {
           const json = JSON.parse(body);
           if (res.statusCode >= 400 || json.error) {
-            reject(new Error(json.error?.message || `OpenRouter HTTP ${res.statusCode}: ${body.substring(0, 200)}`));
+            reject(new Error(json.error?.message || `OmniRoute HTTP ${res.statusCode}: ${body.substring(0, 200)}`));
             return;
           }
           const content = json.choices?.[0]?.message?.content || "No response received.";
           
-          // Extract auto-detected deadline if present
           const dateMatch = /\b(202[4-9]-\d{2}-\d{2})\b/.exec(content);
           const deadline = dateMatch ? dateMatch[1] : null;
 
-          // Extract verdict
           let verdict = "REVIEW";
           if (/\[?GO\]?/i.test(content) && !/NO-GO/i.test(content)) verdict = "GO";
           else if (/NO-GO/i.test(content)) verdict = "NO-GO";
@@ -93,7 +98,7 @@ State 'Not specified' if a detail is absent. Do not invent missing facts.`;
             verdict
           });
         } catch (e) {
-          reject(new Error("Failed to parse AI response: " + e.message));
+          reject(new Error("Failed to parse OmniRoute response: " + e.message));
         }
       });
     });

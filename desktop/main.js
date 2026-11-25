@@ -103,10 +103,12 @@ ipcMain.handle('pdf:parse-file', async (event, filePath) => {
   };
 });
 
-// 3. AI Analysis
+// 3. AI Analysis - OmniRoute Gateway
 ipcMain.handle('ai:analyze', async (event, { title, text }) => {
   const settings = db.loadSettings();
-  return await analyzeTender(settings.openRouterKey, settings.modelId, title, text);
+  const key = settings.omniRouteKey || settings.openRouterKey || "";
+  const baseUrl = settings.omniRouteBaseUrl || "https://openrouter.ai/api/v1";
+  return await analyzeTender(key, settings.modelId, title, text, baseUrl);
 });
 
 // 4. File Open Dialog

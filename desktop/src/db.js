@@ -4,23 +4,50 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const DATA_DIR = path.join(os.homedir(), '.tender_intelligence');
-const DB_FILE = path.join(DATA_DIR, 'saved_tenders.json');
-const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
+function getDataDir() {
+  let dir = null;
+  try {
+    const electron = require('electron');
+    const app = electron.app || (electron.remote && electron.remote.app);
+    if (app && app.getPath) {
+      dir = path.join(app.getPath('userData'), 'tender_intelligence');
+    }
+  } catch (e) {}
 
-function ensureDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+  if (!dir) {
+    const base = process.env.APPDATA || os.homedir();
+    dir = path.join(base, '.tender_intelligence');
+  }
+
+  try {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    return dir;
+  } catch (err) {
+    const fallback = path.join(__dirname, '..', '.data');
+    if (!fs.existsSync(fallback)) {
+      fs.mkdirSync(fallback, { recursive: true });
+    }
+    return fallback;
   }
 }
 
+function getDbFile() {
+  return path.join(getDataDir(), 'saved_tenders.json');
+}
+
+function getSettingsFile() {
+  return path.join(getDataDir(), 'settings.json');
+}
+
 function loadDB() {
-  ensureDir();
-  if (!fs.existsSync(DB_FILE)) {
+  const dbFile = getDbFile();
+  if (!fs.existsSync(dbFile)) {
     return [];
   }
   try {
-    const raw = fs.readFileSync(DB_FILE, 'utf8');
+    const raw = fs.readFileSync(dbFile, 'utf8');
     return JSON.parse(raw);
   } catch (e) {
     return [];
@@ -28,8 +55,8 @@ function loadDB() {
 }
 
 function saveDB(list) {
-  ensureDir();
-  fs.writeFileSync(DB_FILE, JSON.stringify(list, null, 2), 'utf8');
+  const dbFile = getDbFile();
+  fs.writeFileSync(dbFile, JSON.stringify(list, null, 2), 'utf8');
 }
 
 function getAllTenders() {
@@ -79,26 +106,30 @@ function getUpcomingDeadlines(daysAhead = 3) {
 }
 
 function loadSettings() {
-  ensureDir();
-  if (!fs.existsSync(SETTINGS_FILE)) {
+  const settingsFile = getSettingsFile();
+  if (!fs.existsSync(settingsFile)) {
     return {
-      openRouterKey: "",
+      omniRouteKey: "",
+      omniRouteBaseUrl: "https://openrouter.ai/api/v1",
       modelId: "openai/gpt-4o-mini",
-      theme: "dark"
+      theme: "light"
     };
   }
   try {
-    return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+    const data = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+    if (!data.omniRouteKey && data.openRouterKey) data.omniRouteKey = data.openRouterKey;
+    if (!data.omniRouteBaseUrl) data.omniRouteBaseUrl = "https://openrouter.ai/api/v1";
+    return data;
   } catch (e) {
-    return { openRouterKey: "", modelId: "openai/gpt-4o-mini", theme: "dark" };
+    return { omniRouteKey: "", omniRouteBaseUrl: "https://openrouter.ai/api/v1", modelId: "openai/gpt-4o-mini", theme: "light" };
   }
 }
 
 function saveSettings(settings) {
-  ensureDir();
+  const settingsFile = getSettingsFile();
   const current = loadSettings();
   const merged = { ...current, ...settings };
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(merged, null, 2), 'utf8');
+  fs.writeFileSync(settingsFile, JSON.stringify(merged, null, 2), 'utf8');
   return merged;
 }
 
